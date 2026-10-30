@@ -17,7 +17,7 @@
 - Perintah lanjut: `npm run guard`, `npm run lint`, `node app.cjs`, lalu `curl http://localhost:3000/healthz`
 
 ## Blockers
-(kosong)
+- GitHub push belum terkonfirmasi dari lingkungan saat ini; lokal branch `dev` telah di-commit, namun upstream GitHub belum terdaftar/terverifikasi sehingga publikasi ke remote belum dibuktikan.
 
 ## Pertanyaan untuk pemilik proyek
 (kosong)
