@@ -26,6 +26,7 @@ const envSchema = z.object({
   PAYPAL_API_BASE: z.string().url().default('https://api-m.sandbox.paypal.com'),
   JOBENPAY_ENC_KEY: optionalBase64Key,
   JOBENPAY_LEDGER_SIGNING_KEY: optionalBase64Key,
+  JOBENPAY_LEDGER_OLD_PUBLIC_KEYS: z.string().optional(),
   JOBENPAY_HMAC_PEPPER: optionalBase64Key,
 });
 
