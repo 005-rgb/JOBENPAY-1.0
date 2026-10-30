@@ -65,7 +65,8 @@ for (const file of scanPaths) {
   const absolute = path.join(root, file);
   if (!fs.existsSync(absolute)) continue;
   const content = fs.readFileSync(absolute, 'utf8');
-  if (/api-m\.paypal\.com/i.test(content) && !/api-m\.sandbox\.paypal\.com/i.test(content)) {
+  const withoutSandboxHost = content.replace(/api-m\.sandbox\.paypal\.com/ig, '');
+  if (/api-m\.paypal\.com/i.test(withoutSandboxHost)) {
     errors.push(`Live PayPal host found in ${file}. Use sandbox URL only.`);
   }
 }

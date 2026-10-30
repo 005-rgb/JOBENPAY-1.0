@@ -16,6 +16,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/jobenpay'),
   TEST_DATABASE_URL: z.string().optional(),
+  PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
   AI_PROVIDER: z.enum(['anthropic', 'openai', 'replay']).default('replay'),
   AI_MODEL: z.string().optional(),
   AI_API_KEY: z.string().optional(),
@@ -23,7 +24,6 @@ const envSchema = z.object({
   AI_DAILY_BUDGET_USD: z.coerce.number().nonnegative().default(5),
   REGISTRATION_ENABLED: z.coerce.number().int().min(0).max(1).default(0),
   WORKER_ENABLED: z.coerce.number().int().min(0).max(1).default(0),
-  PAYPAL_API_BASE: z.string().url().default('https://api-m.sandbox.paypal.com'),
   JOBENPAY_ENC_KEY: optionalBase64Key,
   JOBENPAY_LEDGER_SIGNING_KEY: optionalBase64Key,
   JOBENPAY_LEDGER_OLD_PUBLIC_KEYS: z.string().optional(),
@@ -31,3 +31,9 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse(process.env);
+if (env.NODE_ENV === 'production' && !process.env.PUBLIC_BASE_URL) {
+  throw new Error('PUBLIC_BASE_URL is required in production.');
+}
+if (env.NODE_ENV === 'production' && !env.PUBLIC_BASE_URL.startsWith('https://')) {
+  throw new Error('PUBLIC_BASE_URL must use HTTPS in production.');
+}
