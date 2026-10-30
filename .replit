@@ -1,0 +1,2 @@
+modules = ["nodejs-22"]
+run = "npm run dev"

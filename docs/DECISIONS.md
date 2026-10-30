@@ -1,0 +1,18 @@
+# DECISIONS
+
+| # | Celah di PRD | Keputusan |
+| --- | --- | --- |
+| D1 | 15.1: `app.cjs` mengimpor `./src/server.js`, tetapi pohon repo menaruh `src/` di dalam `server/` | `app.cjs` memanggil `import('./server/src/server.js')`. Cron: `node server/src/jobs/tick.js`. Skrip: `server/scripts/*.js` (migrate, seed, verify-ledger); `package.json` root menyediakan alias `npm run migrate` dst. |
+| D2 | Struktur paket: kapan `shared/` dan `web/` punya `package.json`? | **Satu `package.json` root** untuk server + shared (impor relatif `../../shared/...`). `web/` punya `package.json` sendiri, memakai `shared/` lewat alias Vite `@shared`. `npm run setup` = `npm --prefix web ci && npm --prefix web run build && npm run migrate && npm run seed`. `web/dist` tidak di-commit; dibangun CI dan `setup`. |
+| D3 | 9.7: rumus `entry_hash` memakai `‖` tanpa encoding; `created_at` timestamptz berpresisi mikrodetik vs JS milidetik | Encoding: `SHA-256(utf8( prev_hash + "\n" + canonical_json(payload) + "\n" + seq + "\n" + org_id + "\n" + type + "\n" + created_at_iso ))`. `created_at_iso` = string ISO-8601 UTC **milidetik** yang dibuat di aplikasi dan disimpan di kolom `created_at` (jangan `now()` DB). `prev_hash` entri pertama = 64 nol. Tanda tangan Ed25519 atas `entry_hash` (hex). |
+| D4 | 10.1: canonical JSON | Fungsi tunggal `canonicalJson()` di `shared/canonical.js`: kunci terurut leksikografis rekursif, tanpa spasi, `undefined` dibuang, angka JSON biasa, tanpa float untuk uang. Dipakai untuk policy, request_hash, ledger. Diuji dengan vektor tetap. |
+| D5 | 10.2: `request_hash` untuk PAYOUT | Payload hash: `{orgId, agentId, mandateVersionId, action, amountMinor (string), currency, payeeId, targetRef: null, documentSha256 (atau null)}`. |
+| D6 | Periode anggaran (`mandate_budget_periods`) dibuat kapan | Dibuat malas (lazy) saat reservasi pertama pada periode berjalan, dalam zona waktu `schedule.timezone`. Periode MONTH = bulan kalender. Reservasi: `UPDATE ... SET reserved_minor = reserved_minor + $x WHERE reserved+spent+$x <= limit` (satu statement atomik; 0 baris = `BUDGET_EXCEEDED`). |
+| D7 | Eksekusi: kapan `reserved` → `spent` | Saat status → EXECUTED (respons PayPal sukses). REJECTED/FAILED/CANCELLED/EXPIRED melepas reservasi. |
+| D8 | Kode alasan | Satu berkas `shared/error-codes.js` berisi semua kode di PRD 9.5 (A, B, C) + kode umum (`UNAUTHENTICATED`, `FORBIDDEN`, `VALIDATION_FAILED`, `NOT_FOUND`, `RATE_LIMITED`, `IDEMPOTENCY_CONFLICT`, `STEP_UP_REQUIRED`, dll.) dengan pesan EN. |
+| D9 | Seed demo | `seed.js` idempoten membuat: org "JOBENPAY Demo", user `owner@`, `judge@` (JUDGE), `approver@`, `viewer@`; kata sandi dari env `SEED_*_PASSWORD` (jika kosong, dibangkitkan acak dan dicetak sekali). Agen demo, mandat demo (US$50 total, US$15 per transaksi, sesuai 9.11), 3 payee sintetis, invoice contoh. Semua berlabel "SYNTHETIC". |
+| D10 | Preset JUDGE di skema | Role disimpan sebagai `memberships.role` ∈ {OWNER, ADMIN, APPROVER, OPERATOR, VIEWER} + kolom `is_judge boolean`. Hak JUDGE = OWNER kecuali kredensial PayPal, manajemen anggota, hapus org (13.3). |
+| D11 | Konfigurasi AI untuk Replit | `AI_PROVIDER` ∈ {`anthropic`, `openai`, `replay`}. Default dev: `replay`. Rekaman di `server/test/ai-eval/recordings/`. UI menampilkan banner "REPLAY MODE" bila `replay`. |
+| D12 | Waktu | Semua timestamp server di UTC; konversi zona hanya untuk jadwal mandat dan tampilan UI. |
+| D13 | Tabel Tier B | Skema tetap dibuat lengkap (agar migrasi tidak berubah), tetapi UI/endpoint Tier B tidak dibuat. |
+| D14 | Hasil spike G0 (PayPal/Passenger) | Ditulis di `docs/SPIKE.md` oleh Anda/agen, lalu keputusan (mis. "Payouts tersedia: ya/tidak, aksi pengganti: ...") disalin ke DECISIONS. |
