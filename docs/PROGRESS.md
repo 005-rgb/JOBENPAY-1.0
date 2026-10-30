@@ -30,7 +30,7 @@
 - PostgreSQL belum aktif di `localhost:5432` sehingga validasi database riil untuk login/session/seed dan migrasi tetap diblokir dari environment ini. Semua pengujian yang memerlukan `TEST_DATABASE_URL` tetap perlu dijalankan pada lingkungan dengan postgres yang hidup.
 - Node.js dan npm tidak tersedia pada PATH environment sesi ini; perintah `npm test`, `npm run lint`, dan `npm run guard` belum dapat dieksekusi.
 - Git tersedia di `C:\\Program Files\\Git\\cmd\\git.exe`; `git diff --check` bersih. Tes, lint, dan guard tetap belum terverifikasi tanpa runtime Node.js 22.
-- Commit implementasi S05: `4cbe4c6 feat(S05): PayPal sandbox connection and webhook receiver`; push masih menunggu validasi dan akses remote.
+- Commit implementasi S05: `4cbe4c6 feat(S05): PayPal sandbox connection and webhook receiver`; push dicoba tetapi tertahan karena kredensial remote tidak tersedia.
 - Push GitHub ditolak karena kredensial tidak tersedia (`Cannot prompt because user interactivity has been disabled`).
 
 ## Pertanyaan untuk pemilik proyek
