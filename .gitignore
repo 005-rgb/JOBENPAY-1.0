@@ -4,5 +4,6 @@ node_modules/
 !.env.example
 coverage/
 dist/
+spike-out/
 .DS_Store
 npm-debug.log*
