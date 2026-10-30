@@ -21,6 +21,7 @@
 - Sudah diverifikasi untuk perubahan ini: pemeriksaan diagnostik editor tidak menemukan error dan `git diff --check` bersih. Tes integration/unit S05 untuk OAuth, redaksi kredensial, verifikasi webhook, deduplikasi, role, rate limit, dan guard sudah ditambahkan.
 - Belum diverifikasi: `npm test`, lint, dan guard tidak dapat dijalankan karena `node`/`npm` tidak tersedia pada PATH; tes DB juga membutuhkan PostgreSQL aktif dan `TEST_DATABASE_URL`.
 - S06 commit lokal `a12cc63 feat(S06): agents, API keys, payees`; `npm test` dicoba tetapi perintah `npm` tidak ditemukan, dan VS Code tidak memiliki test controller. S06 belum dinyatakan DONE sampai `npm test`, `npm run seed` dua kali, lint, dan guard berhasil.
+- Push commit S06 dicoba, tetapi ditolak karena kredensial GitHub tidak tersedia (`Cannot prompt because user interactivity has been disabled`).
 - File utama S12: `server/src/jobs/queue.js`, `server/src/jobs/registry.js`, `server/src/jobs/worker.js`, `server/src/jobs/tick.js`, `server/src/jobs/cleanup.js`, `server/migrations/009_jobs_queue.sql`, `server/test/integration/jobs.test.js`.
 - Referensi `E-S12` di `docs/ROADMAP.md` dan `D18` di `docs/DECISIONS.md` tidak ditemukan pada checkout ini; implementasi mengikuti rincian S12 pada permintaan.
 - Commit lokal: `fa89a6f feat(S12): postgres job queue, worker, tick`; push ke `origin/dev` tertahan karena kredensial GitHub tidak tersedia.
