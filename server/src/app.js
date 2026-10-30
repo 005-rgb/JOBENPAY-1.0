@@ -1,3 +1,6 @@
+import { readdir } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 
 import cookieParser from 'cookie-parser';
@@ -6,6 +9,7 @@ import pinoHttp from 'pino-http';
 import { pino } from 'pino';
 
 import { env } from './config.js';
+import { query } from './db/pool.js';
 import { withTx } from './db/tx.js';
 import { errorHandler } from './lib/errors.js';
 import { verifyPassword } from './lib/crypto.js';
@@ -19,6 +23,7 @@ import { createUser, findUserByEmail, findUserById, resetLoginFailure, updateLog
 import { appendEntry, LEDGER_TYPES } from './services/ledger.js';
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000000';
+const MIGRATIONS_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
 const STEP_UP_PURPOSES = new Set([
   'ACTIVATE_MANDATE',
   'APPROVE_ABOVE_THRESHOLD',
@@ -134,8 +139,42 @@ export function createApp() {
     res.status(200).json({ ok: true, service: 'jobenpay', status: 'healthy' });
   });
 
-  app.get('/readyz', (_req, res) => {
-    res.status(200).json({ ok: true, service: 'jobenpay', status: 'ready' });
+  app.get('/readyz', async (req, res) => {
+    try {
+      const migrations = (await readdir(MIGRATIONS_DIRECTORY))
+        .filter((name) => /^\d+_.*\.sql$/i.test(name))
+        .sort();
+      const latestMigration = migrations.at(-1);
+      const applied = await query(`
+        SELECT filename
+        FROM schema_migrations
+        ORDER BY filename DESC
+        LIMIT 1
+      `);
+      let ready = Boolean(latestMigration && applied.rows[0]?.filename === latestMigration);
+
+      if (ready && env.WORKER_ENABLED === 1) {
+        const heartbeat = await query(`
+          SELECT 1
+          FROM jobs
+          WHERE type = '_worker_heartbeat'
+            AND dedupe_key = '_worker_heartbeat'
+            AND status = 'COMPLETED'
+            AND run_at >= now() - interval '30 seconds'
+          LIMIT 1
+        `);
+        ready = heartbeat.rowCount === 1;
+      }
+
+      res.status(ready ? 200 : 503).json({
+        ok: ready,
+        service: 'jobenpay',
+        status: ready ? 'ready' : 'not_ready',
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Readiness check failed');
+      res.status(503).json({ ok: false, service: 'jobenpay', status: 'not_ready' });
+    }
   });
 
   const api = express.Router();
