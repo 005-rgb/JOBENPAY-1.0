@@ -13,13 +13,14 @@
 | S03 | DONE | feat(S03): hash-chained signed ledger | 2026-10-30 | Service `ledger.js`, CLI verify-ledger, validasi payload guard, dan tes unit/ledger selesai; DB-riil masih menunggu Postgres aktif |
 | S04 | DONE | feat(S04): auth, sessions, RBAC, step-up, seed | 2026-10-30 | App Express 5, repositori auth/session, RBAC, step-up, audit/rate-limit, dan seed dibuat; validasi non-DB serta lint/guard berhasil |
 | S05 | WIP | 4cbe4c6 | 2026-10-30 | PayPal sandbox client, koneksi terenkripsi, penerima webhook, fake server, dan tes sudah ditambahkan; validasi runtime menunggu Node.js 22 dan PostgreSQL |
-| S06 | WIP | pending | 2026-10-30 | Agen, API key, payee, migrasi, seed, dan tes ditambahkan dari prompt S06 pada lampiran; belum divalidasi dengan Node.js/PostgreSQL |
+| S06 | WIP | a12cc63 | 2026-10-30 | Implementasi S06 di-commit; pemeriksaan editor/diff bersih, tetapi test/lint/guard belum dapat dijalankan karena Node.js/npm tidak ada |
 | S12 | WIP | feat(S12): postgres job queue, worker, tick | 2026-10-30 | Queue PostgreSQL, worker, cron tick, cleanup, readiness, metrik, dan tes dibuat; `npm test`/lint/guard belum dapat dijalankan karena Node.js/npm tidak tersedia di environment |
 
 ## Resume (diisi saat WIP)
 - Sudah selesai: S00-S04 dan implementasi S12 (antrean PostgreSQL dengan `SKIP LOCKED`, retry/backoff, worker restart-safe, tick, cleanup periodik, readiness, serta metrik antrean).
 - Sudah diverifikasi untuk perubahan ini: pemeriksaan diagnostik editor tidak menemukan error dan `git diff --check` bersih. Tes integration/unit S05 untuk OAuth, redaksi kredensial, verifikasi webhook, deduplikasi, role, rate limit, dan guard sudah ditambahkan.
 - Belum diverifikasi: `npm test`, lint, dan guard tidak dapat dijalankan karena `node`/`npm` tidak tersedia pada PATH; tes DB juga membutuhkan PostgreSQL aktif dan `TEST_DATABASE_URL`.
+- S06 commit lokal `a12cc63 feat(S06): agents, API keys, payees`; `npm test` dicoba tetapi perintah `npm` tidak ditemukan, dan VS Code tidak memiliki test controller. S06 belum dinyatakan DONE sampai `npm test`, `npm run seed` dua kali, lint, dan guard berhasil.
 - File utama S12: `server/src/jobs/queue.js`, `server/src/jobs/registry.js`, `server/src/jobs/worker.js`, `server/src/jobs/tick.js`, `server/src/jobs/cleanup.js`, `server/migrations/009_jobs_queue.sql`, `server/test/integration/jobs.test.js`.
 - Referensi `E-S12` di `docs/ROADMAP.md` dan `D18` di `docs/DECISIONS.md` tidak ditemukan pada checkout ini; implementasi mengikuti rincian S12 pada permintaan.
 - Commit lokal: `fa89a6f feat(S12): postgres job queue, worker, tick`; push ke `origin/dev` tertahan karena kredensial GitHub tidak tersedia.
@@ -33,6 +34,7 @@
 ## Blockers
 - PostgreSQL belum aktif di `localhost:5432` sehingga validasi database riil untuk login/session/seed dan migrasi tetap diblokir dari environment ini. Semua pengujian yang memerlukan `TEST_DATABASE_URL` tetap perlu dijalankan pada lingkungan dengan postgres yang hidup.
 - Node.js dan npm tidak tersedia pada PATH environment sesi ini; perintah `npm test`, `npm run lint`, dan `npm run guard` belum dapat dieksekusi.
+- Validasi S06 aktual terblokir: `npm test` berhenti pada `npm is not recognized`; tes database juga memerlukan PostgreSQL aktif dan `TEST_DATABASE_URL`.
 - Git tersedia di `C:\\Program Files\\Git\\cmd\\git.exe`; `git diff --check` bersih. Tes, lint, dan guard tetap belum terverifikasi tanpa runtime Node.js 22.
 - Commit implementasi S05: `4cbe4c6 feat(S05): PayPal sandbox connection and webhook receiver`; push dicoba tetapi tertahan karena kredensial remote tidak tersedia.
 - Push GitHub ditolak karena kredensial tidak tersedia (`Cannot prompt because user interactivity has been disabled`).
