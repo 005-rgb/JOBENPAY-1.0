@@ -14,8 +14,26 @@ import { withTx } from './db/tx.js';
 import { errorHandler } from './lib/errors.js';
 import { decrypt, encrypt, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
 import { appendAudit } from './repositories/audit.js';
+import {
+  createAgent,
+  createAgentKey,
+  getAgent,
+  listAgentKeys,
+  listAgents,
+  revokeActiveAgentKeys,
+  revokeAgentKey,
+  updateAgent,
+} from './repositories/agents.js';
 import { getMembership } from './repositories/memberships.js';
 import { getCurrentOrg } from './repositories/orgs.js';
+import {
+  createPayee,
+  getPayee,
+  listPayees,
+  recordPayeeRevision,
+  updatePayee,
+  updatePayeeTrust,
+} from './repositories/payees.js';
 import { rateLimit } from './repositories/rateLimit.js';
 import { insertVerifiedWebhookEvent } from './repositories/webhookEvents.js';
 import {
@@ -26,12 +44,15 @@ import {
   savePaypalConnection,
   updatePaypalConnectionStatus,
 } from './repositories/paypalConnections.js';
-import { createGrant, useGrant } from './repositories/stepUp.js';
+import { consumeGrant, createGrant, useGrant } from './repositories/stepUp.js';
 import { createSession, deleteSession, findSessionByCookie } from './repositories/sessions.js';
 import { createUser, findUserByEmail, findUserById, resetLoginFailure, updateLoginFailure } from './repositories/users.js';
 import { enqueue } from './jobs/queue.js';
+import { agentAuth } from './auth/agentAuth.js';
 import { clearPaypalTokenCache, paypalFor } from './paypal/client.js';
 import { appendEntry, LEDGER_TYPES } from './services/ledger.js';
+import { createAgentApiKey, hashAgentApiKey } from './lib/agentApiKeys.js';
+import { preparePayeeIdentifier } from './lib/payeeIdentifiers.js';
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000000';
 const MIGRATIONS_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
@@ -42,6 +63,49 @@ const STEP_UP_PURPOSES = new Set([
   'TRUST_PAYEE',
   'ROTATE_CREDENTIALS',
 ]);
+const AGENT_STATUSES = new Set(['ACTIVE', 'DISABLED']);
+const PAYEE_KINDS = new Set(['EMAIL', 'PAYPAL_ID', 'PHONE']);
+const PAYEE_TRUST_STATES = new Set(['TRUSTED', 'BLOCKED', 'PENDING_REVIEW']);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validUuid(value) {
+  return UUID_PATTERN.test(String(value || ''));
+}
+
+function publicPayee(payee, { identifier } = {}) {
+  const result = {
+    id: payee.id,
+    displayName: payee.display_name,
+    kind: payee.kind,
+    identifierMasked: payee.identifier_masked,
+    trust: payee.trust,
+    changedAt: payee.changed_at,
+    createdAt: payee.created_at,
+  };
+  if (identifier !== undefined) {
+    result.identifier = identifier;
+  }
+  return result;
+}
+
+function mapPayeeWriteError(error, next) {
+  if (error?.code === '23505') {
+    return next(buildError('VALIDATION_FAILED', 'Payee identifier already exists.', 409));
+  }
+  return next(error);
+}
+
+async function insertAgentApiKey(orgId, agentId, db) {
+  const generated = createAgentApiKey();
+  const key = await createAgentKey(orgId, agentId, {
+    prefix: generated.prefix,
+    keyHash: hashAgentApiKey(env.JOBENPAY_HMAC_PEPPER, generated.apiKey),
+  }, db);
+  if (!key) {
+    throw buildError('NOT_FOUND', 'Agent not found.', 404);
+  }
+  return { key, apiKey: generated.apiKey };
+}
 
 function readRequestId(req, res, next) {
   req.id = req.get('x-request-id') || crypto.randomUUID();
@@ -162,6 +226,10 @@ export function createApp() {
     res.status(200).json({ ok: true, service: 'jobenpay', status: 'healthy' });
   });
 
+  app.get('/agent/v1/ping', agentAuth, (req, res) => {
+    res.status(200).json({ agentId: req.agent.id });
+  });
+
   app.get('/readyz', async (req, res) => {
     try {
       const migrations = (await readdir(MIGRATIONS_DIRECTORY))
@@ -277,6 +345,301 @@ export function createApp() {
   });
 
   const api = express.Router();
+
+  api.get('/agents', requireSession, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const agents = await listAgents(orgId);
+      return res.status(200).json({ agents });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/agents', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+      const description = req.body?.description;
+      const status = req.body?.status ?? 'ACTIVE';
+      if (!name
+        || (description != null && typeof description !== 'string')
+        || !AGENT_STATUSES.has(status)) {
+        return next(buildError('VALIDATION_FAILED', 'Invalid agent fields.', 400));
+      }
+      const agent = await createAgent(req.session.current_org_id || GLOBAL_ORG_ID, {
+        name,
+        description: description == null ? null : description.trim(),
+        status,
+      });
+      return res.status(201).json({ agent });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/agents/:id', requireSession, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      if (!validUuid(req.params.id)) {
+        return next(buildError('NOT_FOUND', 'Agent not found.', 404));
+      }
+      const agent = await getAgent(orgId, req.params.id);
+      if (!agent) {
+        return next(buildError('NOT_FOUND', 'Agent not found.', 404));
+      }
+      const keys = await listAgentKeys(orgId, agent.id);
+      return res.status(200).json({ agent, keys });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.patch('/agents/:id', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      const { name, description, status } = req.body || {};
+      if (!validUuid(req.params.id)
+        || (name !== undefined && (typeof name !== 'string' || !name.trim()))
+        || (description !== undefined && description !== null
+          && typeof description !== 'string')
+        || (status !== undefined && !AGENT_STATUSES.has(status))
+        || (name === undefined && description === undefined && status === undefined)) {
+        return next(buildError('VALIDATION_FAILED', 'Invalid agent fields.', 400));
+      }
+      const agent = await updateAgent(req.session.current_org_id || GLOBAL_ORG_ID, req.params.id, {
+        name: name === undefined ? undefined : name.trim(),
+        description: description === undefined || description === null ? description : description.trim(),
+        status,
+      });
+      if (!agent) {
+        return next(buildError('NOT_FOUND', 'Agent not found.', 404));
+      }
+      return res.status(200).json({ agent });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/agents/:id/keys', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) {
+        return next(buildError('NOT_FOUND', 'Agent not found.', 404));
+      }
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const { key, apiKey } = await insertAgentApiKey(orgId, req.params.id);
+      return res.status(201).json({
+        key: {
+          id: key.id,
+          prefix: key.prefix,
+          createdAt: key.created_at,
+        },
+        apiKey,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/agents/:id/keys/:keyId/revoke', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id) || !validUuid(req.params.keyId)) {
+        return next(buildError('NOT_FOUND', 'API key not found.', 404));
+      }
+      const revoked = await revokeAgentKey(
+        req.session.current_org_id || GLOBAL_ORG_ID,
+        req.params.id,
+        req.params.keyId,
+      );
+      if (!revoked) {
+        return next(buildError('NOT_FOUND', 'API key not found.', 404));
+      }
+      return res.status(204).end();
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/agents/:id/keys/rotate', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) {
+        return next(buildError('NOT_FOUND', 'Agent not found.', 404));
+      }
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const rotated = await withTx(async (tx) => {
+        const agent = await getAgent(orgId, req.params.id, tx);
+        if (!agent) {
+          throw buildError('NOT_FOUND', 'Agent not found.', 404);
+        }
+        const granted = await consumeGrant(tx, GLOBAL_ORG_ID, {
+          grantId: req.body?.grantId,
+          userId: req.user.id,
+          sessionId: req.session.id,
+          purpose: 'ROTATE_CREDENTIALS',
+        });
+        if (!granted) {
+          throw buildError('STEP_UP_REQUIRED', 'Step-up authentication required.', 403);
+        }
+        const revoked = await revokeActiveAgentKeys(orgId, agent.id, tx);
+        const created = await insertAgentApiKey(orgId, agent.id, tx);
+        await appendEntry(tx, {
+          orgId,
+          type: LEDGER_TYPES.AGENT_KEY_ROTATED,
+          subjectType: 'AGENT',
+          subjectId: agent.id,
+          payload: {
+            newKeyId: created.key.id,
+            revokedKeyIds: revoked.map(({ id }) => id),
+            actorId: req.user.id,
+          },
+        });
+        return { agent, key: created.key, apiKey: created.apiKey };
+      });
+      return res.status(201).json({
+        key: {
+          id: rotated.key.id,
+          prefix: rotated.key.prefix,
+          createdAt: rotated.key.created_at,
+        },
+        apiKey: rotated.apiKey,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/payees', requireSession, async (req, res, next) => {
+    try {
+      const payees = await listPayees(req.session.current_org_id || GLOBAL_ORG_ID);
+      return res.status(200).json({ payees: payees.map((payee) => publicPayee(payee)) });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/payees', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
+      const { kind, identifier } = req.body || {};
+      if (!displayName || !PAYEE_KINDS.has(kind)
+        || typeof identifier !== 'string' || !identifier.trim()) {
+        return next(buildError('VALIDATION_FAILED', 'Invalid payee fields.', 400));
+      }
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const identifiers = preparePayeeIdentifier(orgId, identifier, kind, {
+        encryptionKey: env.JOBENPAY_ENC_KEY,
+        pepper: env.JOBENPAY_HMAC_PEPPER,
+      });
+      const payee = await createPayee(orgId, {
+        displayName,
+        kind,
+        ...identifiers,
+        trust: 'PENDING_REVIEW',
+      });
+      return res.status(201).json({
+        payee: publicPayee(payee, req.membership.role === 'OWNER' ? { identifier: identifier.trim() } : {}),
+      });
+    } catch (error) {
+      return mapPayeeWriteError(error, next);
+    }
+  });
+
+  api.patch('/payees/:id', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) {
+        return next(buildError('NOT_FOUND', 'Payee not found.', 404));
+      }
+      const { displayName, kind, identifier } = req.body || {};
+      if ((displayName !== undefined && (typeof displayName !== 'string' || !displayName.trim()))
+        || (kind !== undefined && !PAYEE_KINDS.has(kind))
+        || (identifier !== undefined && (typeof identifier !== 'string' || !identifier.trim()))
+        || (kind !== undefined && identifier === undefined)
+        || (displayName === undefined && kind === undefined && identifier === undefined)) {
+        return next(buildError('VALIDATION_FAILED', 'Invalid payee fields.', 400));
+      }
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const payee = await withTx(async (tx) => {
+        const current = await getPayee(orgId, req.params.id, tx);
+        if (!current) {
+          throw buildError('NOT_FOUND', 'Payee not found.', 404);
+        }
+        const nextKind = kind ?? current.kind;
+        const prepared = identifier === undefined
+          ? null
+          : preparePayeeIdentifier(orgId, identifier, nextKind, {
+            encryptionKey: env.JOBENPAY_ENC_KEY,
+            pepper: env.JOBENPAY_HMAC_PEPPER,
+          });
+        const identifierChanged = Boolean(prepared
+          && (prepared.identifierHmac !== current.identifier_hmac || nextKind !== current.kind));
+        const updated = await updatePayee(orgId, current.id, {
+          displayName: displayName === undefined ? undefined : displayName.trim(),
+          kind,
+          ...(identifierChanged ? prepared : {}),
+          identifierChanged,
+        }, tx);
+        if (identifierChanged) {
+          await recordPayeeRevision(orgId, current.id, {
+            oldHmac: current.identifier_hmac,
+            newHmac: prepared.identifierHmac,
+            changedBy: req.user.id,
+          }, tx);
+        }
+        return updated;
+      });
+      let rawIdentifier;
+      if (req.membership.role === 'OWNER') {
+        rawIdentifier = decrypt({
+          key: env.JOBENPAY_ENC_KEY,
+          payload: payee.identifier_enc,
+          aad: `payees:identifier_enc:${orgId}`,
+        });
+      }
+      return res.status(200).json({
+        payee: publicPayee(payee, rawIdentifier === undefined ? {} : { identifier: rawIdentifier }),
+      });
+    } catch (error) {
+      return mapPayeeWriteError(error, next);
+    }
+  });
+
+  api.post('/payees/:id/trust', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id) || !PAYEE_TRUST_STATES.has(req.body?.trust)) {
+        return next(buildError('VALIDATION_FAILED', 'Invalid payee trust update.', 400));
+      }
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const payee = await withTx(async (tx) => {
+        const current = await getPayee(orgId, req.params.id, tx);
+        if (!current) {
+          throw buildError('NOT_FOUND', 'Payee not found.', 404);
+        }
+        const granted = await consumeGrant(tx, GLOBAL_ORG_ID, {
+          grantId: req.body?.grantId,
+          userId: req.user.id,
+          sessionId: req.session.id,
+          purpose: 'TRUST_PAYEE',
+        });
+        if (!granted) {
+          throw buildError('STEP_UP_REQUIRED', 'Step-up authentication required.', 403);
+        }
+        const updated = await updatePayeeTrust(orgId, current.id, req.body.trust, tx);
+        await appendEntry(tx, {
+          orgId,
+          type: LEDGER_TYPES.PAYEE_TRUST_CHANGED,
+          subjectType: 'PAYEE',
+          subjectId: current.id,
+          payload: {
+            previousTrust: current.trust,
+            trust: updated.trust,
+            actorId: req.user.id,
+          },
+        });
+        return updated;
+      });
+      return res.status(200).json({ payee: publicPayee(payee) });
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   api.post('/auth/login', async (req, res, next) => {
     try {

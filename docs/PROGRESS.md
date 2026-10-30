@@ -2,7 +2,7 @@
 
 ## Status ringkas
 - Langkah terakhir SELESAI: S04
-- Langkah AKTIF: S05 (WIP)
+- Langkah AKTIF: S06 (WIP)
 - Gerbang terakhir lulus: G0 (spike S01 ready) dan S04 verification gates (`node --test`, `eslint . --ext .js`, `node scripts/guard.js`)
 
 ## Tabel langkah
@@ -13,6 +13,7 @@
 | S03 | DONE | feat(S03): hash-chained signed ledger | 2026-10-30 | Service `ledger.js`, CLI verify-ledger, validasi payload guard, dan tes unit/ledger selesai; DB-riil masih menunggu Postgres aktif |
 | S04 | DONE | feat(S04): auth, sessions, RBAC, step-up, seed | 2026-10-30 | App Express 5, repositori auth/session, RBAC, step-up, audit/rate-limit, dan seed dibuat; validasi non-DB serta lint/guard berhasil |
 | S05 | WIP | 4cbe4c6 | 2026-10-30 | PayPal sandbox client, koneksi terenkripsi, penerima webhook, fake server, dan tes sudah ditambahkan; validasi runtime menunggu Node.js 22 dan PostgreSQL |
+| S06 | WIP | pending | 2026-10-30 | Agen, API key, payee, migrasi, seed, dan tes ditambahkan dari prompt S06 pada lampiran; belum divalidasi dengan Node.js/PostgreSQL |
 | S12 | WIP | feat(S12): postgres job queue, worker, tick | 2026-10-30 | Queue PostgreSQL, worker, cron tick, cleanup, readiness, metrik, dan tes dibuat; `npm test`/lint/guard belum dapat dijalankan karena Node.js/npm tidak tersedia di environment |
 
 ## Resume (diisi saat WIP)
@@ -25,6 +26,9 @@
 - Perintah lanjut: sediakan Node.js 22/npm, PostgreSQL, dan akses push GitHub; jalankan `npm test`, `npm run lint`, dan `npm run guard`, lalu push setelah gerbang hijau.
 - S05 mengikuti spesifikasi permintaan karena `docs/ROADMAP.md` checkout ini tidak memiliki bagian E-S05. Endpoint verifikasi dan nama field cocok dengan contoh PayPal OpenAPI resmi (D20); `docs/SPIKE.md` PayPal/webhook masih BELUM DIJALANKAN sehingga belum diuji dengan akun Sandbox.
 - File utama S05: `server/src/paypal/constants.js`, `server/src/paypal/client.js`, `server/src/repositories/paypalConnections.js`, `server/src/repositories/webhookEvents.js`, `server/src/jobs/webhook.js`, `server/src/app.js`, `server/test/helpers/fake-paypal.js`, dan tes `paypal-client`, `webhook-job`, `paypal`, serta `guard`.
+- S06 mengikuti spesifikasi terperinci pada prompt terlampir. Checkout tidak memiliki bagian E-S06 di `docs/ROADMAP.md`, dan `docs/PRD.md` hanya berisi judul; tes/lint/guard belum dapat dijalankan karena Node.js/npm tidak tersedia, sedangkan tes integrasi S06 membutuhkan PostgreSQL.
+- File utama S06: `server/migrations/010_s06_agent_keys_payee_changed_at.sql`, `server/src/auth/agentAuth.js`, `server/src/repositories/agents.js`, `server/src/repositories/payees.js`, `server/src/app.js`, `server/scripts/seed.js`, `server/test/integration/agents-payees.test.js`, dan tes unit autentikasi/identifier.
+- D21 mendokumentasikan lookup prefix acak lintas-tenant hanya pada tahap autentikasi awal; seluruh operasi berikutnya dibatasi `org_id`.
 
 ## Blockers
 - PostgreSQL belum aktif di `localhost:5432` sehingga validasi database riil untuk login/session/seed dan migrasi tetap diblokir dari environment ini. Semua pengujian yang memerlukan `TEST_DATABASE_URL` tetap perlu dijalankan pada lingkungan dengan postgres yang hidup.
@@ -32,6 +36,7 @@
 - Git tersedia di `C:\\Program Files\\Git\\cmd\\git.exe`; `git diff --check` bersih. Tes, lint, dan guard tetap belum terverifikasi tanpa runtime Node.js 22.
 - Commit implementasi S05: `4cbe4c6 feat(S05): PayPal sandbox connection and webhook receiver`; push dicoba tetapi tertahan karena kredensial remote tidak tersedia.
 - Push GitHub ditolak karena kredensial tidak tersedia (`Cannot prompt because user interactivity has been disabled`).
+- Untuk lanjut urutan setelah S06, F01 mensyaratkan keputusan manual M-TOKEN (warna final); token final belum tersedia. G1/F03 juga belum lulus.
 
 ## Pertanyaan untuk pemilik proyek
 (kosong)

@@ -11,6 +11,7 @@
     "dev": "node --watch app.cjs",
     "start": "node app.cjs",
     "migrate": "node server/scripts/migrate.js",
+    "seed": "node server/scripts/seed.js",
     "verify-ledger": "node server/scripts/verify-ledger.js",
     "keys:gen": "node scripts/gen-keys.js",
     "guard": "node scripts/guard.js",

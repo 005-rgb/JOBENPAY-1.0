@@ -42,7 +42,31 @@ export async function useGrant(orgId, { grantId, purpose, sessionId }) {
   return grant;
 }
 
+export async function consumeGrant(tx, orgId, {
+  grantId,
+  userId,
+  sessionId,
+  purpose,
+}) {
+  if (!orgId) {
+    throw new Error('orgId is required for stepUp repository methods.');
+  }
+  if (!tx || typeof tx.query !== 'function') {
+    throw new TypeError('A transaction is required to consume a step-up grant.');
+  }
+  const result = await tx.query(
+    `UPDATE step_up_grants
+     SET consumed_at = now()
+     WHERE id = $1 AND user_id = $2 AND session_id = $3 AND purpose = $4
+       AND consumed_at IS NULL AND expires_at > now()
+     RETURNING id`,
+    [grantId, userId, sessionId, purpose],
+  );
+  return result.rowCount === 1;
+}
+
 export default {
   createGrant,
   useGrant,
+  consumeGrant,
 };
