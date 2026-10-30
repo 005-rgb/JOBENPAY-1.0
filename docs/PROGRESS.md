@@ -2,7 +2,7 @@
 
 ## Status ringkas
 - Langkah terakhir SELESAI: S04
-- Langkah AKTIF: S12 (implementasi selesai; validasi dan gerbang commit menunggu Node.js/npm tersedia)
+- Langkah AKTIF: S12 (implementasi dan commit lokal selesai; validasi menunggu Node.js/npm tersedia)
 - Gerbang terakhir lulus: G0 (spike S01 ready) dan S04 verification gates (`node --test`, `eslint . --ext .js`, `node scripts/guard.js`)
 
 ## Tabel langkah
@@ -20,11 +20,13 @@
 - Belum diverifikasi: `npm test`, lint, dan guard tidak dapat dijalankan karena `node`/`npm` tidak tersedia pada PATH; tes DB juga membutuhkan PostgreSQL aktif dan `TEST_DATABASE_URL`.
 - File utama S12: `server/src/jobs/queue.js`, `server/src/jobs/registry.js`, `server/src/jobs/worker.js`, `server/src/jobs/tick.js`, `server/src/jobs/cleanup.js`, `server/migrations/009_jobs_queue.sql`, `server/test/integration/jobs.test.js`.
 - Referensi `E-S12` di `docs/ROADMAP.md` dan `D18` di `docs/DECISIONS.md` tidak ditemukan pada checkout ini; implementasi mengikuti rincian S12 pada permintaan.
-- Perintah lanjut: sediakan Node.js 22/npm dan PostgreSQL, lalu jalankan `npm test`, `npm run lint`, dan `npm run guard`; perbaiki jika ada kegagalan sebelum menandai S12 DONE.
+- Commit lokal: `fa89a6f feat(S12): postgres job queue, worker, tick`; push ke `origin/dev` tertahan karena kredensial GitHub tidak tersedia.
+- Perintah lanjut: sediakan Node.js 22/npm, PostgreSQL, dan akses push GitHub; jalankan `npm test`, `npm run lint`, dan `npm run guard`, lalu push setelah gerbang hijau.
 
 ## Blockers
 - PostgreSQL belum aktif di `localhost:5432` sehingga validasi database riil untuk login/session/seed dan migrasi tetap diblokir dari environment ini. Semua pengujian yang memerlukan `TEST_DATABASE_URL` tetap perlu dijalankan pada lingkungan dengan postgres yang hidup.
 - Node.js dan npm tidak tersedia pada PATH environment sesi ini; perintah `npm test`, `npm run lint`, dan `npm run guard` belum dapat dieksekusi.
+- Push GitHub ditolak karena kredensial tidak tersedia (`Cannot prompt because user interactivity has been disabled`).
 
 ## Pertanyaan untuk pemilik proyek
 (kosong)
