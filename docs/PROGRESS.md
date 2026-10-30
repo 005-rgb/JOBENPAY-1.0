@@ -40,6 +40,8 @@
 - Commit implementasi S05: `4cbe4c6 feat(S05): PayPal sandbox connection and webhook receiver`; push dicoba tetapi tertahan karena kredensial remote tidak tersedia.
 - Push GitHub ditolak karena kredensial tidak tersedia (`Cannot prompt because user interactivity has been disabled`).
 - Untuk lanjut urutan setelah S06, F01 mensyaratkan keputusan manual M-TOKEN (warna final); token final belum tersedia. G1/F03 juga belum lulus.
+- Lanjutan build tertahan: `docs/ROADMAP.md` checkout ini hanya merinci E-S00, `docs/prd/` tidak berisi spesifikasi langkah lanjutan, dan PRD utama hanya berisi judul. Tidak ada kriteria yang cukup untuk mengimplementasikan S07 atau fase berikutnya tanpa menebak. Minta spesifikasi langkah berikutnya atau keputusan M-TOKEN untuk F01.
+- Validasi non-DB belum bisa dijalankan pada environment saat ini karena `node`, `npm`, dan `psql` tidak tersedia.
 
 ## Pertanyaan untuk pemilik proyek
 (kosong)
