@@ -12,7 +12,7 @@
 | S02 | DONE | feat(S02): schema, migrations and crypto utilities | 2026-10-30 | Skema, util DB/crypto, dan migrasi dibuat; validasi DB real masih diblokir oleh PostgreSQL yang tidak aktif |
 | S03 | DONE | feat(S03): hash-chained signed ledger | 2026-10-30 | Service `ledger.js`, CLI verify-ledger, validasi payload guard, dan tes unit/ledger selesai; DB-riil masih menunggu Postgres aktif |
 | S04 | DONE | feat(S04): auth, sessions, RBAC, step-up, seed | 2026-10-30 | App Express 5, repositori auth/session, RBAC, step-up, audit/rate-limit, dan seed dibuat; validasi non-DB serta lint/guard berhasil |
-| S05 | WIP | pending | 2026-10-30 | PayPal sandbox client, koneksi terenkripsi, penerima webhook, fake server, dan tes sudah ditambahkan; validasi runtime menunggu Node.js 22 dan PostgreSQL |
+| S05 | WIP | 4cbe4c6 | 2026-10-30 | PayPal sandbox client, koneksi terenkripsi, penerima webhook, fake server, dan tes sudah ditambahkan; validasi runtime menunggu Node.js 22 dan PostgreSQL |
 | S12 | WIP | feat(S12): postgres job queue, worker, tick | 2026-10-30 | Queue PostgreSQL, worker, cron tick, cleanup, readiness, metrik, dan tes dibuat; `npm test`/lint/guard belum dapat dijalankan karena Node.js/npm tidak tersedia di environment |
 
 ## Resume (diisi saat WIP)
@@ -30,6 +30,7 @@
 - PostgreSQL belum aktif di `localhost:5432` sehingga validasi database riil untuk login/session/seed dan migrasi tetap diblokir dari environment ini. Semua pengujian yang memerlukan `TEST_DATABASE_URL` tetap perlu dijalankan pada lingkungan dengan postgres yang hidup.
 - Node.js dan npm tidak tersedia pada PATH environment sesi ini; perintah `npm test`, `npm run lint`, dan `npm run guard` belum dapat dieksekusi.
 - Git tersedia di `C:\\Program Files\\Git\\cmd\\git.exe`; `git diff --check` bersih. Tes, lint, dan guard tetap belum terverifikasi tanpa runtime Node.js 22.
+- Commit implementasi S05: `4cbe4c6 feat(S05): PayPal sandbox connection and webhook receiver`; push masih menunggu validasi dan akses remote.
 - Push GitHub ditolak karena kredensial tidak tersedia (`Cannot prompt because user interactivity has been disabled`).
 
 ## Pertanyaan untuk pemilik proyek
