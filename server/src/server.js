@@ -1,21 +1,5 @@
-import express from 'express';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { env } from './config.js';
-
-const app = express();
-const modulePath = fileURLToPath(import.meta.url);
-
-app.disable('x-powered-by');
-app.use(express.json({ limit: '1mb' }));
-
-app.get('/healthz', (_req, res) => {
-  res.status(200).json({ ok: true, service: 'jobenpay', status: 'healthy' });
-});
-
-app.get('/readyz', (_req, res) => {
-  res.status(200).json({ ok: true, service: 'jobenpay', status: 'ready' });
-});
+import app from './app.js';
 
 export function startServer(port = env.PORT) {
   const server = app.listen(port, () => {
@@ -25,7 +9,7 @@ export function startServer(port = env.PORT) {
   return server;
 }
 
-const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === modulePath;
+const isDirectRun = process.argv[1] && process.argv[1].endsWith('server.js');
 if (isDirectRun) {
   startServer();
 }

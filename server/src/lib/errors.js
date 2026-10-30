@@ -30,7 +30,11 @@ export function errorHandler(error, _req, res, next) {
 
   const requestId = _req?.id ?? crypto.randomUUID();
 
-  const appError = error instanceof AppError ? error : new AppError('INTERNAL', 'Internal server error.');
+  const appError = error instanceof AppError
+    ? error
+    : new AppError(error?.code ?? 'INTERNAL', error?.message ?? 'Internal server error.', error?.details);
+
+  appError.statusCode = error?.statusCode ?? appError.statusCode ?? 500;
   const payload = formatError(appError, requestId);
-  res.status(appError?.statusCode ?? 500).json(payload);
+  res.status(appError.statusCode).json(payload);
 }
