@@ -1,11 +1,13 @@
 import pool from '../db/pool.js';
 import { withTx } from '../db/tx.js';
+import { expireMandates } from '../services/mandates.js';
 
 export async function runCleanup(job, { db = pool } = {}) {
   const execute = async (tx) => {
     await tx.query("DELETE FROM rate_limit_buckets WHERE window_start < now() - interval '1 day'");
     await tx.query('DELETE FROM sessions WHERE expires_at < now()');
     await tx.query("DELETE FROM jobs WHERE status = 'COMPLETED' AND created_at < now() - interval '7 days'");
+    await expireMandates(tx);
 
     const rescheduled = await tx.query(`
       UPDATE jobs

@@ -1,9 +1,9 @@
 # PROGRESS
 
 ## Status ringkas
-- Langkah terakhir SELESAI: S04
+- Langkah terakhir SELESAI: S08
 - Langkah AKTIF: F03 (WIP; validasi integrasi DB dan E2E CI belum dijalankan)
-- Gerbang terakhir lulus: build web, CSS lint, geometry S1/S2, lint, guard, dan `npm test` (28 lulus, 10 dilewati karena database)
+- Gerbang terakhir lulus: schema S08 (23 kasus), lint, guard, dan syntax check; suite penuh masih memiliki satu kegagalan lama pada jobs-registry
 
 ## Tabel langkah
 | Langkah | Status (TODO/WIP/DONE) | Commit | Jam aktual | Catatan |
@@ -14,6 +14,7 @@
 | S04 | DONE | feat(S04): auth, sessions, RBAC, step-up, seed | 2026-10-30 | App Express 5, repositori auth/session, RBAC, step-up, audit/rate-limit, dan seed dibuat; validasi non-DB serta lint/guard berhasil |
 | S05 | WIP | 4cbe4c6 | 2026-10-30 | PayPal sandbox client, koneksi terenkripsi, penerima webhook, fake server, dan tes dibuat; validasi integrasi DB/Sandbox masih tertunda |
 | S06 | WIP | a12cc63 | 2026-10-30 | Implementasi S06 di-commit; unit test/lint/guard lulus, tetapi validasi database dan seed masih menunggu PostgreSQL |
+| S08 | DONE | feat(S08): mandates, signing, budget periods | 2026-10-31 | Policy Zod bersama, mandate API/AI draft, versi immutable, Ed25519 activation, ledger events, budget periods, expiry cleanup, dan seed demo |
 | S12 | WIP | feat(S12): postgres job queue, worker, tick | 2026-10-30 | Queue PostgreSQL, worker, tick, cleanup, readiness, metrik, dan tes dibuat; tes/lint/guard non-DB lulus, validasi integrasi menunggu PostgreSQL |
 | F01 | WIP | | 2026-10-30 | Scaffold web, token desain awal, design-spec, dan harness parity dibuat; token final/M-TOKEN dan G1 masih belum diputuskan |
 | F02 | WIP | feat(F02): app shell and base components | 2026-10-31 | AppShell, komponen dasar, fixtures S1/S2, feedback endpoint, dan CSP dibuat; seluruh gate UI lulus, validasi DB ditunda |
@@ -36,6 +37,8 @@
 - S06 mengikuti spesifikasi terperinci pada prompt terlampir. Checkout tidak memiliki bagian E-S06 di `docs/ROADMAP.md`, dan `docs/PRD.md` hanya berisi judul; tes/lint/guard belum dapat dijalankan karena Node.js/npm tidak tersedia, sedangkan tes integrasi S06 membutuhkan PostgreSQL.
 - File utama S06: `server/migrations/010_s06_agent_keys_payee_changed_at.sql`, `server/src/auth/agentAuth.js`, `server/src/repositories/agents.js`, `server/src/repositories/payees.js`, `server/src/app.js`, `server/scripts/seed.js`, `server/test/integration/agents-payees.test.js`, dan tes unit autentikasi/identifier.
 - D21 mendokumentasikan lookup prefix acak lintas-tenant hanya pada tahap autentikasi awal; seluruh operasi berikutnya dibatasi `org_id`.
+- S08: file utama `shared/policy.schema.js`, `server/src/services/mandates.js`, `server/src/services/budget.js`, `server/src/app.js`, `server/migrations/012_s08_mandate_indexes.sql`, `server/test/unit/policy-schema.test.js`; AI draft tidak membuat payee.
+- Validasi S08: 23 tes schema lulus, `npm run lint` lulus, `npm run guard` lulus. `npm test` menghasilkan 63 lulus, 1 gagal lama (`jobs-registry` mengharapkan `extract_document` NOT_IMPLEMENTED), dan 10 dilewati karena database.
 
 ## Blockers
 - `TEST_DATABASE_URL` tidak dikonfigurasi; sepuluh tes integrasi/database dilewati. Migrasi dari awal dan integrasi (termasuk feedback audit, ringkasan dashboard, serta isolasi tenant) perlu dijalankan pada database tes terpisah sebelum F02/F03 dinyatakan DONE.
@@ -49,6 +52,7 @@
 - F01 mengikuti spesifikasi F01 pada lampiran; `docs/ROADMAP.md` checkout tidak memuat E-F01. Nilai token memakai estimasi awal PRD 12.2 karena `docs/ui-reference/token-final.json` belum tersedia; D22 mencatat hal ini.
 - F01 tidak menambahkan `@axe-core/playwright` karena MPL-2.0 tidak termasuk lisensi yang diizinkan repo. Sesuai keputusan pemilik, memakai Playwright built-in role locators sebagai pengganti smoke-check terbatas; dicatat di D23.
 - F02 masih WIP sampai validasi database integrasi dilakukan. Unduhan browser Playwright lokal gagal karena TLS, tetapi geometry lokal berhasil memakai Chrome sistem; CI UI memakai image Playwright yang sudah menyediakan browser.
+- S08: PostgreSQL/TEST_DATABASE_URL tidak tersedia, sehingga aktivasi end-to-end, concurrency reserve, seed idempotency, dan verifyChain belum dapat dijalankan lokal.
 - File F01 dibuat/diubah: `web/package.json`, Vite/React scaffold dan CSS token files, `docs/ui-reference/design-spec.json`, `scripts/geometry-test.js`, `server/src/app.js`, `scripts/guard.js`, `.github/workflows/ci.yml`, `README.md`, `THIRD_PARTY_NOTICES.md`, `docs/DECISIONS.md`, `.gitignore`.
 - F03 WIP: AuthProvider/RequireAuth, apiClient, rute login/dashboard/agents/payees/PayPal/security, step-up, refresh/polling sesuai visibilitas tab, API notifikasi, dan tests tenant dashboard dibuat. CSS F03 memakai design tokens; satu-time API key dan kredensial Sandbox tidak ditampilkan ulang oleh API.
 - Validasi F03 lokal: web build, CSS lint, JS lint, guard, `git diff --check`, dan geometry S1/S2 (46 assertions) lulus; `npm test` lulus (28 pass, 10 skip, 0 fail).

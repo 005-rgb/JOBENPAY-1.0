@@ -22,11 +22,18 @@ export default [
         URLSearchParams: 'readonly',
         AbortController: 'readonly',
         AbortSignal: 'readonly',
+        URL: 'readonly',
+        TextDecoder: 'readonly',
+        FormData: 'readonly',
+        Blob: 'readonly',
+        Response: 'readonly',
+        DOMException: 'readonly',
         __dirname: 'readonly',
       },
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-control-regex': 'off',
     },
   },
   {

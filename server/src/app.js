@@ -3,6 +3,8 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { access } from 'node:fs/promises';
 
 import cookieParser from 'cookie-parser';
 import express from 'express';
@@ -49,6 +51,12 @@ import {
   updatePaypalConnectionStatus,
 } from './repositories/paypalConnections.js';
 import { listNotifications, markNotificationRead } from './repositories/notifications.js';
+import {
+  getDocument,
+  getDocumentExtraction,
+  listDocuments,
+  markDocumentDeleted,
+} from './repositories/documents.js';
 import { consumeGrant, createGrant, useGrant } from './repositories/stepUp.js';
 import { createSession, deleteSession, findSessionByCookie } from './repositories/sessions.js';
 import { createUser, findUserByEmail, findUserById, resetLoginFailure, updateLoginFailure } from './repositories/users.js';
@@ -58,6 +66,21 @@ import { clearPaypalTokenCache, paypalFor } from './paypal/client.js';
 import { appendEntry, LEDGER_TYPES } from './services/ledger.js';
 import { createAgentApiKey, hashAgentApiKey } from './lib/agentApiKeys.js';
 import { preparePayeeIdentifier } from './lib/payeeIdentifiers.js';
+import { uploadMultipartDocument } from './documents/multipart.js';
+import { removeStoredDocument, safeFilename, storedDocumentPath } from './documents/storage.js';
+import { generateStructured } from './ai/index.js';
+import { policySchema as mandatePolicySchema } from './ai/prompts/mandateDraft.js';
+import { PROMPT_VERSION as MANDATE_PROMPT_VERSION } from './ai/prompts/mandateDraft.js';
+import { listPayees as listMandatePayees } from './repositories/payees.js';
+import {
+  addMandateVersion,
+  activateMandate,
+  changeMandateStatus,
+  createMandate,
+  getMandate,
+  listMandates,
+} from './services/mandates.js';
+import { getBudget } from './services/budget.js';
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000000';
 const MIGRATIONS_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
@@ -407,6 +430,165 @@ export function createApp() {
     }
   });
 
+  api.get('/mandates', requireSession, async (req, res, next) => {
+    try {
+      const mandates = await listMandates(req.session.current_org_id || GLOBAL_ORG_ID);
+      return res.status(200).json({ mandates });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/mandates', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const agent = await getAgent(orgId, req.body?.agentId);
+      if (!agent) throw buildError('NOT_FOUND', 'Agent not found.', 404);
+      const result = await withTx((tx) => createMandate(tx, {
+        orgId,
+        agentId: agent.id,
+        name: String(req.body?.name || '').trim() || 'Untitled mandate',
+        policy: req.body?.policy,
+        purposeText: req.body?.purposeText,
+      }));
+      return res.status(201).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/mandates/draft-from-text', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const agent = await getAgent(orgId, req.body?.agentId);
+      if (!agent || typeof req.body?.purposeText !== 'string' || !req.body.purposeText.trim()) {
+        throw buildError('VALIDATION_FAILED', 'agentId and purposeText are required.', 400);
+      }
+      const payees = await listMandatePayees(orgId);
+      let policy;
+      try {
+        policy = await generateStructured({
+          task: 'mandateDraft',
+          schema: mandatePolicySchema,
+          input: {
+            purposeText: req.body.purposeText,
+            existingPayees: payees.map((payee) => ({ id: payee.id, displayName: payee.display_name })),
+          },
+          orgId,
+        });
+      } catch (error) {
+        error.code = 'AI_UNAVAILABLE';
+        error.statusCode = 503;
+        error.message = 'AI is unavailable. Use the manual policy editor.';
+        return next(error);
+      }
+      const previous = await query(
+        `SELECT v.policy FROM mandates m JOIN mandate_versions v ON v.id = m.current_version_id
+         WHERE m.org_id = $1 AND m.agent_id = $2 ORDER BY v.created_at DESC LIMIT 1`,
+        [orgId, agent.id],
+      );
+      const knownPayeeIds = new Set(payees.map((payee) => payee.id));
+      const unknownPayees = policy.payees.ids.filter((id) => !knownPayeeIds.has(id));
+      const mappedPolicy = {
+        ...policy,
+        payees: { ...policy.payees, ids: policy.payees.ids.filter((id) => knownPayeeIds.has(id)) },
+      };
+      return res.status(200).json({
+        draft: {
+          agentId: agent.id,
+          purposeText: req.body.purposeText,
+          policy: mappedPolicy,
+          promptVersion: MANDATE_PROMPT_VERSION,
+        },
+        diff: { previous: previous.rows[0]?.policy || null, next: mappedPolicy },
+        warnings: unknownPayees.length
+          ? ['AI returned a payee that is not in this organization; it was removed from the draft.']
+          : [],
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/mandates/:id', requireSession, async (req, res, next) => {
+    try {
+      const mandate = await getMandate(req.session.current_org_id || GLOBAL_ORG_ID, req.params.id);
+      if (!mandate) throw buildError('NOT_FOUND', 'Mandate not found.', 404);
+      return res.status(200).json({ mandate });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/mandates/:id/versions', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      const version = await withTx((tx) => addMandateVersion(tx, {
+        orgId: req.session.current_org_id || GLOBAL_ORG_ID,
+        mandateId: req.params.id,
+        policy: req.body?.policy,
+        purposeText: req.body?.purposeText,
+      }));
+      return res.status(201).json({ version });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/mandates/:id/activate', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+    try {
+      const versionId = req.body?.versionId;
+      if (!validUuid(req.params.id) || !validUuid(versionId)) throw buildError('VALIDATION_FAILED', 'A valid mandate and version are required.', 400);
+      const version = await withTx((tx) => activateMandate(tx, {
+        orgId: req.session.current_org_id || GLOBAL_ORG_ID,
+        mandateId: req.params.id,
+        versionId,
+        actorId: req.user.id,
+        grantId: req.get('x-step-up-grant') || req.body?.grantId,
+        sessionId: req.session.id,
+      }));
+      return res.status(200).json({ version });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  for (const [action, status] of [['suspend', 'SUSPENDED'], ['revoke', 'REVOKED']]) {
+    api.post(`/mandates/:id/${action}`, requireSession, requireCsrf, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+      try {
+        const mandate = await withTx((tx) => changeMandateStatus(tx, {
+          orgId: req.session.current_org_id || GLOBAL_ORG_ID,
+          mandateId: req.params.id,
+          actorId: req.user.id,
+          status,
+        }));
+        return res.status(200).json({ mandate });
+      } catch (error) {
+        return next(error);
+      }
+    });
+  }
+
+  api.get('/mandates/:id/budget', requireSession, async (req, res, next) => {
+    try {
+      const budget = await getBudget(req.session.current_org_id || GLOBAL_ORG_ID, req.params.id);
+      if (!budget) throw buildError('NOT_FOUND', 'Budget period not found.', 404);
+      const limitMinor = BigInt(budget.limit_minor);
+      const reservedMinor = BigInt(budget.reserved_minor);
+      const spentMinor = BigInt(budget.spent_minor);
+      return res.status(200).json({
+        limitMinor: limitMinor.toString(),
+        reservedMinor: reservedMinor.toString(),
+        spentMinor: spentMinor.toString(),
+        remainingMinor: (limitMinor - reservedMinor - spentMinor).toString(),
+        currency: budget.currency,
+        periodStart: budget.period_start,
+        periodEnd: budget.period_end,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   api.post('/notifications/:id/read', requireSession, requireCsrf, async (req, res, next) => {
     try {
       if (!validUuid(req.params.id)) {
@@ -420,6 +602,132 @@ export function createApp() {
         return next(buildError('NOT_FOUND', 'Notification not found.', 404));
       }
       return res.status(200).json({ notification });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/documents', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+    try {
+      const document = await uploadMultipartDocument(req, {
+        orgId: req.session.current_org_id || GLOBAL_ORG_ID,
+        uploaderId: req.user.id,
+      });
+      return res.status(201).json({
+        document: {
+          id: document.id,
+          filename: document.filename,
+          mime: document.mime,
+          size: document.size,
+          sha256: document.sha256,
+          status: document.status,
+          createdAt: document.created_at,
+          injectionFlags: document.injection_flags,
+        },
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/documents', requireSession, async (req, res, next) => {
+    try {
+      const documents = await listDocuments(req.session.current_org_id || GLOBAL_ORG_ID);
+      return res.status(200).json({
+        documents: documents.map((document) => ({
+          id: document.id,
+          filename: document.filename,
+          mime: document.mime,
+          size: document.size,
+          sha256: document.sha256,
+          status: document.status,
+          injectionFlags: document.injection_flags,
+          createdAt: document.created_at,
+        })),
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/documents/:id/file', requireSession, async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) return next(buildError('NOT_FOUND', 'Document not found.', 404));
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const document = await getDocument(orgId, req.params.id);
+      if (!document || document.status === 'DELETED' || !document.storage_key) {
+        return next(buildError('NOT_FOUND', 'Document not found.', 404));
+      }
+      const filePath = await storedDocumentPath(document.storage_key);
+      await access(filePath);
+      const downloadName = safeFilename(document.filename).replace(/[^A-Za-z0-9._ -]/g, '_').slice(0, 120) || 'document';
+      res.setHeader('content-type', 'application/octet-stream');
+      res.setHeader('content-disposition', `attachment; filename="${downloadName}"`);
+      res.setHeader('x-content-type-options', 'nosniff');
+      const stream = createReadStream(filePath);
+      stream.once('error', next);
+      stream.pipe(res);
+      return undefined;
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/documents/:id', requireSession, async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) return next(buildError('NOT_FOUND', 'Document not found.', 404));
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const document = await getDocument(orgId, req.params.id);
+      if (!document) return next(buildError('NOT_FOUND', 'Document not found.', 404));
+      const extraction = await getDocumentExtraction(orgId, document.id);
+      return res.status(200).json({
+        document: {
+          id: document.id,
+          filename: document.filename,
+          mime: document.mime,
+          size: document.size,
+          sha256: document.sha256,
+          status: document.status,
+          injectionFlags: document.injection_flags,
+          createdAt: document.created_at,
+        },
+        extraction: extraction ? {
+          payeeName: extraction.payee_name,
+          invoiceNumber: extraction.invoice_number,
+          amountMinor: extraction.amount_minor,
+          currency: extraction.currency?.trim() || null,
+          dueDate: extraction.due_date,
+          items: extraction.items,
+          notes: extraction.notes,
+          confidence: extraction.confidence,
+          promptVersion: extraction.prompt_version,
+        } : null,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.delete('/documents/:id', requireSession, requireCsrf, requireRole('OWNER'), async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) return next(buildError('NOT_FOUND', 'Document not found.', 404));
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const document = await withTx(async (tx) => {
+        const deleted = await markDocumentDeleted(orgId, req.params.id, tx);
+        if (!deleted) throw buildError('NOT_FOUND', 'Document not found.', 404);
+        await appendEntry(tx, {
+          orgId,
+          type: LEDGER_TYPES.DOCUMENT_DELETED,
+          subjectType: 'DOCUMENT',
+          subjectId: deleted.id,
+          payload: { sha256: deleted.sha256 },
+        });
+        return deleted;
+      });
+      const existing = await getDocument(orgId, req.params.id);
+      if (existing?.storage_key) await removeStoredDocument(existing.storage_key);
+      if (!document) return next(buildError('NOT_FOUND', 'Document not found.', 404));
+      return res.status(200).json({ ok: true, documentId: document.id, sha256: document.sha256 });
     } catch (error) {
       return next(error);
     }

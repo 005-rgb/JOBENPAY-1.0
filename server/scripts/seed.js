@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 
 import { env } from '../src/config.js';
@@ -6,6 +9,15 @@ import { hashPassword, randomToken } from '../src/lib/crypto.js';
 import { createAgentKey } from '../src/repositories/agents.js';
 import { preparePayeeIdentifier } from '../src/lib/payeeIdentifiers.js';
 import { createAgentApiKey, hashAgentApiKey } from '../src/lib/agentApiKeys.js';
+import { findDocumentByHash } from '../src/repositories/documents.js';
+import { uploadDocument } from '../src/documents/service.js';
+import { createMandate, activateMandate } from '../src/services/mandates.js';
+
+const DEMO_DOCUMENTS = [
+  'SYNTHETIC-clean-invoice.txt',
+  'SYNTHETIC-injected-invoice.txt',
+  'SYNTHETIC-inflated-invoice.txt',
+];
 
 const DEMO_USERS = [
   { key: 'OWNER', email: 'owner@jobenpay.test', role: 'OWNER', isJudge: false },
@@ -61,6 +73,8 @@ export async function seedDemoData(db = pool, { write = (value) => process.stdou
   }
 
   const generatedCredentials = [];
+  let demoOrgId;
+  let demoOwnerId;
   const tx = await db.connect();
   try {
     await tx.query('BEGIN');
@@ -72,9 +86,11 @@ export async function seedDemoData(db = pool, { write = (value) => process.stdou
        RETURNING id`,
     );
     const orgId = orgResult.rows[0].id;
+    demoOrgId = orgId;
 
     for (const user of DEMO_USERS) {
       const userId = await ensureUser(tx, user, generatedCredentials);
+      if (user.key === 'OWNER') demoOwnerId = userId;
       await tx.query(
         `INSERT INTO memberships (org_id, user_id, role, is_judge)
          VALUES ($1, $2, $3, $4)
@@ -152,12 +168,80 @@ export async function seedDemoData(db = pool, { write = (value) => process.stdou
       }
     }
 
+    const trustedPayee = await tx.query(
+      `SELECT id FROM payees WHERE org_id = $1 AND trust = 'TRUSTED'
+       ORDER BY created_at ASC, id LIMIT 1`,
+      [orgId],
+    );
+    if (!trustedPayee.rowCount) throw new Error('Seed trusted payee was not created.');
+    const existingMandate = await tx.query(
+      `SELECT id, status, current_version_id FROM mandates
+       WHERE org_id = $1 AND agent_id = $2 AND name = 'SYNTHETIC Demo mandate'
+       LIMIT 1`,
+      [orgId, agentId],
+    );
+    let mandate = existingMandate.rows[0];
+    if (!mandate) {
+      const now = new Date();
+      const validTo = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+      const policy = {
+        schemaVersion: 1,
+        purpose: 'SYNTHETIC demo payouts with invoices',
+        allowedActions: ['PAYOUT'],
+        currency: 'USD',
+        perTransactionCapMinor: 1500,
+        budget: { period: 'MONTH', limitMinor: 5000 },
+        autoApproveBelowMinor: 1000,
+        payees: { mode: 'ALLOWLIST', ids: [trustedPayee.rows[0].id] },
+        allowNewPayees: false,
+        schedule: { timezone: 'UTC', days: [1, 2, 3, 4, 5, 6, 7], startHour: 0, endHour: 24 },
+        velocity: { maxRequestsPerHour: 10, maxPayoutPerPayeePerDay: 2 },
+        duplicateWindowHours: 72,
+        requireInvoice: true,
+        invoiceAmountToleranceMinor: 0,
+        ai: { intentCheck: true, escalateOnRiskAtOrAbove: 40, blockOnRiskAtOrAbove: 80 },
+        stepUpApprovalAboveMinor: 1000,
+        fourEyesAboveMinor: 1500,
+        approvalTtlHours: 24,
+        validFrom: now.toISOString(),
+        validTo: validTo.toISOString(),
+      };
+      const created = await createMandate(tx, {
+        orgId,
+        agentId,
+        name: 'SYNTHETIC Demo mandate',
+        policy,
+        purposeText: policy.purpose,
+      });
+      mandate = created.mandate;
+      await activateMandate(tx, {
+        orgId,
+        mandateId: mandate.id,
+        versionId: created.version.id,
+        systemActor: 'seed',
+      });
+    }
+
     await tx.query('COMMIT');
   } catch (error) {
     await tx.query('ROLLBACK').catch(() => undefined);
     throw error;
   } finally {
     tx.release();
+  }
+
+  for (const filename of DEMO_DOCUMENTS) {
+    const fileUrl = new URL(`../seed-data/${filename}`, import.meta.url);
+    const contents = await readFile(fileUrl);
+    const sha256 = createHash('sha256').update(contents).digest('hex');
+    if (await findDocumentByHash(demoOrgId, sha256, db)) continue;
+    await uploadDocument({
+      stream: Readable.from([contents]),
+      filename,
+      orgId: demoOrgId,
+      uploaderId: demoOwnerId,
+      db,
+    });
   }
 
   for (const credential of generatedCredentials) {
