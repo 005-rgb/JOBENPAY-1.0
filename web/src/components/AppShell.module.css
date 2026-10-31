@@ -170,7 +170,7 @@
 .header {
   align-items: center;
   background: var(--jp-surface);
-  border-bottom: 1px solid var(--jp-border);
+  border-bottom: var(--jp-border-width) solid var(--jp-border);
   display: flex;
   flex: 0 0 var(--jp-header-h);
   height: var(--jp-header-h);
@@ -367,7 +367,7 @@
 }
 
 .feedbackForm textarea {
-  border: 1px solid var(--jp-border-input);
+  border: var(--jp-border-width) solid var(--jp-border-input);
   border-radius: var(--jp-radius-input);
   color: var(--jp-text);
   min-height: var(--jp-feedback-textarea-h);
@@ -390,7 +390,7 @@
 .accountMenu {
   animation: popIn var(--jp-transition-standard);
   background: var(--jp-surface);
-  border: 1px solid var(--jp-border);
+  border: var(--jp-border-width) solid var(--jp-border);
   border-radius: var(--jp-radius-card);
   box-shadow: var(--jp-shadow-popover);
   min-width: var(--jp-dropdown-min-w);
@@ -459,6 +459,48 @@
   text-align: center;
 }
 
+.notificationList {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: var(--jp-space-2) 0;
+  max-height: var(--jp-sheet-max-height);
+  overflow-y: auto;
+  padding: 0;
+}
+
+.notificationList button {
+  background: var(--jp-transparent);
+  border: 0;
+  border-radius: var(--jp-dropdown-item-radius);
+  color: var(--jp-text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-1);
+  padding: var(--jp-space-3);
+  text-align: left;
+  width: 100%;
+}
+
+.notificationList button:hover:not(:disabled) {
+  background: var(--jp-surface-sidebar);
+}
+
+.notificationList button:disabled {
+  color: var(--jp-text-muted);
+  cursor: default;
+}
+
+.notificationList span,
+.notificationList small {
+  overflow-wrap: anywhere;
+}
+
+.notificationList small {
+  color: var(--jp-link);
+}
+
 .popoverLink {
   color: var(--jp-link);
   display: block;
@@ -484,7 +526,7 @@
 
 .menuSeparator {
   background: var(--jp-border);
-  height: 1px;
+  height: var(--jp-border-width);
   margin: var(--jp-space-2) 0;
 }
 
@@ -561,7 +603,7 @@
 
 .footerDivider {
   background: var(--jp-border);
-  height: 1px;
+  height: var(--jp-border-width);
   margin-top: var(--jp-footer-divider-margin);
 }
 
@@ -633,7 +675,7 @@
 }
 
 .setupCard {
-  border: 1px solid var(--jp-border);
+  border: var(--jp-border-width) solid var(--jp-border);
   border-radius: var(--jp-radius-card);
   display: flex;
   flex-direction: column;
@@ -727,7 +769,7 @@
 }
 
 .performanceCard {
-  border: 1px solid var(--jp-border);
+  border: var(--jp-border-width) solid var(--jp-border);
   border-radius: var(--jp-radius-card);
   display: grid;
   gap: var(--jp-space-3);
@@ -749,7 +791,7 @@
 }
 
 .fixtureMeasurement [data-testid="table-row"] {
-  border-bottom: 1px solid var(--jp-border);
+  border-bottom: var(--jp-border-width) solid var(--jp-border);
   height: var(--jp-table-row-h);
 }
 
@@ -766,7 +808,7 @@
 }
 
 .fixtureControls input {
-  border: 1px solid var(--jp-border-input);
+  border: var(--jp-border-width) solid var(--jp-border-input);
   border-radius: var(--jp-radius-input);
   height: var(--jp-input-h);
   padding: var(--jp-space-4);
@@ -784,7 +826,7 @@
 
 .fixtureForm {
   background: var(--jp-surface);
-  border: 1px solid var(--jp-border);
+  border: var(--jp-border-width) solid var(--jp-border);
   border-radius: var(--jp-radius-card);
   display: grid;
   gap: var(--jp-space-4);
@@ -810,7 +852,7 @@
 }
 
 .fixtureFormFields input {
-  border: 1px solid var(--jp-border-input);
+  border: var(--jp-border-width) solid var(--jp-border-input);
   border-radius: var(--jp-radius-input);
   height: var(--jp-input-h);
   outline: 0;

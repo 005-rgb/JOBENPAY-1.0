@@ -52,7 +52,7 @@ async function ensureUser(tx, user, output) {
   return created.rows[0].id;
 }
 
-export async function seedDemoData(db = pool) {
+export async function seedDemoData(db = pool, { write = (value) => process.stdout.write(value) } = {}) {
   if (!env.JOBENPAY_ENC_KEY) {
     throw new Error('JOBENPAY_ENC_KEY is required to seed payees.');
   }
@@ -161,9 +161,9 @@ export async function seedDemoData(db = pool) {
   }
 
   for (const credential of generatedCredentials) {
-    process.stdout.write(`${credential.label}: ${credential.value}\n`);
+    write(`${credential.label}: ${credential.value}\n`);
   }
-  process.stdout.write('SYNTHETIC demo organization, agent, and payees are ready.\n');
+  write('SYNTHETIC demo organization, agent, and payees are ready.\n');
 }
 
 async function main() {

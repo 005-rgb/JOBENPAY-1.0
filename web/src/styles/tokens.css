@@ -13,6 +13,7 @@
   --jp-blue-dark: #003087;
   --jp-border: #cbd2d9;
   --jp-border-input: #9da3a6;
+  --jp-border-width: 1px;
   --jp-icon-circle: #f0f2f5;
   --jp-badge-red: #c5192d;
   --jp-success: #118c4f;
@@ -95,6 +96,7 @@
   --jp-nav-icon-gap: 10px;
   --jp-modal-md-w: 480px;
   --jp-modal-lg-w: 640px;
+  --jp-login-card-w: 440px;
   --jp-card-tile-min-w: 337px;
   --jp-card-tile-h: 146px;
   --jp-feedback-right: 2px;

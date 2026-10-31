@@ -36,10 +36,15 @@ JOBENPAY is a sandbox-only governance layer for AI-driven payout requests. The s
 - Install dependencies with the local Node 22 toolchain.
 - Run guard and lint before submitting changes.
 
+## Demo accounts
+Running `npm run seed` creates the synthetic accounts `owner@jobenpay.test`, `judge@jobenpay.test`, `approver@jobenpay.test`, and `viewer@jobenpay.test`.
+Set `SEED_OWNER_PASSWORD`, `SEED_JUDGE_PASSWORD`, `SEED_APPROVER_PASSWORD`, and `SEED_VIEWER_PASSWORD` before seeding to choose their passwords; there are no built-in passwords. If omitted, the seed script generates temporary passwords and prints them once. Do not enable the demo hint on a public deployment.
+
 ## Development
 - `npm run guard` checks repo safety constraints.
 - `npm run lint` enforces JavaScript style.
-- `npm test` runs the server health checks.
+- `npm test` runs server unit tests and database integrations when `TEST_DATABASE_URL` points to a dedicated test database.
 - `npm --prefix web run lint:css` checks CSS and rejects literal colors or pixel sizes outside the token file.
 - `npm --prefix web run build` builds the production web assets.
-- `npm --prefix web run test:geometry` is CI-only; it uses the pinned Playwright Chromium image and currently reports placeholder geometry until F02.
+- `npm --prefix web run test:geometry` checks the S1/S2 shell geometry using Playwright Chromium.
+- `npm --prefix web run test:e2e` runs the F03 browser flow against a dedicated test PostgreSQL database and fake PayPal server.

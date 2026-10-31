@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint:css": "stylelint \"src/**/*.css\"",
-    "test:geometry": "node ../scripts/geometry-test.js"
+    "test:geometry": "node ../scripts/geometry-test.js",
+    "test:e2e": "node ../scripts/f03-e2e.js"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.4",

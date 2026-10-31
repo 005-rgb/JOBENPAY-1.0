@@ -100,6 +100,18 @@ export async function recordPayeeRevision(orgId, payeeId, {
   );
 }
 
+export async function listPayeeRevisions(orgId, payeeId, db = pool) {
+  assertOrgId(orgId);
+  const result = await db.query(
+    `SELECT id, changed_by, created_at
+     FROM payee_revisions
+     WHERE org_id = $1 AND payee_id = $2
+     ORDER BY created_at DESC, id`,
+    [orgId, payeeId],
+  );
+  return result.rows;
+}
+
 export async function updatePayeeTrust(orgId, payeeId, trust, db = pool) {
   assertOrgId(orgId);
   const result = await db.query(

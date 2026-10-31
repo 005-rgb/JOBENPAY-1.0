@@ -16,6 +16,7 @@ import { withTx } from './db/tx.js';
 import { errorHandler } from './lib/errors.js';
 import { decrypt, encrypt, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
 import { appendAudit } from './repositories/audit.js';
+import { getDashboardSummary } from './repositories/dashboard.js';
 import {
   createAgent,
   createAgentKey,
@@ -27,11 +28,12 @@ import {
   updateAgent,
 } from './repositories/agents.js';
 import { getMembership } from './repositories/memberships.js';
-import { getCurrentOrg } from './repositories/orgs.js';
+import { getCurrentOrg, setFrozenStatus } from './repositories/orgs.js';
 import {
   createPayee,
   getPayee,
   listPayees,
+  listPayeeRevisions,
   recordPayeeRevision,
   updatePayee,
   updatePayeeTrust,
@@ -46,6 +48,7 @@ import {
   savePaypalConnection,
   updatePaypalConnectionStatus,
 } from './repositories/paypalConnections.js';
+import { listNotifications, markNotificationRead } from './repositories/notifications.js';
 import { consumeGrant, createGrant, useGrant } from './repositories/stepUp.js';
 import { createSession, deleteSession, findSessionByCookie } from './repositories/sessions.js';
 import { createUser, findUserByEmail, findUserById, resetLoginFailure, updateLoginFailure } from './repositories/users.js';
@@ -184,6 +187,26 @@ function requireRole(...roles) {
       }
       req.user = user;
       req.membership = membership;
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+function requireStepUp(purpose) {
+  return async function requireStepUpMiddleware(req, _res, next) {
+    try {
+      const grant = await useGrant(GLOBAL_ORG_ID, {
+        grantId: req.get('x-step-up-grant') || req.body?.grantId,
+        purpose,
+        sessionId: req.session.id,
+      });
+      if (!grant) {
+        next(buildError('STEP_UP_REQUIRED', 'Step-up authentication required.', 403));
+        return;
+      }
+      req.stepUpGrant = grant;
       next();
     } catch (error) {
       next(error);
@@ -366,6 +389,42 @@ export function createApp() {
 
   const api = express.Router();
 
+  api.get('/dashboard/summary', requireSession, async (req, res, next) => {
+    try {
+      const summary = await getDashboardSummary(req.session.current_org_id || GLOBAL_ORG_ID);
+      return res.status(200).json(summary);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/notifications', requireSession, async (req, res, next) => {
+    try {
+      const notifications = await listNotifications(req.session.current_org_id || GLOBAL_ORG_ID);
+      return res.status(200).json({ notifications });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/notifications/:id/read', requireSession, requireCsrf, async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) {
+        return next(buildError('NOT_FOUND', 'Notification not found.', 404));
+      }
+      const notification = await markNotificationRead(
+        req.session.current_org_id || GLOBAL_ORG_ID,
+        req.params.id,
+      );
+      if (!notification) {
+        return next(buildError('NOT_FOUND', 'Notification not found.', 404));
+      }
+      return res.status(200).json({ notification });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   api.post('/feedback', requireSession, requireCsrf, async (req, res, next) => {
     try {
       const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
@@ -480,7 +539,7 @@ export function createApp() {
     }
   });
 
-  api.post('/agents/:id/keys/:keyId/revoke', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.post('/agents/:id/keys/:keyId/revoke', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), requireStepUp('ROTATE_CREDENTIALS'), async (req, res, next) => {
     try {
       if (!validUuid(req.params.id) || !validUuid(req.params.keyId)) {
         return next(buildError('NOT_FOUND', 'API key not found.', 404));
@@ -511,7 +570,7 @@ export function createApp() {
           throw buildError('NOT_FOUND', 'Agent not found.', 404);
         }
         const granted = await consumeGrant(tx, GLOBAL_ORG_ID, {
-          grantId: req.body?.grantId,
+          grantId: req.get('x-step-up-grant') || req.body?.grantId,
           userId: req.user.id,
           sessionId: req.session.id,
           purpose: 'ROTATE_CREDENTIALS',
@@ -575,9 +634,7 @@ export function createApp() {
         ...identifiers,
         trust: 'PENDING_REVIEW',
       });
-      return res.status(201).json({
-        payee: publicPayee(payee, req.membership.role === 'OWNER' ? { identifier: identifier.trim() } : {}),
-      });
+      return res.status(201).json({ payee: publicPayee(payee) });
     } catch (error) {
       return mapPayeeWriteError(error, next);
     }
@@ -626,19 +683,33 @@ export function createApp() {
         }
         return updated;
       });
-      let rawIdentifier;
-      if (req.membership.role === 'OWNER') {
-        rawIdentifier = decrypt({
-          key: env.JOBENPAY_ENC_KEY,
-          payload: payee.identifier_enc,
-          aad: `payees:identifier_enc:${orgId}`,
-        });
-      }
-      return res.status(200).json({
-        payee: publicPayee(payee, rawIdentifier === undefined ? {} : { identifier: rawIdentifier }),
-      });
+      return res.status(200).json({ payee: publicPayee(payee) });
     } catch (error) {
       return mapPayeeWriteError(error, next);
+    }
+  });
+
+  api.get('/payees/:id', requireSession, async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) {
+        return next(buildError('NOT_FOUND', 'Payee not found.', 404));
+      }
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const payee = await getPayee(orgId, req.params.id);
+      if (!payee) {
+        return next(buildError('NOT_FOUND', 'Payee not found.', 404));
+      }
+      const revisions = await listPayeeRevisions(orgId, payee.id);
+      return res.status(200).json({
+        payee: publicPayee(payee),
+        revisions: revisions.map((revision) => ({
+          id: revision.id,
+          changedBy: revision.changed_by,
+          changedAt: revision.created_at,
+        })),
+      });
+    } catch (error) {
+      return next(error);
     }
   });
 
@@ -654,7 +725,7 @@ export function createApp() {
           throw buildError('NOT_FOUND', 'Payee not found.', 404);
         }
         const granted = await consumeGrant(tx, GLOBAL_ORG_ID, {
-          grantId: req.body?.grantId,
+          grantId: req.get('x-step-up-grant') || req.body?.grantId,
           userId: req.user.id,
           sessionId: req.session.id,
           purpose: 'TRUST_PAYEE',
@@ -859,7 +930,7 @@ export function createApp() {
       }
       if (current?.client_id_enc && current?.client_secret_enc && credentialsProvided) {
         const grant = await useGrant(GLOBAL_ORG_ID, {
-          grantId: req.body?.grantId,
+          grantId: req.get('x-step-up-grant') || req.body?.grantId,
           purpose: 'ROTATE_CREDENTIALS',
           sessionId: req.session.id,
         });
@@ -929,7 +1000,7 @@ export function createApp() {
   api.delete('/paypal/connection', requireSession, requireCsrf, requireRole('OWNER'), async (req, res, next) => {
     try {
       const grant = await useGrant(GLOBAL_ORG_ID, {
-        grantId: req.body?.grantId,
+        grantId: req.get('x-step-up-grant') || req.body?.grantId,
         purpose: 'ROTATE_CREDENTIALS',
         sessionId: req.session.id,
       });
@@ -951,7 +1022,7 @@ export function createApp() {
     }
   });
 
-  api.post('/paypal/connection/test', requireSession, requireCsrf, async (req, res, next) => {
+  api.post('/paypal/connection/test', requireSession, requireCsrf, requireRole('OWNER'), async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       if (!(await getPaypalConnection(orgId))) {
@@ -1029,7 +1100,7 @@ export function createApp() {
       const session = req.session;
       const purpose = req.body?.purpose || 'FREEZE_TOGGLE';
       const grant = await useGrant(GLOBAL_ORG_ID, {
-        grantId: req.body?.grantId,
+        grantId: req.get('x-step-up-grant') || req.body?.grantId,
         purpose,
         sessionId: session.id,
       });
@@ -1039,6 +1110,7 @@ export function createApp() {
 
       const orgId = session.current_org_id || GLOBAL_ORG_ID;
       await withTx(async (tx) => {
+        await setFrozenStatus(tx, orgId, { frozenBy: req.user.id, frozen: true });
         await appendEntry(tx, {
           orgId,
           type: LEDGER_TYPES.ORG_FROZEN,
@@ -1065,7 +1137,7 @@ export function createApp() {
       const session = req.session;
       const purpose = req.body?.purpose || 'FREEZE_TOGGLE';
       const grant = await useGrant(GLOBAL_ORG_ID, {
-        grantId: req.body?.grantId,
+        grantId: req.get('x-step-up-grant') || req.body?.grantId,
         purpose,
         sessionId: session.id,
       });
@@ -1075,6 +1147,7 @@ export function createApp() {
 
       const orgId = session.current_org_id || GLOBAL_ORG_ID;
       await withTx(async (tx) => {
+        await setFrozenStatus(tx, orgId, { frozenBy: req.user.id, frozen: false });
         await appendEntry(tx, {
           orgId,
           type: LEDGER_TYPES.ORG_UNFROZEN,

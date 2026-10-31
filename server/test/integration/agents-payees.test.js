@@ -187,6 +187,42 @@ test('agents, API keys, and payees enforce tenancy, step-up, redaction, and rate
     });
     assert.equal(createdAgent.status, 201);
     const agent = (await createdAgent.json()).agent;
+    const createdAgentB = await postJson(`${baseUrl}/api/v1/agents`, ownerB, {
+      name: 'SYNTHETIC Org B Agent',
+      description: 'SYNTHETIC isolated test data',
+    });
+    assert.equal(createdAgentB.status, 201);
+    const agentB = (await createdAgentB.json()).agent;
+    await db.query(`
+      INSERT INTO payment_requests (org_id, agent_id, action, status, amount_minor, currency, decision)
+      VALUES
+        ($1, $2, 'PAYOUT', 'EXECUTED', 1000, 'USD', 'AUTO_APPROVE'),
+        ($3, $4, 'PAYOUT', 'REJECTED', 2000, 'USD', 'REJECT')
+    `, [orgA, agent.id, orgB, agentB.id]);
+    const summaryAResponse = await fetch(`${baseUrl}/api/v1/dashboard/summary`, {
+      headers: headers(ownerA),
+    });
+    const summaryBResponse = await fetch(`${baseUrl}/api/v1/dashboard/summary`, {
+      headers: headers(ownerB),
+    });
+    assert.equal(summaryAResponse.status, 200);
+    assert.equal(summaryBResponse.status, 200);
+    const summaryA = await summaryAResponse.json();
+    const summaryB = await summaryBResponse.json();
+    assert.deepEqual(summaryA.counts, {
+      requests: 1,
+      autoApproved: 1,
+      held: 0,
+      blocked: 0,
+      reconciled: 0,
+    });
+    assert.deepEqual(summaryB.counts, {
+      requests: 1,
+      autoApproved: 0,
+      held: 0,
+      blocked: 1,
+      reconciled: 0,
+    });
 
     const createdKey = await postJson(`${baseUrl}/api/v1/agents/${agent.id}/keys`, ownerA, {});
     assert.equal(createdKey.status, 201);

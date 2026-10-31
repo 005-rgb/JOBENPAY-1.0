@@ -117,6 +117,9 @@ const STATUS_KIND = {
   REJECTED: 'error',
   FAILED: 'error',
   MISMATCH: 'error',
+  TRUSTED: 'success',
+  PENDING_REVIEW: 'warning',
+  BLOCKED: 'error',
 };
 
 export function StatusPill({ status, label }) {

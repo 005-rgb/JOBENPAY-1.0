@@ -16,6 +16,7 @@ export default [
         process: 'readonly',
         Buffer: 'readonly',
         fetch: 'readonly',
+        Headers: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         URLSearchParams: 'readonly',

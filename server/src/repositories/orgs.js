@@ -61,13 +61,15 @@ export async function setFrozenStatus(tx, orgId, { frozenBy, frozen }) {
     throw new Error('orgId is required for orgs repository methods.');
   }
 
-  await tx.query(
+  const result = await tx.query(
     `UPDATE organizations
      SET frozen_at = $1,
          frozen_by = $2
-     WHERE id = $3`,
+     WHERE id = $3
+     RETURNING id`,
     [frozen ? new Date().toISOString() : null, frozen ? frozenBy : null, orgId],
   );
+  return result.rowCount === 1;
 }
 
 export default {

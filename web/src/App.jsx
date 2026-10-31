@@ -1,10 +1,22 @@
-import React from 'react';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import AppShell, { FixtureMain } from './components/AppShell.jsx';
-import { Button, EmptyState, Skeleton, ToastProvider } from './components/primitives.jsx';
+import { AuthProvider, useAuth } from './auth/AuthProvider.jsx';
+import { RequireAuth, RequireRole } from './auth/RequireAuth.jsx';
+import { ToastProvider } from './components/primitives.jsx';
+import {
+  AgentDetailPage,
+  AgentsPage,
+  ComingSoonPage,
+  DashboardPage,
+  LoginPage,
+  PayeeDetailPage,
+  PayeesPage,
+  PaypalSettingsPage,
+  SecurityPage,
+} from './pages/FeaturePages.jsx';
+import { useTranslation } from 'react-i18next';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,50 +28,32 @@ const queryClient = new QueryClient({
   },
 });
 
-async function fetchCurrentUser() {
-  const response = await fetch('/api/v1/auth/me', { credentials: 'same-origin' });
-  const body = await response.json();
-  if (!response.ok) {
-    const error = new Error(body?.error?.message || 'Unable to load the current session.');
-    error.status = response.status;
-    throw error;
-  }
-  return body;
-}
-
-function AuthenticatedShell() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { data, error, isPending, refetch } = useQuery({
-    queryKey: ['auth', 'me'],
-    queryFn: fetchCurrentUser,
-  });
-
-  if (isPending) {
-    return <main aria-label={t('components.loading')}><Skeleton /></main>;
-  }
-
-  if (error || !data) {
-    return (
-      <main className="session-state" role="main">
-        <EmptyState
-          description={error?.message || t('app.signInRequired')}
-          title={t('app.signInRequired')}
-          action={<Button onClick={() => error?.status === 401 ? navigate('/login') : refetch()}>{error?.status === 401 ? t('app.signIn') : t('app.retry')}</Button>}
-        />
-      </main>
-    );
-  }
-
+function AuthenticatedApp() {
+  const auth = useAuth();
   return (
     <AppShell
-      aiMode={data.aiMode}
-      csrfToken={data.csrfToken}
-      frozen={data.frozen}
-      org={data.org}
-      role={data.role}
-      user={data.user}
-    />
+      aiMode={auth.data?.aiMode || 'live'}
+      csrfToken={auth.csrfToken}
+      frozen={Boolean(auth.org?.frozen || auth.data?.frozen)}
+      onLogout={auth.logout}
+      org={auth.org}
+      role={auth.role}
+      user={auth.user}
+    >
+      <Routes>
+        <Route element={<DashboardPage />} path="/" />
+        <Route element={<DashboardPage />} path="/dashboard" />
+        <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'OPERATOR']}><AgentsPage /></RequireRole>} path="/agents" />
+        <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'OPERATOR']}><AgentsPage initialCreate /></RequireRole>} path="/agents/new" />
+        <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'OPERATOR']}><AgentDetailPage /></RequireRole>} path="/agents/:id" />
+        <Route element={<PayeesPage />} path="/payees" />
+        <Route element={<PayeesPage initialCreate />} path="/payees/new" />
+        <Route element={<PayeeDetailPage />} path="/payees/:id" />
+        <Route element={<PaypalSettingsPage />} path="/settings/paypal" />
+        <Route element={<SecurityPage />} path="/settings/security" />
+        <Route element={<ComingSoonPage />} path="*" />
+      </Routes>
+    </AppShell>
   );
 }
 
@@ -85,11 +79,19 @@ function AppRoutes() {
     <Routes>
       {parityEnabled ? (
         <>
-          <Route path="/__parity/s1" element={<ParityPage variant="s1" />} />
-          <Route path="/__parity/s2" element={<ParityPage variant="s2" />} />
+          <Route element={<ParityPage variant="s1" />} path="/__parity/s1" />
+          <Route element={<ParityPage variant="s2" />} path="/__parity/s2" />
         </>
       ) : null}
-      <Route path="*" element={<AuthenticatedShell />} />
+      <Route element={<LoginPage />} path="/login" />
+      <Route
+        element={(
+          <RequireAuth>
+            <AuthenticatedApp />
+          </RequireAuth>
+        )}
+        path="/*"
+      />
     </Routes>
   );
 }
@@ -97,11 +99,13 @@ function AppRoutes() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </ToastProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <ToastProvider>
+            <AppRoutes />
+          </ToastProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 }

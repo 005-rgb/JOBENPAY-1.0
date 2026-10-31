@@ -24,22 +24,14 @@ export async function useGrant(orgId, { grantId, purpose, sessionId }) {
   }
 
   const result = await query(
-    `SELECT * FROM step_up_grants
-     WHERE id = $1 AND session_id = $2 AND purpose = $3 AND consumed_at IS NULL AND expires_at > now() LIMIT 1`,
+    `UPDATE step_up_grants
+     SET consumed_at = now()
+     WHERE id = $1 AND session_id = $2 AND purpose = $3
+       AND consumed_at IS NULL AND expires_at > now()
+     RETURNING *`,
     [grantId, sessionId, purpose],
   );
-
-  const grant = result.rows[0];
-  if (!grant) {
-    return null;
-  }
-
-  await query(
-    `UPDATE step_up_grants SET consumed_at = now() WHERE id = $1`,
-    [grantId],
-  );
-
-  return grant;
+  return result.rows[0] ?? null;
 }
 
 export async function consumeGrant(tx, orgId, {

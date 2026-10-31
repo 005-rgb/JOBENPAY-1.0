@@ -37,6 +37,25 @@ jobs:
 
   ui:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: jobenpay_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d jobenpay_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/jobenpay_test
+      TEST_DATABASE_URL: postgres://postgres:postgres@postgres:5432/jobenpay_test
+      SEED_OWNER_PASSWORD: E2E-Owner-Password-2026!
     container:
       image: mcr.microsoft.com/playwright:v1.51.1-noble
     steps:
@@ -50,14 +69,23 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
+      - name: Install server dependencies
+        run: npm ci
+
       - name: Install web dependencies
         run: npm --prefix web ci
 
       - name: Build web
         run: npm --prefix web run build
 
+      - name: Run database integration tests
+        run: npm test
+
       - name: Lint CSS
         run: npm --prefix web run lint:css
 
       - name: Check geometry parity
         run: npm --prefix web run test:geometry
+
+      - name: Run F03 end-to-end journey
+        run: npm --prefix web run test:e2e

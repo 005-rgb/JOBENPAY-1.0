@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Popover from '@radix-ui/react-popover';
 import {
@@ -26,7 +26,9 @@ import {
 } from 'lucide-react';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { apiClient } from '../api/client.js';
 import {
   Banner,
   Button,
@@ -96,6 +98,7 @@ const routeTitles = [
   ['/mandates', 'mandates'],
   ['/payees', 'payees'],
   ['/settings/paypal', 'paypalSandbox'],
+  ['/settings/security', 'security'],
   ['/requests', 'requests'],
   ['/approvals', 'approvals'],
   ['/ledger', 'ledger'],
@@ -203,12 +206,37 @@ function CreateMenu({ t }) {
 }
 
 function NotificationPopover({ t }) {
+  const queryClient = useQueryClient();
+  const [readError, setReadError] = useState(false);
+  const [visible, setVisible] = useState(document.visibilityState === 'visible');
+  useEffect(() => {
+    const updateVisibility = () => setVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', updateVisibility);
+    return () => document.removeEventListener('visibilitychange', updateVisibility);
+  }, []);
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => apiClient.get('/notifications').then((result) => result.notifications),
+    refetchInterval: visible ? 15000 : false,
+    refetchIntervalInBackground: false,
+  });
+  const notifications = notificationsQuery.data || [];
+  const unreadCount = notifications.filter((notification) => notification.status !== 'READ').length;
+  const markRead = async (id) => {
+    setReadError(false);
+    try {
+      await apiClient.post(`/notifications/${id}/read`);
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    } catch {
+      setReadError(true);
+    }
+  };
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
         <button aria-label={t('app.notifications')} className={styles.headerIconButton} data-testid="notification-button" type="button">
           <Bell aria-hidden="true" size={24} strokeWidth={1.5} />
-          <span aria-label={t('app.notificationsCount', { count: 0 })} className={styles.notificationBadge} data-testid="notification-badge">0</span>
+          <span aria-label={t('app.notificationsCount', { count: unreadCount })} className={styles.notificationBadge} data-testid="notification-badge">{unreadCount}</span>
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -217,7 +245,22 @@ function NotificationPopover({ t }) {
             <strong>{t('app.notifications')}</strong>
             <Popover.Close asChild><button aria-label={t('app.dismiss')} className={styles.smallIconButton} type="button"><X aria-hidden="true" /></button></Popover.Close>
           </div>
-          <p className={styles.noNotifications}>{t('app.noNotifications')}</p>
+          {readError || notificationsQuery.error ? <p className={styles.noNotifications} role="alert">{t('app.actionFailed')}</p> : null}
+          {notificationsQuery.isPending ? <p className={styles.noNotifications}>{t('components.loading')}</p> : null}
+          {!notificationsQuery.isPending && notifications.length ? (
+            <ul className={styles.notificationList}>
+              {notifications.map((notification) => (
+                <li key={notification.id}>
+                  <button disabled={notification.status === 'READ'} onClick={() => markRead(notification.id)} type="button">
+                    <strong>{notification.payload?.title || notification.kind || t('app.notifications')}</strong>
+                    <span>{notification.payload?.message || notification.payload?.body || ''}</span>
+                    {notification.status !== 'READ' ? <small>{t('app.notificationRead')}</small> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {!notificationsQuery.isPending && !notificationsQuery.error && !notifications.length && !readError ? <p className={styles.noNotifications}>{t('app.noNotifications')}</p> : null}
           <RouterLink className={styles.popoverLink} to="/audit">{t('app.viewAll')}</RouterLink>
         </Popover.Content>
       </Popover.Portal>
@@ -363,6 +406,7 @@ export default function AppShell({
   children,
   fixture = false,
   pageTitle,
+  onLogout: onLogoutProp,
 }) {
   const { t } = useTranslation();
   const location = useLocation();
@@ -373,11 +417,19 @@ export default function AppShell({
     () => routeTitles.find(([route]) => location.pathname.startsWith(route))?.[1] || 'pageTitle',
     [location.pathname],
   );
-  const title = pageTitle || t(`app.${routeTitle}`);
+  const title = pageTitle
+    || (location.pathname === '/' || location.pathname === '/dashboard'
+      ? user?.display_name || user?.email || t(`app.${routeTitle}`)
+      : t(`app.${routeTitle}`));
 
   const { notify } = useToast();
-  const onLogout = async (token) => {
+  const handleLogout = async (token) => {
     try {
+      if (onLogoutProp) {
+        await onLogoutProp();
+        navigate('/login');
+        return;
+      }
       const response = await fetch('/api/v1/auth/logout', {
         method: 'POST',
         credentials: 'same-origin',
@@ -417,7 +469,7 @@ export default function AppShell({
             </RouterLink>
             <NotificationPopover t={t} />
             <span aria-hidden="true" className={styles.headerDivider} data-testid="header-divider" />
-            <AccountMenu csrfToken={csrfToken} onLogout={onLogout} org={org} t={t} user={user} />
+            <AccountMenu csrfToken={csrfToken} onLogout={handleLogout} org={org} t={t} user={user} />
           </div>
         </header>
         <main className={styles.mainContent}>

@@ -1,0 +1,484 @@
+.loginPage {
+  align-items: center;
+  background: var(--jp-surface-sidebar);
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--jp-space-6);
+}
+
+.loginCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+  max-width: var(--jp-login-card-w);
+  width: 100%;
+}
+
+.loginWordmark {
+  align-self: center;
+  color: var(--jp-text);
+  font-size: var(--jp-wordmark-font-size);
+  font-weight: var(--jp-font-weight-bold);
+  letter-spacing: var(--jp-wordmark-letter-spacing);
+  text-decoration: none;
+}
+
+.loginCard h1 {
+  font-size: var(--jp-font-size-page-title);
+  line-height: var(--jp-font-line-page-title);
+  margin: 0;
+  text-align: center;
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.demoHint,
+.paypalDisclaimer,
+.fieldHint {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+  line-height: var(--jp-font-line-caption);
+  margin: 0;
+}
+
+.loginLink,
+.performanceHeading > a,
+.dataTable a {
+  color: var(--jp-link);
+  text-decoration: underline;
+  text-underline-offset: var(--jp-space-1);
+}
+
+.loginLink {
+  align-self: center;
+}
+
+.dashboard,
+.pageStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-6);
+  min-width: 0;
+}
+
+.budgetHeader,
+.sectionHeading,
+.performanceHeading,
+.pageToolbar,
+.cardHeading,
+.inlineActions,
+.setupCardTop,
+.pagination {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.budgetHeader {
+  gap: var(--jp-space-4);
+}
+
+.budgetHeader p,
+.performanceHeading p,
+.cardHeading p {
+  color: var(--jp-text-muted);
+  margin: 0;
+}
+
+.budgetHeader strong {
+  display: block;
+  font-size: var(--jp-font-size-page-title);
+  line-height: var(--jp-font-line-page-title);
+  margin-top: var(--jp-space-1);
+}
+
+.budgetAction > span {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--jp-space-2);
+}
+
+.setupCards,
+.metricsGrid {
+  display: grid;
+  gap: var(--jp-card-grid-gap);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--jp-card-tile-min-w)), 1fr));
+}
+
+.setupCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-2);
+  min-height: var(--jp-card-tile-h);
+  min-width: 0;
+}
+
+.setupCard > a {
+  color: var(--jp-link);
+  font-size: var(--jp-font-size-card-link);
+  line-height: var(--jp-font-line-card-link);
+  text-decoration: underline;
+}
+
+.setupCard p {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-card-body);
+  line-height: var(--jp-font-line-card-body);
+  margin: 0;
+}
+
+.setupCardTop {
+  min-height: var(--jp-icon-size);
+}
+
+.setupIcon,
+.quickCircle {
+  align-items: center;
+  background: var(--jp-icon-circle);
+  border-radius: var(--jp-radius-pill);
+  display: inline-flex;
+  justify-content: center;
+}
+
+.setupIcon {
+  height: var(--jp-icon-size);
+  width: var(--jp-icon-size);
+}
+
+.setupIcon svg {
+  height: var(--jp-icon-size);
+  width: var(--jp-icon-size);
+}
+
+.iconAction {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--jp-text);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  min-height: var(--jp-header-menu-size);
+  min-width: var(--jp-header-menu-size);
+}
+
+.setupComplete {
+  justify-content: center;
+}
+
+.completedText {
+  align-items: center;
+  color: var(--jp-success);
+  display: flex;
+  gap: var(--jp-space-2);
+}
+
+.quickSection,
+.performance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+}
+
+.sectionHeading,
+.performanceHeading {
+  gap: var(--jp-space-4);
+}
+
+.sectionHeading h2,
+.performanceHeading h2,
+.cardHeading h2,
+.webhookBlock h3,
+.formCard h2 {
+  font-size: var(--jp-font-size-section-title);
+  line-height: var(--jp-font-line-section-title);
+  margin: 0;
+}
+
+.quickItems {
+  display: grid;
+  gap: var(--jp-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(var(--jp-qa-item-w), 1fr));
+}
+
+.quickItem {
+  align-items: center;
+  color: var(--jp-text);
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-2);
+  min-height: var(--jp-quick-target-h);
+  text-align: center;
+  text-decoration: none;
+}
+
+.quickCircle {
+  height: var(--jp-qa-circle);
+  width: var(--jp-qa-circle);
+}
+
+.quickIcon {
+  color: var(--jp-text);
+  height: var(--jp-icon-size);
+  width: var(--jp-icon-size);
+}
+
+.quickItem > span:last-child {
+  font-size: var(--jp-font-size-quick-label);
+  line-height: var(--jp-font-line-quick-label);
+}
+
+.performanceHeading p {
+  font-size: var(--jp-font-size-caption);
+  line-height: var(--jp-font-line-caption);
+  margin-top: var(--jp-space-1);
+}
+
+.metricCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-2);
+  min-width: 0;
+  min-height: var(--jp-card-tile-h);
+}
+
+.metricLabel {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.metricValue {
+  font-size: var(--jp-font-size-page-title);
+  line-height: var(--jp-font-line-page-title);
+  overflow-wrap: anywhere;
+}
+
+.metricDelta {
+  align-items: center;
+  color: var(--jp-text-muted);
+  display: flex;
+  font-size: var(--jp-font-size-caption);
+  gap: var(--jp-space-1);
+}
+
+.metricDelta svg {
+  height: var(--jp-icon-size);
+  width: var(--jp-icon-size);
+}
+
+.sparkline {
+  height: var(--jp-space-8);
+  width: 100%;
+}
+
+.skeletonGrid {
+  display: grid;
+  gap: var(--jp-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--jp-card-tile-min-w)), 1fr));
+}
+
+.pageToolbar {
+  gap: var(--jp-space-4);
+}
+
+.pageToolbar > span {
+  font-size: var(--jp-font-size-section-title);
+  font-weight: var(--jp-font-weight-medium);
+}
+
+.tableCard {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.dataTable {
+  border-collapse: collapse;
+  min-width: 100%;
+  text-align: left;
+  width: 100%;
+}
+
+.dataTable th {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+  font-weight: var(--jp-font-weight-medium);
+  line-height: var(--jp-font-line-caption);
+  padding: var(--jp-space-4);
+}
+
+.dataTable td {
+  border-top: var(--jp-border-width) solid var(--jp-border);
+  height: var(--jp-table-row-h);
+  padding: var(--jp-space-4);
+  white-space: nowrap;
+}
+
+.dataTable tbody tr:hover {
+  background: var(--jp-surface-sidebar);
+}
+
+.dataTable td:first-child {
+  white-space: normal;
+}
+
+.dataTable code,
+.keyRow code,
+.detailsList code {
+  font-family: var(--jp-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.cellDescription {
+  color: var(--jp-text-muted);
+  display: block;
+  font-size: var(--jp-font-size-caption);
+}
+
+.tableActions {
+  display: flex;
+  gap: var(--jp-space-2);
+}
+
+.rowAction {
+  color: var(--jp-link);
+  text-decoration: underline;
+}
+
+.pagination {
+  gap: var(--jp-space-4);
+  justify-content: center;
+  padding: var(--jp-space-4);
+}
+
+.pagination > span {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.formCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-6);
+  min-width: 0;
+}
+
+.alignStart {
+  align-self: flex-start;
+}
+
+.cardHeading {
+  gap: var(--jp-space-4);
+}
+
+.cardHeading p {
+  margin-top: var(--jp-space-1);
+}
+
+.keyList {
+  display: flex;
+  flex-direction: column;
+}
+
+.keyRow {
+  align-items: center;
+  border-top: var(--jp-border-width) solid var(--jp-border);
+  display: flex;
+  gap: var(--jp-space-4);
+  justify-content: space-between;
+  padding: var(--jp-space-4) 0;
+}
+
+.keyRow > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-2);
+  min-width: 0;
+}
+
+.keyRow span {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.oneTimeKey {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+}
+
+.formError,
+.formFeedback {
+  color: var(--jp-error);
+  margin: 0;
+}
+
+.formFeedback {
+  color: var(--jp-success);
+}
+
+.detailsList {
+  display: grid;
+  gap: var(--jp-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--jp-card-tile-min-w)), 1fr));
+  margin: 0;
+}
+
+.detailsList > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-1);
+  min-width: 0;
+}
+
+.detailsList dt {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.detailsList dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.historyList li {
+  border-top: var(--jp-border-width) solid var(--jp-border);
+  display: flex;
+  gap: var(--jp-space-4);
+  justify-content: space-between;
+  padding-top: var(--jp-space-3);
+}
+
+.historyList span:first-child {
+  color: var(--jp-text-muted);
+}
+
+.webhookBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-2);
+  min-width: 0;
+}
+
+.inlineActions {
+  flex-wrap: wrap;
+  gap: var(--jp-space-3);
+  justify-content: flex-start;
+}
