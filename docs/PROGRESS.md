@@ -17,7 +17,7 @@
 | S12 | WIP | feat(S12): postgres job queue, worker, tick | 2026-10-30 | Queue PostgreSQL, worker, tick, cleanup, readiness, metrik, dan tes dibuat; tes/lint/guard non-DB lulus, validasi integrasi menunggu PostgreSQL |
 | F01 | WIP | | 2026-10-30 | Scaffold web, token desain awal, design-spec, dan harness parity dibuat; token final/M-TOKEN dan G1 masih belum diputuskan |
 | F02 | WIP | feat(F02): app shell and base components | 2026-10-31 | AppShell, komponen dasar, fixtures S1/S2, feedback endpoint, dan CSP dibuat; seluruh gate UI lulus, validasi DB ditunda |
-| F03 | WIP | | 2026-10-31 | Login, dashboard, agen/API key, payee, PayPal Sandbox, step-up, kill switch, notifikasi, API ringkasan bertenant, dan alur E2E CI disiapkan; tes database/E2E masih menunggu `TEST_DATABASE_URL` |
+| F03 | WIP | 448e387 | 2026-10-31 | Login, dashboard, agen/API key, payee, PayPal Sandbox, step-up, kill switch, notifikasi, API ringkasan bertenant, dan alur E2E CI disiapkan; tes database/E2E masih menunggu `TEST_DATABASE_URL` |
 
 ## Resume (diisi saat WIP)
 - Sudah selesai: S00-S04 dan implementasi S12 (antrean PostgreSQL dengan `SKIP LOCKED`, retry/backoff, worker restart-safe, tick, cleanup periodik, readiness, serta metrik antrean).
@@ -54,6 +54,7 @@
 - Validasi F03 lokal: web build, CSS lint, JS lint, guard, `git diff --check`, dan geometry S1/S2 (46 assertions) lulus; `npm test` lulus (28 pass, 10 skip, 0 fail).
 - Validasi F03 terblokir: `TEST_DATABASE_URL` tidak dikonfigurasi, sehingga integrasi dashboard/payee serta browser journey PostgreSQL belum dijalankan. CI job `ui` kini menyiapkan PostgreSQL, menjalankan test database, lalu Playwright E2E terhadap fake PayPal.
 - File utama F03: `server/src/repositories/dashboard.js`, `server/src/repositories/notifications.js`, `server/src/app.js`, `server/test/integration/agents-payees.test.js`, `web/src/App.jsx`, `web/src/api/client.js`, `web/src/auth/`, `web/src/pages/FeaturePages.jsx`, `web/src/pages/FeaturePages.module.css`, `scripts/f03-e2e.js`, dan `.github/workflows/ci.yml`.
+- Commit F03 lokal: `448e387 feat(F03): login, home, agents, payees, PayPal settings`; `git push` tertahan karena kredensial remote tidak tersedia.
 
 ## Pertanyaan untuk pemilik proyek
 (kosong)
