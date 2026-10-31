@@ -20,6 +20,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install web dependencies
+        run: npm --prefix web ci
+
+      - name: Build web
+        run: npm --prefix web run build
+
       - name: Guard checks
         run: npm run guard
 
@@ -28,3 +34,30 @@ jobs:
 
       - name: Test
         run: npm test
+
+  ui:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.51.1-noble
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm --prefix web ci
+
+      - name: Build web
+        run: npm --prefix web run build
+
+      - name: Lint CSS
+        run: npm --prefix web run lint:css
+
+      - name: Check geometry parity
+        run: npm --prefix web run test:geometry

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -5,6 +6,7 @@ import crypto from 'node:crypto';
 
 import cookieParser from 'cookie-parser';
 import express from 'express';
+import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import { pino } from 'pino';
 
@@ -56,6 +58,8 @@ import { preparePayeeIdentifier } from './lib/payeeIdentifiers.js';
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000000';
 const MIGRATIONS_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
+const WEB_BUILD_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+const WEB_INDEX_FILE = path.join(WEB_BUILD_DIRECTORY, 'index.html');
 const STEP_UP_PURPOSES = new Set([
   'ACTIVATE_MANDATE',
   'APPROVE_ABOVE_THRESHOLD',
@@ -205,6 +209,22 @@ export function createApp() {
   const logger = pino();
 
   app.disable('x-powered-by');
+  app.use(helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        styleSrcAttr: ["'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+  }));
   app.use(readRequestId);
   app.use(pinoHttp({
     logger,
@@ -345,6 +365,27 @@ export function createApp() {
   });
 
   const api = express.Router();
+
+  api.post('/feedback', requireSession, requireCsrf, async (req, res, next) => {
+    try {
+      const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+      if (!message || message.length > 2000) {
+        return next(buildError('VALIDATION_FAILED', 'Feedback must contain between 1 and 2000 characters.', 400));
+      }
+
+      await withTx(async (tx) => {
+        await appendAudit(tx, {
+          orgId: req.session.current_org_id || GLOBAL_ORG_ID,
+          actorId: req.session.user_id,
+          action: 'FEEDBACK_SUBMITTED',
+          details: { message },
+        });
+      });
+      return res.status(201).json({ ok: true });
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   api.get('/agents', requireSession, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
     try {
@@ -1060,6 +1101,34 @@ export function createApp() {
   });
 
   app.use('/api/v1', api);
+  if (existsSync(WEB_INDEX_FILE)) {
+    app.use(express.static(WEB_BUILD_DIRECTORY, {
+      index: false,
+      setHeaders(res, filePath) {
+        if (/\.[\da-f]{8,}\./i.test(path.basename(filePath))) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      },
+    }));
+    app.get('/{*path}', (req, res, next) => {
+      if (req.path === '/api' || req.path.startsWith('/api/')) {
+        return next();
+      }
+      return res.sendFile(WEB_INDEX_FILE, (error) => {
+        if (error) next(error);
+      });
+    });
+  } else {
+    app.get('/{*path}', (req, res, next) => {
+      if (req.path === '/api' || req.path.startsWith('/api/')) {
+        return next();
+      }
+      return res
+        .status(503)
+        .type('text/plain')
+        .send('Web assets are not built. Run npm --prefix web run build.');
+    });
+  }
   app.use((err, req, res, next) => {
     errorHandler(err, req, res, next);
   });

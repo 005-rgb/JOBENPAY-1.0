@@ -1,0 +1,19 @@
+@import url("./tokens.css");
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: var(--jp-body-min-width);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: var(--jp-transition-reduced) !important;
+    animation-duration: var(--jp-transition-reduced) !important;
+  }
+}

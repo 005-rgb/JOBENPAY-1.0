@@ -3,7 +3,7 @@ import prettier from 'eslint-config-prettier';
 
 export default [
   {
-    ignores: ['node_modules/**', 'dist/**', 'coverage/**'],
+    ignores: ['node_modules/**', '**/dist/**', 'coverage/**'],
   },
   js.configs.recommended,
   {
@@ -26,6 +26,16 @@ export default [
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    files: ['scripts/geometry-test.js'],
+    languageOptions: {
+      globals: {
+        URL: 'readonly',
+        document: 'readonly',
+        getComputedStyle: 'readonly',
+      },
     },
   },
   prettier,

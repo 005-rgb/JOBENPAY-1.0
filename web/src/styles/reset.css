@@ -1,0 +1,38 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  font-family: var(--jp-font-family);
+  color: var(--jp-text);
+  background: var(--jp-surface);
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--jp-focus-ring-width) solid var(--jp-blue);
+  outline-offset: var(--jp-focus-ring-offset);
+}

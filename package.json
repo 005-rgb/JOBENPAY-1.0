@@ -17,11 +17,12 @@
     "guard": "node scripts/guard.js",
     "lint": "eslint . --ext .js",
     "format": "prettier . --write",
-    "test": "node --test"
+    "test": "node --test \"server/test/**/*.test.js\""
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
+    "helmet": "^8.0.0",
     "pg": "^8.13.0",
     "pino": "^9.5.0",
     "pino-http": "^10.0.0",

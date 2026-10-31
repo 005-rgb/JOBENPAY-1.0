@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -52,6 +53,20 @@ walk(root);
 
 check(!repoFiles.some((file) => /\.ts$|\.tsx$/i.test(file)), 'TypeScript files are not allowed in S00.');
 
+if (fileExists('web/package.json')) {
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const cssLint = spawnSync(npm, ['--prefix', 'web', 'run', 'lint:css'], {
+    cwd: root,
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  });
+  if (cssLint.error) {
+    errors.push(`CSS lint could not run: ${cssLint.error.message}`);
+  } else if (cssLint.status !== 0) {
+    errors.push(`CSS lint failed.\n${cssLint.stdout || ''}${cssLint.stderr || ''}`);
+  }
+}
+
 const nativeCandidates = ['node-gyp', 'sqlite3', 'better-sqlite3', 'sharp', 'bcrypt', 'argon2', 'node-addon-api', 'binding'];
 const dependencyNames = Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies });
 const hasNativeDependency = dependencyNames.some((name) => nativeCandidates.includes(name));
@@ -68,6 +83,36 @@ for (const file of scanPaths) {
   const withoutSandboxHost = content.replace(/api-m\.sandbox\.paypal\.com/ig, '');
   if (/api-m\.paypal\.com/i.test(withoutSandboxHost)) {
     errors.push(`Live PayPal host found in ${file}. Use sandbox URL only.`);
+  }
+}
+
+if (fileExists('web/index.html')) {
+  const indexHtml = readText('web/index.html');
+  check(!/<script\b(?![^>]*\bsrc\s*=)[^>]*>/i.test(indexHtml), 'web/index.html must not contain inline scripts.');
+  check(!/<style\b/i.test(indexHtml), 'web/index.html must not contain inline styles.');
+}
+
+const allowedPaypalPhrases = [
+  'Connect PayPal Sandbox',
+  'PayPal Sandbox',
+  'not a PayPal product',
+  'Connected to PayPal Sandbox only',
+  'PayPal account',
+];
+for (const file of repoFiles.filter((name) => name.startsWith('web/src/'))) {
+  const content = fs.readFileSync(path.join(root, file), 'utf8');
+  const remaining = allowedPaypalPhrases.reduce((result, phrase) => result.replaceAll(phrase, ''), content);
+  if (/\bPayPal\b/.test(remaining)) {
+    errors.push(`Unexpected PayPal branding in ${file}. Use factual allowlisted references only.`);
+  }
+}
+
+if (fileExists('web/dist')) {
+  const builtFiles = repoFiles.filter((file) => file.startsWith('web/dist/'));
+  for (const file of builtFiles) {
+    if (fs.readFileSync(path.join(root, file), 'utf8').includes('__parity')) {
+      errors.push(`Development parity route leaked into production output: ${file}.`);
+    }
   }
 }
 
