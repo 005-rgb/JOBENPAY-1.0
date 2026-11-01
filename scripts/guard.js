@@ -136,9 +136,12 @@ if (fileExists('web/index.html')) {
 
 const allowedPaypalPhrases = [
   'Connect PayPal Sandbox',
+  'Connect a PayPal Sandbox account',
   'PayPal Sandbox',
   'not a PayPal product',
+  'not affiliated with PayPal',
   'Connected to PayPal Sandbox only',
+  'Money movement is disabled outside PayPal Sandbox.',
   'PayPal account',
 ];
 for (const file of repoFiles.filter((name) => name.startsWith('web/src/'))) {
