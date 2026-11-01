@@ -81,6 +81,7 @@ import {
   listMandates,
 } from './services/mandates.js';
 import { getBudget } from './services/budget.js';
+import { submitPaymentRequest } from './services/requests.js';
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000000';
 const MIGRATIONS_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
@@ -294,6 +295,25 @@ export function createApp() {
 
   app.get('/agent/v1/ping', agentAuth, (req, res) => {
     res.status(200).json({ agentId: req.agent.id });
+  });
+
+  app.post('/agent/v1/requests', agentAuth, async (req, res, next) => {
+    try {
+      const request = await submitPaymentRequest({
+        orgId: req.agent.orgId,
+        agentId: req.agent.id,
+        action: req.body?.action,
+        payeeId: req.body?.payeeId,
+        amountMinor: req.body?.amountMinor,
+        currency: req.body?.currency,
+        documentId: req.body?.documentId,
+        reason: req.body?.reason,
+        idempotencyKey: req.get('idempotency-key') || req.body?.idempotencyKey,
+      });
+      return res.status(201).json({ request });
+    } catch (error) {
+      return next(error);
+    }
   });
 
   app.get('/readyz', async (req, res) => {

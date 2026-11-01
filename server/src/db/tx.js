@@ -1,7 +1,7 @@
 import pool from './pool.js';
 
-export async function withTx(fn) {
-  const client = await pool.connect();
+export async function withTx(fn, db = pool) {
+  const client = await db.connect();
 
   try {
     await client.query('BEGIN');

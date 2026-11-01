@@ -1,5 +1,7 @@
 import { runCleanup } from './cleanup.js';
 import { processWebhook } from './webhook.js';
+import { extractDocument } from './extractDocument.js';
+import { evaluateRequestJob } from './evaluateRequest.js';
 
 export const JOB_TYPES = Object.freeze([
   'extract_document',
@@ -28,6 +30,8 @@ for (const type of JOB_TYPES) {
 }
 handlers.set('cleanup', runCleanup);
 handlers.set('process_webhook', processWebhook);
+handlers.set('extract_document', extractDocument);
+handlers.set('evaluate_request', evaluateRequestJob);
 
 export function registerHandler(type, handler) {
   if (!JOB_TYPES.includes(type)) {

@@ -21,7 +21,7 @@ test('job registry contains the supported job types', () => {
 
 test('unimplemented job handlers fail with NOT_IMPLEMENTED', async () => {
   await assert.rejects(
-    async () => getHandler('extract_document')({}, {}),
+    async () => getHandler('execute_request')({}, {}),
     { code: 'NOT_IMPLEMENTED', message: 'NOT_IMPLEMENTED' },
   );
 });
