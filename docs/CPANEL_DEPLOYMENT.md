@@ -84,7 +84,30 @@ Repeat this command manually only when the root `package-lock.json` or runtime d
 
 ## 3. Build and publish each release locally
 
-On the development machine, from a clean checkout of the intended release:
+On the development machine, from a clean checkout of the intended release. In Windows PowerShell, add both Laragon Node 22 and Git to the current terminal's `PATH` (this fixes `npm`/`git is not recognized` without changing machine-wide settings):
+
+```powershell
+$env:Path = "C:\laragon\bin\nodejs\node-v22;C:\laragon\bin\git\cmd;$env:Path"
+node --version
+npm.cmd --version
+git --version
+```
+
+Confirm Node reports version 22.13 or newer in the Node 22 line. Use `npm.cmd` explicitly in PowerShell:
+
+```powershell
+npm.cmd ci
+npm.cmd ci --prefix web
+npm.cmd run build
+npm.cmd run guard
+npm.cmd run lint
+npm.cmd run secret-scan
+npm.cmd test
+```
+
+If Laragon installed Node or Git in different folders, replace the corresponding paths with the directories containing `node.exe`/`npm.cmd` and `git.exe`. The `PATH` change above lasts only for the current PowerShell window; reopen a terminal and repeat it when needed.
+
+On macOS/Linux, activate the project's Node 22 environment and run:
 
 ```sh
 npm ci
@@ -105,6 +128,8 @@ git diff --cached --stat
 git commit -m "release: describe this release"
 git push origin main
 ```
+
+In PowerShell, use `git` after applying the PATH command above. If you prefer not to edit PATH, call Git directly with `& "C:\laragon\bin\git\cmd\git.exe" <arguments>`.
 
 Do not commit `.env`, credentials, upload files, generated database files, or local logs. Wait for the required GitHub Actions checks to pass before deploying.
 
