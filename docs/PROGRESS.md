@@ -2,8 +2,8 @@
 
 ## Status ringkas
 - Langkah terakhir dikerjakan: perbaikan blocker CI dan persiapan deployment cPanel.
-- Langkah berikutnya: kirim koreksi CI terbaru ke `main` dan verifikasi workflow ulang; deployment tetap menunggu PostgreSQL TLS serta pengaturan cPanel.
-- Validasi lokal: 217 tes lulus tanpa gagal/skip; coverage baris 96,73% dan cabang 90,38% (470/520); guard, lint, serta secret scan lulus. Commit `ff8aefa` sudah di `main`. CI `41331156482` mengonfirmasi server (termasuk coverage), UI, dan fresh-clone lulus, tetapi menemukan allowlist branding guard belum lengkap dan Docker Compose menjalankan konfigurasi lokal sebagai production; koreksinya sudah dibuat lokal dan menunggu rerun.
+- Langkah berikutnya: siapkan PostgreSQL TLS dan pengaturan cPanel; deployment menunggu akses hosting dan pemeriksaan keamanan URL source.
+- Validasi lokal: 217 tes lulus tanpa gagal/skip; coverage baris 96,73% dan cabang 90,38% (470/520); guard, lint, serta secret scan lulus. Perbaikan CI dipush melalui `ff8aefa` dan `679ed5f`. Workflow `41331761454` pada `main` lulus untuk seluruh job.
 
 ## Tabel langkah
 | Langkah | Status (TODO/WIP/DONE) | Commit | Jam aktual | Catatan |
@@ -107,11 +107,11 @@
 - Runner UI dipatok ke `ubuntu-24.04` agar Chromium Playwright tersedia; job fresh-clone menyediakan nilai secret sementara sebelum Compose memvalidasi konfigurasi semua service.
 - Tes webhook dan Stage C ditambah untuk jalur validasi, event payout tak cocok/tertunda, eskalasi retry, fallback konteks opsional, serta propagasi exception non-AI.
 - `npm run coverage`: 217 tes lulus, pemeriksaan ledger akhir lulus (5 ledger valid; 6/6 jenis tamper terdeteksi), coverage baris 96,73%, cabang 90,38% (470/520), fungsi 100%; gate 90% lulus. `npm run guard`, `npm run lint`, dan `git diff --check` juga lulus.
-- CI run `41331156482` setelah push: coverage/server checks sebelum guard, UI, dan fresh-clone lulus; guard gagal karena frasa legal/faktual PayPal di i18n belum seluruhnya di-allowlist, sedangkan `/healthz` Compose gagal karena stack PostgreSQL lokal dipaksa memakai validasi TLS production. Allowlist faktual dilengkapi dan service Compose lokal ditandai `NODE_ENV=development`; guard dan `docker compose config` kini lulus lokal. Rerun remote masih menunggu push koreksi ini.
+- CI run `41331156482` setelah push awal menemukan allowlist guard belum lengkap dan `/healthz` Compose gagal karena stack PostgreSQL lokal dipaksa memakai validasi TLS production. Allowlist faktual dilengkapi dan service Compose lokal ditandai `NODE_ENV=development`; guard dan `docker compose config` lulus lokal. Perbaikan dipush sebagai `679ed5f`; rerun `41331761454` sukses untuk job `server`, `ui`, `fresh-clone`, dan `docker-compose`.
 
 ## Blockers
 - cPanel: belum ada akses shell/hosting atau detail server PostgreSQL eksternal. Sebelum aktif, atur secrets di cPanel, verifikasi URL source di `public_html` mengembalikan 403/404, lalu cek `/readyz`.
-- CI remote: coverage, runner UI, dan fresh-clone sudah lulus run `41331156482`; koreksi lokal atas guard dan Compose perlu dipush dan divalidasi dengan workflow baru. Pemilik tetap perlu mengisi `{{HOSTED_URL}}` dan `{{JUDGE_PASSWORD}}` serta meninjau persyaratan provider sebelum rilis.
+- CI: selesai; seluruh job workflow `41331761454` lulus pada commit `679ed5f` di `main`. Sebelum rilis, pemilik tetap perlu mengisi `{{HOSTED_URL}}` dan `{{JUDGE_PASSWORD}}` serta meninjau persyaratan provider. Deployment cPanel masih membutuhkan PostgreSQL TLS dan akses hosting.
 - F05 local checks/E2E pass; requested commit, push, and remote CI remain blocked because this checkout has no `.git` metadata or configured remote. Existing test DB was not modified; a clean temporary DB was used for browser E2E after the existing ledger reported an unknown key.
 - S14 implementation and local validation are complete, but the requested commit/push cannot be performed because this checkout has no `.git` metadata or configured remote.
 - S13 menunggu M-REAL untuk memastikan perilaku/status/event PayPal Sandbox riil sesuai SPIKE; tes fake bukan penggantinya. Commit/push/CI remote terhalang karena checkout tidak memiliki `.git`.
