@@ -1,0 +1,8 @@
+SYNTHETIC INVOICE
+Invoice number: SYNTH-INFLATED-003
+Supplier: Sample Logistics
+Due date: 2026-11-20
+Currency: USD
+Line item: Standard delivery, 125.00 USD
+Line item: SYNTHETIC inflated surcharge, 9875.00 USD
+Total: 10000.00 USD

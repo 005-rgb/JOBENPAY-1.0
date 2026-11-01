@@ -185,7 +185,7 @@ function SideNavigation({ pathname, t, openGroups, setOpenGroups, onNavigate }) 
 
 function CreateMenu({ t }) {
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger asChild>
         <button className={styles.createButton} data-testid="create-button" type="button">
           <Plus aria-hidden="true" size={16} strokeWidth={1.5} />
@@ -276,7 +276,7 @@ function AccountMenu({ t, user, org, csrfToken, onLogout }) {
     .map((part) => part[0].toUpperCase())
     .join('');
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger asChild>
         <button aria-label={`${user?.display_name || 'Account'} account menu`} className={styles.avatar} data-testid="avatar" type="button">
           {initials}

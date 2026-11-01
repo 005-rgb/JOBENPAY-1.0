@@ -44,7 +44,7 @@ function waitForPort(child, timeoutMs = 10_000) {
   });
 }
 
-async function createSession(db, { orgId, role, email }) {
+async function createSession(db, { orgId, role, email, isJudge = false }) {
   const passwordHash = await hashPassword(password);
   const user = await db.query(
     'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id',
@@ -52,16 +52,17 @@ async function createSession(db, { orgId, role, email }) {
   );
   const actualUserId = user.rows[0].id;
   await db.query(
-    'INSERT INTO memberships (org_id, user_id, role) VALUES ($1, $2, $3)',
-    [orgId, actualUserId, role],
+    'INSERT INTO memberships (org_id, user_id, role, is_judge) VALUES ($1, $2, $3, $4)',
+    [orgId, actualUserId, role, isJudge],
   );
   const cookie = randomUUID() + randomUUID();
   const csrfToken = randomUUID();
-  await db.query(`
+  const sessionResult = await db.query(`
     INSERT INTO sessions (id_hash, user_id, current_org_id, csrf_secret, expires_at)
     VALUES ($1, $2, $3, $4, now() + interval '1 hour')
+    RETURNING id
   `, [sha256Hex(cookie), actualUserId, orgId, csrfToken]);
-  return { cookie, csrfToken, userId: actualUserId };
+  return { cookie, csrfToken, userId: actualUserId, sessionId: sessionResult.rows[0].id };
 }
 
 function requestHeaders(session, extra = {}) {
@@ -95,9 +96,10 @@ test('PayPal connection and webhook routes enforce credentials, signatures, dedu
     fake = await createFakePaypalServer();
     await runMigrations(isolatedConnectionString);
     const orgId = randomUUID();
-    await db.query('INSERT INTO organizations (id, name, slug) VALUES ($1, $2, $3)', [orgId, 'PayPal tests', `paypal-${schema}`]);
+    await db.query('INSERT INTO organizations (id, name, slug) VALUES ($1, $2, $3)', [orgId, 'PayPal tests', 'jobenpay-demo']);
     const owner = await createSession(db, { orgId, role: 'OWNER', email: 'owner@paypal.test' });
     const viewer = await createSession(db, { orgId, role: 'VIEWER', email: 'viewer@paypal.test' });
+    const judge = await createSession(db, { orgId, role: 'OWNER', email: 'judge@paypal.test', isJudge: true });
 
     appProcess = spawn(process.execPath, [helperScript], {
       env: {
@@ -117,6 +119,46 @@ test('PayPal connection and webhook routes enforce credentials, signatures, dedu
     appProcess.stderr.on('data', (chunk) => { appOutput += chunk; });
     const port = await waitForPort(appProcess);
     const baseUrl = `http://127.0.0.1:${port}`;
+
+    const judgeLoginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'judge@paypal.test', password }),
+    });
+    assert.equal(judgeLoginResponse.status, 200);
+    const judgeLogin = await readJson(judgeLoginResponse);
+    assert.equal(judgeLogin.ok, true);
+    const judgeCookie = judgeLoginResponse.headers.get('set-cookie')?.match(/jp_sid=([^;]+)/)?.[1];
+    assert.ok(judgeCookie);
+    const authenticatedJudge = { cookie: judgeCookie, csrfToken: judgeLogin.csrfToken };
+    const authenticatedJudgeMeResponse = await fetch(`${baseUrl}/api/v1/auth/me`, {
+      headers: requestHeaders(authenticatedJudge),
+    });
+    const authenticatedJudgeMe = await readJson(authenticatedJudgeMeResponse);
+    assert.equal(authenticatedJudgeMe.role, 'JUDGE');
+    assert.equal(authenticatedJudgeMe.org.id, orgId);
+
+    const ownerDashboard = await fetch(`${baseUrl}/api/v1/dashboard/summary`, {
+      headers: requestHeaders(owner),
+    });
+    assert.ok((await readJson(ownerDashboard)).queue);
+    const ownerQueue = await fetch(`${baseUrl}/api/v1/admin/queue`, {
+      headers: requestHeaders(owner),
+    });
+    assert.equal(ownerQueue.status, 200);
+    assert.ok(Object.hasOwn(await readJson(ownerQueue), 'depth'));
+    const judgeQueue = await fetch(`${baseUrl}/api/v1/admin/queue`, {
+      headers: requestHeaders(judge),
+    });
+    assert.equal(judgeQueue.status, 200);
+    const viewerQueue = await fetch(`${baseUrl}/api/v1/admin/queue`, {
+      headers: requestHeaders(viewer),
+    });
+    assert.equal(viewerQueue.status, 403);
+    const viewerDashboard = await fetch(`${baseUrl}/api/v1/dashboard/summary`, {
+      headers: requestHeaders(viewer),
+    });
+    assert.equal(Object.hasOwn(await readJson(viewerDashboard), 'queue'), false);
 
     const noConnection = await fetch(`${baseUrl}/api/v1/paypal/connection`, {
       headers: requestHeaders(owner),
@@ -143,6 +185,61 @@ test('PayPal connection and webhook routes enforce credentials, signatures, dedu
     assert.ok(saved.webhookUrl.startsWith('https://jobenpay.test/webhooks/paypal/'));
     const webhookToken = saved.webhookUrl.split('/').at(-1);
     assert.ok(webhookToken.length >= 40);
+
+    const viewerConnection = await fetch(`${baseUrl}/api/v1/paypal/connection`, {
+      headers: requestHeaders(viewer),
+    });
+    assert.equal((await readJson(viewerConnection)).webhookUrl, null);
+    const judgeConnection = await fetch(`${baseUrl}/api/v1/paypal/connection`, {
+      headers: requestHeaders(judge),
+    });
+    assert.equal((await readJson(judgeConnection)).webhookUrl, null);
+    const judgeMe = await fetch(`${baseUrl}/api/v1/auth/me`, {
+      headers: requestHeaders(judge),
+    });
+    assert.equal((await readJson(judgeMe)).role, 'JUDGE');
+    const judgeCredentialUpdate = await fetch(`${baseUrl}/api/v1/paypal/connection`, {
+      method: 'PUT',
+      headers: requestHeaders(judge, { 'content-type': 'application/json' }),
+      body: JSON.stringify({ clientId: 'judge-client', clientSecret: 'judge-secret' }),
+    });
+    assert.equal(judgeCredentialUpdate.status, 403);
+
+    const wrongPurposeGrantId = randomUUID();
+    await db.query(
+      `INSERT INTO step_up_grants (id, user_id, session_id, purpose, expires_at)
+       VALUES ($1, $2, $3, 'ROTATE_CREDENTIALS', now() + interval '5 minutes')`,
+      [wrongPurposeGrantId, judge.userId, judge.sessionId],
+    );
+    const wrongPurposeFreeze = await fetch(`${baseUrl}/api/v1/org/freeze`, {
+      method: 'POST',
+      headers: requestHeaders(judge, {
+        'content-type': 'application/json',
+        'x-step-up-grant': wrongPurposeGrantId,
+      }),
+      body: JSON.stringify({ purpose: 'ROTATE_CREDENTIALS' }),
+    });
+    assert.equal(wrongPurposeFreeze.status, 401);
+    const unusedGrant = await db.query(
+      'SELECT consumed_at FROM step_up_grants WHERE id = $1',
+      [wrongPurposeGrantId],
+    );
+    assert.equal(unusedGrant.rows[0].consumed_at, null);
+    const properPurposeGrantId = randomUUID();
+    await db.query(
+      `INSERT INTO step_up_grants (id, user_id, session_id, purpose, expires_at)
+       VALUES ($1, $2, $3, 'FREEZE_TOGGLE', now() + interval '5 minutes')`,
+      [properPurposeGrantId, judge.userId, judge.sessionId],
+    );
+    const validPurposeFreeze = await fetch(`${baseUrl}/api/v1/org/freeze`, {
+      method: 'POST',
+      headers: requestHeaders(judge, {
+        'content-type': 'application/json',
+        'x-step-up-grant': properPurposeGrantId,
+      }),
+      body: JSON.stringify({ purpose: 'ROTATE_CREDENTIALS' }),
+    });
+    assert.equal(validPurposeFreeze.status, 200);
 
     const stored = await db.query('SELECT client_id_enc, client_secret_enc FROM paypal_connections WHERE org_id = $1', [orgId]);
     assert.equal(stored.rows[0].client_id_enc.includes('test-client'), false);

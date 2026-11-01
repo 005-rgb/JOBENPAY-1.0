@@ -7,5 +7,6 @@ web/dist/
 coverage/
 dist/
 spike-out/
+var/uploads/
 .DS_Store
 npm-debug.log*

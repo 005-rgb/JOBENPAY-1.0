@@ -1,8 +1,10 @@
 import crypto from 'node:crypto';
 
 import { env } from '../config.js';
+import { AppError } from '../lib/errors.js';
 import { hmacSha256 } from '../lib/crypto.js';
 import { rateLimit } from '../repositories/rateLimit.js';
+import { query } from '../db/pool.js';
 import {
   getAgentKeysByPrefix,
   touchAgentKey,
@@ -11,8 +13,10 @@ import {
 const API_KEY_PATTERN = /^jp_sbx_([A-Za-z0-9_-]{8})_([A-Za-z0-9_-]{32})$/;
 
 function authError(code, statusCode) {
-  const error = new Error(code === 'RATE_LIMITED' ? 'Rate limit exceeded.' : 'Agent authentication failed.');
-  error.code = code;
+  const error = new AppError(
+    code,
+    code === 'RATE_LIMITED' ? 'Rate limit exceeded.' : 'Agent authentication failed.',
+  );
   error.statusCode = statusCode;
   return error;
 }
@@ -33,6 +37,10 @@ export function createAgentAuth({
   findKeys = getAgentKeysByPrefix,
   touchKey = touchAgentKey,
   applyRateLimit = rateLimit,
+  findOrganization = (orgId) => query(
+    'SELECT archived_at FROM organizations WHERE id = $1',
+    [orgId],
+  ),
 } = {}) {
   return async function agentAuthMiddleware(req, _res, next) {
     try {
@@ -67,6 +75,10 @@ export function createAgentAuth({
       if (stored.agent_status !== 'ACTIVE') {
         throw authError('FORBIDDEN', 403);
       }
+      const organization = await findOrganization(stored.org_id);
+      if (organization.rows[0]?.archived_at) {
+        throw authError('ORG_ARCHIVED', 403);
+      }
 
       if (!(await touchKey(stored.org_id, stored.id))) {
         throw authError('UNAUTHENTICATED', 401);
@@ -85,8 +97,7 @@ export function createAgentAuth({
 
 export function assertOwnedByAgent(agentId, resourceAgentId) {
   if (!agentId || !resourceAgentId || String(agentId) !== String(resourceAgentId)) {
-    const error = new Error('Resource not found.');
-    error.code = 'NOT_FOUND';
+    const error = new AppError('NOT_FOUND', 'Resource not found.');
     error.statusCode = 404;
     throw error;
   }

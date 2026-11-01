@@ -32,9 +32,11 @@ export function errorHandler(error, _req, res, next) {
 
   const appError = error instanceof AppError
     ? error
-    : new AppError(error?.code ?? 'INTERNAL', error?.message ?? 'Internal server error.', error?.details);
+    : new AppError('INTERNAL', 'Internal server error.');
 
-  appError.statusCode = error?.statusCode ?? appError.statusCode ?? 500;
+  appError.statusCode = error instanceof AppError
+    ? error?.statusCode ?? appError.statusCode ?? 500
+    : 500;
   const payload = formatError(appError, requestId);
   res.status(appError.statusCode).json(payload);
 }

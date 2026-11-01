@@ -1,50 +1,97 @@
-# JOBENPAY-1.0
+# JOBENPAY
 
-## Overview
-JOBENPAY is a sandbox-only governance layer for AI-driven payout requests. The server and initial web UI are built as separate packages.
+## 1. What it is and the problem
 
-## Quick start
-1. Use Node.js 22.
-2. Copy `.env.example` to `.env` and fill any required values.
-3. Install dependencies:
-   ```bash
-   npm install
-   npm --prefix web install
-   ```
-4. Start the app:
-   ```bash
-   npm start
-   ```
-5. In another terminal, start the web development server:
-   ```bash
-   npm --prefix web run dev
-   ```
-6. Check health endpoints:
-   ```bash
-   curl http://localhost:3000/healthz
-   curl http://localhost:3000/readyz
-   ```
+JOBENPAY is a sandbox-only governance layer between AI agents and business payouts. An agent can propose a payment, but it cannot approve or execute one. Deterministic policy checks, invoice signals, human approval where required, and an auditable ledger constrain the path from proposal to payout.
 
-## Architecture
-- `app.cjs` is the entrypoint bootstrapping the server.
-- `server/src/server.js` starts the API and serves `web/dist` when it is built.
-- `server/src/config.js` validates runtime configuration using Zod.
-- `web/` contains the Vite + React application and shared design tokens.
+Business email compromise (BEC) targets people through impersonation, invoice fraud, and changes to payment details. Applying those lessons to agents that read documents and can propose payments is an extrapolation, not a measured claim about AI-agent losses. JOBENPAY is intended to complement AP2's agent-payment authorization approach; it is not an AP2 implementation.
 
-## Setup
-- Use Node.js 22 via `.nvmrc` or `.replit`.
-- Install dependencies with the local Node 22 toolchain.
-- Run guard and lint before submitting changes.
+## 2. Demo: hosted URL + judge credentials
 
-## Demo accounts
-Running `npm run seed` creates the synthetic accounts `owner@jobenpay.test`, `judge@jobenpay.test`, `approver@jobenpay.test`, and `viewer@jobenpay.test`.
-Set `SEED_OWNER_PASSWORD`, `SEED_JUDGE_PASSWORD`, `SEED_APPROVER_PASSWORD`, and `SEED_VIEWER_PASSWORD` before seeding to choose their passwords; there are no built-in passwords. If omitted, the seed script generates temporary passwords and prints them once. Do not enable the demo hint on a public deployment.
+- Hosted demo: {{HOSTED_URL}}
+- Judge account: `judge@jobenpay.test`
+- Judge password: {{JUDGE_PASSWORD}}
 
-## Development
-- `npm run guard` checks repo safety constraints.
-- `npm run lint` enforces JavaScript style.
-- `npm test` runs server unit tests and database integrations when `TEST_DATABASE_URL` points to a dedicated test database.
-- `npm --prefix web run lint:css` checks CSS and rejects literal colors or pixel sizes outside the token file.
-- `npm --prefix web run build` builds the production web assets.
-- `npm --prefix web run test:geometry` checks the S1/S2 shell geometry using Playwright Chromium.
-- `npm --prefix web run test:e2e` runs the F03 browser flow against a dedicated test PostgreSQL database and fake PayPal server.
+The project owner must replace these placeholders before publishing a release. Demo data is synthetic, and payment operations are restricted to PayPal Sandbox.
+
+## 3. Run it yourself
+
+Requirements: Node.js 22.13 or newer in the Node 22 line, npm, and Docker Compose.
+
+Start the PostgreSQL service, create a local environment file, and generate local cryptographic keys:
+
+```sh
+docker compose up -d postgres
+cp .env.example .env
+npm run keys:gen >> .env
+```
+
+Set `SEED_JUDGE_PASSWORD` in `.env` to a private password of at least 12 characters. For the smoke test, set `JUDGE_SMOKE_PASSWORD` to the same value. Then install, initialize, and start:
+
+```sh
+npm ci && npm run setup && npm start
+```
+
+`npm run setup` installs the web dependencies, builds the UI, applies database migrations, and seeds synthetic demo data. The default `AI_PROVIDER=replay` needs no AI key. To use a live AI provider, configure its API key, model, and non-zero input/output prices in `.env`. To use PayPal, connect your own PayPal Sandbox credentials in the application settings; do not use live credentials.
+
+In another terminal, run the dry-run judge smoke test:
+
+```sh
+node --env-file=.env scripts/judge-smoke.js
+```
+
+## 4. How PayPal is used and how AI is used
+
+PayPal is used only through its Sandbox API: OAuth obtains an access token, the Payouts API submits an approved payout with a stable idempotency key, and signed webhooks are verified before payout results are reconciled. The UI is not a PayPal product and does not expose provider credentials to agents or AI.
+
+AI may extract invoice fields, check intent, and parse natural-language mandate drafts. Uploaded text is treated as untrusted data; provider calls receive no tools. AI can only tighten a deterministic decision, never approve a payment. Provider errors or invalid output fail closed to a non-automatic decision.
+
+Provider agreement links and operator review notes are in [docs/third-party-terms.md](docs/third-party-terms.md).
+
+## 5. Architecture
+
+The diagram is also maintained in [docs/architecture.md](docs/architecture.md).
+
+![JOBENPAY request and payout architecture](docs/architecture.svg)
+
+## 6. Security model and honest limits
+
+- The hash-chained ledger and signatures provide evidence of internal record integrity. They do not prove that an operator could not recreate or replace the entire database and its history.
+- Approvals and ledger entries are signed by the server; approval signatures are not held by an independent client key.
+- The interface follows selected PayPal Business interaction patterns, but JOBENPAY is not a PayPal product. Screens without a supplied reference are marked **INFERRED**; parity there is not independently established.
+- This project makes no claim of AP2 compliance or certification.
+- AI output is untrusted and cannot override deterministic rejection or approval requirements. PayPal calls are sandbox-only by construction.
+
+See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for threats, controls, and test evidence.
+
+## 7. Built during the submission period
+
+The first project commit is dated October 30, 2026. The submission-period build includes:
+
+- Node.js/Express API, PostgreSQL schema, sessions, tenant isolation, and role-based access.
+- Mandates, deterministic payment decisions, invoice upload and extraction, injection checks, approvals, and budget controls.
+- PayPal Sandbox payout execution, idempotent recovery, webhook reconciliation, and a verifiable ledger.
+- Agent REST and stateless MCP interfaces, synthetic simulator scenarios, and the React web application.
+- Security checks, operations tooling, CI workflows, and documentation for local setup and integration.
+
+## 8. Testing instructions
+
+For the hosted demo, use the judge account above:
+
+1. Log in.
+2. Open **Simulator**.
+3. Select **Run legit invoice**.
+4. Select **Run attack pack**.
+5. Open **Ledger** and select **Verify**.
+
+These scenarios use synthetic data. The simulator dry-run does not submit a payout.
+
+## 9. What's next
+
+The current submission targets Tier A. Possible Tier B work from the product roadmap includes registration and account recovery, TOTP, refund/dispute workflows, email notifications, CSV export, Indonesian localization, an AG Grid ledger theme, an expanded AI evaluation corpus, and additional MCP tools.
+
+Tier C roadmap items include reminders, a complete email outbox, four-eyes approval, organization deletion, fuller ADMIN/OPERATOR UI permissions, and WebAuthn. These are roadmap items, not claims about delivered functionality.
+
+## 10. License
+
+JOBENPAY is licensed under the [MIT License](LICENSE). Third-party package licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

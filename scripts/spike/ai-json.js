@@ -19,12 +19,12 @@ const schema = z.object({
   vendor: z.string().min(1),
   invoiceNumber: z.string().min(1),
   currency: z.string().length(3),
-  totalMinor: z.number().int().nonnegative(),
+  totalMinor: z.string().regex(/^(0|[1-9]\d*)$/),
   dueDate: z.string().min(1),
   items: z.array(
     z.object({
       description: z.string().min(1),
-      amountMinor: z.number().int().nonnegative(),
+      amountMinor: z.string().regex(/^(0|[1-9]\d*)$/),
     }),
   ),
 });
@@ -34,9 +34,9 @@ const prompt = `Extract the invoice fields from the sample below and return only
   "vendor": "string",
   "invoiceNumber": "string",
   "currency": "3-letter ISO code",
-  "totalMinor": 1234,
+  "totalMinor": "1234",
   "dueDate": "YYYY-MM-DD",
-  "items": [{ "description": "string", "amountMinor": 1234 }]
+  "items": [{ "description": "string", "amountMinor": "1234" }]
 }
 
 Sample invoice:

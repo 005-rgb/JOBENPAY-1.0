@@ -201,7 +201,8 @@ test('PostgreSQL jobs are deduplicated, claimed once, retried, recovered, and dr
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    await waitForStatus(db, stubJob.id, 'DEAD');
+    const stubDead = await accelerateRetriesUntilDead(db, stubJob.id);
+    assert.equal(stubDead.attempts, 5);
     assert.equal(stubWorker.exitCode, null);
     stubWorker.kill('SIGKILL');
     await once(stubWorker, 'close');
@@ -275,15 +276,26 @@ test('PostgreSQL jobs are deduplicated, claimed once, retried, recovered, and dr
     assert.equal((await db.query("SELECT 1 FROM sessions WHERE id_hash = 'expired-test-session'")).rowCount, 0);
     assert.equal((await db.query("SELECT 1 FROM jobs WHERE created_at < now() - interval '7 days' AND status = 'COMPLETED'")).rowCount, 0);
 
-    const stats = await queueStats(db);
+    const stats = await queueStats(null, db);
     assert.equal(stats.dead, 4);
     assert.equal(stats.oldestUnprocessedWebhookAgeSeconds, null);
     await db.query(`
       INSERT INTO webhook_events (org_id, event_type, status, received_at)
       VALUES (gen_random_uuid(), 'TEST.EVENT', 'RECEIVED', now() - interval '2 hours')
     `);
-    const webhookStats = await queueStats(db);
+    const webhookStats = await queueStats(null, db);
     assert.ok(webhookStats.oldestUnprocessedWebhookAgeSeconds >= 7190);
+
+    const metricsOrgId = randomUUID();
+    await enqueue(db, {
+      type: 'send_email',
+      orgId: metricsOrgId,
+      dedupeKey: `metrics-${randomUUID()}`,
+    });
+    const scopedStats = await queueStats(metricsOrgId, db);
+    assert.equal(scopedStats.depth, 1);
+    assert.equal(scopedStats.dead, 0);
+    assert.equal(scopedStats.oldestUnprocessedWebhookAgeSeconds, null);
 
     const tickStartedAt = Date.now();
     const tick = spawn(process.execPath, [tickScript], {

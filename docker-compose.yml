@@ -1,16 +1,62 @@
+
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: jobenpay-db
+    image: postgres:16
+    container_name: jobenpay_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: jobenpay
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: "GantiPassword123!"
+      POSTGRES_DB: jobenpay_db
     ports:
-      - "5432:5432"
+      - "55433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - jobenpay_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d jobenpay_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: jobenpay_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - jobenpay_redis_data:/data
+    command: redis-server --appendonly yes
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+      DATABASE_URL: postgres://postgres:GantiPassword123!@postgres:5432/jobenpay_db
+      AI_PROVIDER: replay
+      WORKER_ENABLED: 0
+      JOBENPAY_ENC_KEY: ${JOBENPAY_ENC_KEY:?Set JOBENPAY_ENC_KEY in the environment}
+      JOBENPAY_LEDGER_SIGNING_KEY: ${JOBENPAY_LEDGER_SIGNING_KEY:?Set JOBENPAY_LEDGER_SIGNING_KEY in the environment}
+      JOBENPAY_HMAC_PEPPER: ${JOBENPAY_HMAC_PEPPER:?Set JOBENPAY_HMAC_PEPPER in the environment}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
 volumes:
-  postgres_data:
+  jobenpay_postgres_data:
+  jobenpay_redis_data:

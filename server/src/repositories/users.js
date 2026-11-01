@@ -46,18 +46,23 @@ export async function createUser(orgId, { email, passwordHash, displayName, role
   return user;
 }
 
-export async function updateLoginFailure(orgId, userId, { failedLoginCount, lockedUntil }) {
+export async function recordLoginFailure(orgId, userId) {
   if (!orgId) {
     throw new Error('orgId is required for users repository methods.');
   }
 
-  await query(
+  const result = await query(
     `UPDATE users
-     SET failed_login_count = $2,
-         locked_until = $3
-     WHERE id = $1`,
-    [userId, failedLoginCount, lockedUntil],
+     SET failed_login_count = failed_login_count + 1,
+         locked_until = CASE
+           WHEN failed_login_count + 1 >= 5 THEN now() + interval '15 minutes'
+           ELSE NULL
+         END
+     WHERE id = $1
+     RETURNING failed_login_count`,
+    [userId],
   );
+  return Number(result.rows[0].failed_login_count);
 }
 
 export async function resetLoginFailure(orgId, userId) {
@@ -82,7 +87,7 @@ export default {
   findUserByEmail,
   findUserById,
   createUser,
-  updateLoginFailure,
+  recordLoginFailure,
   resetLoginFailure,
   hashToken,
 };

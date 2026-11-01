@@ -29,6 +29,7 @@ const base = {
 const cases = [
   ['schema version', { schemaVersion: 2 }],
   ['empty purpose', { purpose: '' }],
+  ['empty actions', { allowedActions: [] }],
   ['unknown action', { allowedActions: ['TRANSFER'] }],
   ['duplicate action', { allowedActions: ['PAYOUT', 'PAYOUT'] }],
   ['lowercase currency', { currency: 'usd' }],
@@ -42,17 +43,23 @@ const cases = [
   ['invalid payee uuid', { payees: { mode: 'ALLOWLIST', ids: ['not-uuid'] } }],
   ['invalid timezone', { schedule: { ...base.schedule, timezone: 'Not/AZone' } }],
   ['invalid day', { schedule: { ...base.schedule, days: [8] } }],
+  ['duplicate day', { schedule: { ...base.schedule, days: [1, 1] } }],
   ['invalid hours', { schedule: { ...base.schedule, startHour: 18, endHour: 18 } }],
   ['negative tolerance', { invoiceAmountToleranceMinor: -1 }],
   ['risk order', { ai: { ...base.ai, escalateOnRiskAtOrAbove: 80 } }],
   ['step-up below auto', { stepUpApprovalAboveMinor: 999 }],
   ['invalid valid from', { validFrom: '2026-11-01T00:00:00+07:00' }],
+  ['impossible UTC date', { validFrom: '2026-02-30T00:00:00Z' }],
   ['valid to before from', { validTo: '2026-10-01T00:00:00Z' }],
   ['extra field', { unexpected: true }],
 ];
 
 test('policy schema accepts a valid policy', () => {
   assert.equal(policySchema.safeParse(base).success, true);
+  assert.equal(policySchema.safeParse({
+    ...base,
+    allowedActions: ['PAYOUT', 'REFUND', 'ACCEPT_DISPUTE'],
+  }).success, true);
 });
 
 for (const [label, change] of cases) {

@@ -9,15 +9,52 @@ import { hashPassword, randomToken } from '../src/lib/crypto.js';
 import { createAgentKey } from '../src/repositories/agents.js';
 import { preparePayeeIdentifier } from '../src/lib/payeeIdentifiers.js';
 import { createAgentApiKey, hashAgentApiKey } from '../src/lib/agentApiKeys.js';
-import { findDocumentByHash } from '../src/repositories/documents.js';
+import { findDocumentByHash, updateDocumentAnalysis } from '../src/repositories/documents.js';
 import { uploadDocument } from '../src/documents/service.js';
 import { createMandate, activateMandate } from '../src/services/mandates.js';
+import { detectInjectionHeuristics } from '../src/documents/injection.js';
 
 const DEMO_DOCUMENTS = [
   'SYNTHETIC-clean-invoice.txt',
   'SYNTHETIC-injected-invoice.txt',
   'SYNTHETIC-inflated-invoice.txt',
 ];
+
+const DEMO_EXTRACTIONS = {
+  'SYNTHETIC-clean-invoice.txt': {
+    payeeName: 'SYNTHETIC Trusted Payee',
+    invoiceNumber: 'SYNTH-CLEAN-001',
+    amountMinor: '1000',
+    currency: 'USD',
+    dueDate: '2026-11-01',
+    items: [{ description: 'Printer paper', amountMinor: '1000' }],
+    notes: null,
+    confidence: 1,
+  },
+  'SYNTHETIC-injected-invoice.txt': {
+    payeeName: 'Example Parts',
+    invoiceNumber: 'SYNTH-INJECT-002',
+    amountMinor: '25000',
+    currency: 'USD',
+    dueDate: '2026-11-15',
+    items: [{ description: 'Replacement part', amountMinor: '25000' }],
+    notes: null,
+    confidence: 1,
+  },
+  'SYNTHETIC-inflated-invoice.txt': {
+    payeeName: 'Sample Logistics',
+    invoiceNumber: 'SYNTH-INFLATED-003',
+    amountMinor: '1000000',
+    currency: 'USD',
+    dueDate: '2026-11-20',
+    items: [
+      { description: 'Standard delivery', amountMinor: '12500' },
+      { description: 'Synthetic inflated surcharge', amountMinor: '987500' },
+    ],
+    notes: null,
+    confidence: 1,
+  },
+};
 
 const DEMO_USERS = [
   { key: 'OWNER', email: 'owner@jobenpay.test', role: 'OWNER', isJudge: false },
@@ -64,7 +101,11 @@ async function ensureUser(tx, user, output) {
   return created.rows[0].id;
 }
 
-export async function seedDemoData(db = pool, { write = (value) => process.stdout.write(value) } = {}) {
+export async function seedDemoData(db = pool, {
+  write = (value) => process.stdout.write(value),
+  orgSlug = 'jobenpay-demo',
+  orgName = 'JOBENPAY Demo',
+} = {}) {
   if (!env.JOBENPAY_ENC_KEY) {
     throw new Error('JOBENPAY_ENC_KEY is required to seed payees.');
   }
@@ -81,9 +122,10 @@ export async function seedDemoData(db = pool, { write = (value) => process.stdou
     await tx.query('SELECT pg_advisory_xact_lock($1)', [20261031]);
     const orgResult = await tx.query(
       `INSERT INTO organizations (name, slug)
-       VALUES ('JOBENPAY Demo', 'jobenpay-demo')
+       VALUES ($1, $2)
        ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
        RETURNING id`,
+      [orgName, orgSlug],
     );
     const orgId = orgResult.rows[0].id;
     demoOrgId = orgId;
@@ -170,6 +212,7 @@ export async function seedDemoData(db = pool, { write = (value) => process.stdou
 
     const trustedPayee = await tx.query(
       `SELECT id FROM payees WHERE org_id = $1 AND trust = 'TRUSTED'
+         AND display_name = 'SYNTHETIC Trusted Payee'
        ORDER BY created_at ASC, id LIMIT 1`,
       [orgId],
     );
@@ -234,14 +277,22 @@ export async function seedDemoData(db = pool, { write = (value) => process.stdou
     const fileUrl = new URL(`../seed-data/${filename}`, import.meta.url);
     const contents = await readFile(fileUrl);
     const sha256 = createHash('sha256').update(contents).digest('hex');
-    if (await findDocumentByHash(demoOrgId, sha256, db)) continue;
-    await uploadDocument({
+    const existing = await findDocumentByHash(demoOrgId, sha256, db);
+    const document = existing || await uploadDocument({
       stream: Readable.from([contents]),
       filename,
       orgId: demoOrgId,
       uploaderId: demoOwnerId,
       db,
     });
+    await updateDocumentAnalysis(demoOrgId, document.id, {
+      status: 'EXTRACTED',
+      injectionFlags: detectInjectionHeuristics(contents.toString('utf8')),
+      extraction: {
+        ...DEMO_EXTRACTIONS[filename],
+        promptVersion: 'synthetic-seed-v1',
+      },
+    }, db);
   }
 
   for (const credential of generatedCredentials) {

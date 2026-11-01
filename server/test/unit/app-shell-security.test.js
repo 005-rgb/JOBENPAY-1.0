@@ -13,7 +13,8 @@ test('web responses include the specified content security policy', async () => 
       "default-src 'self';script-src 'self';style-src 'self';style-src-attr 'unsafe-inline';img-src 'self' data:;connect-src 'self';frame-ancestors 'none';base-uri 'self';form-action 'self'",
     );
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
-    assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(response.headers.get('referrer-policy'), 'same-origin');
+    assert.match(response.headers.get('strict-transport-security') || '', /max-age=/);
   } finally {
     await closeTestApp(server);
   }

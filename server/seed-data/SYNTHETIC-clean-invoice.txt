@@ -1,0 +1,9 @@
+SYNTHETIC INVOICE
+Invoice number: SYNTH-CLEAN-001
+Supplier: SYNTHETIC Trusted Payee
+Payee contact: trusted@synthetic.test
+Invoice date: 2026-10-01
+Due date: 2026-11-01
+Currency: USD
+Line item: Printer paper, 10.00 USD
+Total: 10.00 USD

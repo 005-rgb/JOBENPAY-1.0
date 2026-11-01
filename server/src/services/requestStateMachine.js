@@ -1,10 +1,11 @@
 import { AppError } from '../lib/errors.js';
 import { appendEntry, LEDGER_TYPES } from './ledger.js';
 import { commitSpend, release } from './budget.js';
+import { notifyOrgRoles } from '../repositories/notifications.js';
 
 const GRAPH = Object.freeze({
   RECEIVED: ['EVALUATING'],
-  EVALUATING: ['REJECTED', 'PENDING_APPROVAL', 'APPROVED'],
+  EVALUATING: ['REJECTED', 'PENDING_APPROVAL', 'APPROVED', 'CANCELLED'],
   PENDING_APPROVAL: ['APPROVED', 'REJECTED', 'EXPIRED', 'CANCELLED'],
   APPROVED: ['EXECUTING', 'CANCELLED'],
   EXECUTING: ['EXECUTED', 'FAILED'],
@@ -21,8 +22,10 @@ function transitionError(from, to) {
 
 function ledgerType(to, meta = {}) {
   if (meta.ledgerType) return meta.ledgerType;
+  if (to === 'EVALUATING') return LEDGER_TYPES.REQUEST_EVALUATING;
   if (to === 'EXECUTED') return LEDGER_TYPES.EXECUTION_RESULT;
-  if (to === 'RECONCILED' || to === 'MISMATCH') return LEDGER_TYPES.RECONCILED;
+  if (to === 'RECONCILED') return LEDGER_TYPES.RECONCILED;
+  if (to === 'MISMATCH') return LEDGER_TYPES.MISMATCH;
   if (to === 'EXECUTING') return LEDGER_TYPES.EXECUTION_STARTED;
   if (to === 'REJECTED' || to === 'PENDING_APPROVAL' || to === 'APPROVED') return LEDGER_TYPES.REQUEST_DECIDED;
   return LEDGER_TYPES.REQUEST_CANCELLED;
@@ -45,7 +48,10 @@ export async function transition(tx, request, to, actor, meta = {}) {
          decision = COALESCE($2, decision),
          reason_codes = COALESCE($3::text[], reason_codes),
          explanation = COALESCE($4, explanation),
-         reserved_released = CASE WHEN $1 = ANY($5::text[]) THEN true ELSE reserved_released END
+         reserved_released = CASE
+           WHEN $1 = ANY($5::text[]) AND NOT $9::boolean THEN true
+           ELSE reserved_released
+         END
      WHERE id = $6 AND org_id = $7 AND status = $8
      RETURNING *`,
     [
@@ -57,6 +63,7 @@ export async function transition(tx, request, to, actor, meta = {}) {
       request.id,
       request.org_id,
       from,
+      meta.preserveReservation === true,
     ],
   );
   if (!updated.rowCount) {
@@ -66,7 +73,8 @@ export async function transition(tx, request, to, actor, meta = {}) {
   }
   const current = updated.rows[0];
 
-  if (RELEASE_STATES.has(to) && request.reserved_released !== true && request.reserved_period_id) {
+  if (RELEASE_STATES.has(to) && meta.preserveReservation !== true
+    && request.reserved_released !== true && request.reserved_period_id) {
     await release(tx, request.reserved_period_id, request.reserved_amount_minor ?? request.amount_minor);
     await tx.query(
       'UPDATE payment_requests SET reserved_released = true WHERE id = $1 AND org_id = $2',
@@ -94,6 +102,12 @@ export async function transition(tx, request, to, actor, meta = {}) {
       ...(meta.ledgerPayload || {}),
     },
   });
+  if (['EXECUTED', 'FAILED', 'MISMATCH'].includes(to)) {
+    await notifyOrgRoles(tx, request.org_id, ['OWNER', 'ADMIN', 'APPROVER'], `REQUEST_${to}`, {
+      requestId: request.id,
+      status: to,
+    });
+  }
   return current;
 }
 

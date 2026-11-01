@@ -4,6 +4,8 @@ import pool from '../db/pool.js';
 import { enqueue, heartbeat, complete, fail, claimNext } from './queue.js';
 import { getHandler } from './registry.js';
 import { logger } from '../lib/logger.js';
+import { scheduleApprovalExpiry } from './expireApprovals.js';
+import { scheduleDemoReset } from './resetDemoData.js';
 
 const WORKER_CONCURRENCY = 2;
 const PROCESS_HEARTBEAT_MS = 10_000;
@@ -18,6 +20,16 @@ export async function executeClaimedJob(job) {
   heartbeatTimer.unref();
 
   try {
+    if (job.org_id) {
+      const organization = await pool.query(
+        'SELECT archived_at FROM organizations WHERE id = $1',
+        [job.org_id],
+      );
+      if (organization.rows[0]?.archived_at) {
+        await complete(job.id);
+        return;
+      }
+    }
     await handler(job, {
       db: pool,
       heartbeat: () => heartbeat(job.id),
@@ -85,6 +97,8 @@ export function startWorker({
           payload: {},
           dedupeKey: 'job:cleanup-hourly',
         });
+        await scheduleApprovalExpiry(pool);
+        await scheduleDemoReset(pool);
 
         const slots = WORKER_CONCURRENCY - active.size;
         if (slots > 0) {

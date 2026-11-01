@@ -4,6 +4,8 @@ import pool from '../db/pool.js';
 import { enqueue, claimNext } from './queue.js';
 import { executeClaimedJob } from './worker.js';
 import { logger } from '../lib/logger.js';
+import { scheduleApprovalExpiry } from './expireApprovals.js';
+import { scheduleDemoReset } from './resetDemoData.js';
 
 const DEFAULT_MAX_DURATION_MS = 55_000;
 
@@ -26,6 +28,8 @@ export async function drainQueue({ maxDurationMs = getMaxDurationMs() } = {}) {
     payload: {},
     dedupeKey: 'job:cleanup-hourly',
   });
+  await scheduleApprovalExpiry(pool);
+  await scheduleDemoReset(pool);
 
   while (Date.now() < deadline) {
     const [job] = await claimNext(1);

@@ -21,8 +21,8 @@ function dice(a, b) {
 }
 
 export function flagB1PayeeNew({ payee }) {
-  return payee?.trust !== 'TRUSTED' || payee?.allowed === false
-    ? { code: 'PAYEE_NEW', detail: 'Payee is not trusted or is outside the allowlist.' } : null;
+  return payee && (payee.trust !== 'TRUSTED' || payee.allowed === false)
+    ? { code: 'PAYEE_NEW', detail: 'Payee is new, untrusted, or outside the allowlist and requires review.' } : null;
 }
 
 export function flagB2PayeeChanged({ history = {} }) {

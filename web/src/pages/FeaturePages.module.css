@@ -161,7 +161,7 @@
 
 .iconAction {
   align-items: center;
-  background: transparent;
+  background: var(--jp-transparent);
   border: 0;
   color: var(--jp-text);
   cursor: pointer;

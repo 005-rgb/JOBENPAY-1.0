@@ -32,6 +32,7 @@ test('agent authentication verifies HMAC and applies disabled, revoked, and rate
       : []),
     touchKey: async () => { touched += 1; return true; },
     applyRateLimit: async () => limited,
+    findOrganization: async () => ({ rows: [{ archived_at: null }] }),
   });
   const request = (key = generated.apiKey) => ({
     get(name) {
@@ -64,4 +65,36 @@ test('assertOwnedByAgent denies cross-agent resource access', () => {
     () => assertOwnedByAgent('agent-a', 'agent-b'),
     (error) => error.code === 'NOT_FOUND' && error.statusCode === 404,
   );
+});
+
+test('agent API rate limit permits 60 requests per key per minute and rejects the 61st', async () => {
+  const generated = createAgentApiKey();
+  const stored = {
+    id: 'key-limit-id',
+    org_id: 'org-id',
+    agent_id: 'agent-id',
+    key_hash: hashAgentApiKey(pepper, generated.apiKey),
+    agent_status: 'ACTIVE',
+    revoked_at: null,
+  };
+  let calls = 0;
+  const middleware = createAgentAuth({
+    pepper,
+    findKeys: async () => [stored],
+    touchKey: async () => true,
+    findOrganization: async () => ({ rows: [{ archived_at: null }] }),
+    applyRateLimit: async () => {
+      calls += 1;
+      return calls > 60;
+    },
+  });
+  const invoke = async () => new Promise((resolve) => {
+    middleware({
+      get(name) {
+        return name === 'authorization' ? `Bearer ${generated.apiKey}` : '';
+      },
+    }, {}, (error) => resolve(error || null));
+  });
+  for (let attempt = 0; attempt < 60; attempt += 1) assert.equal(await invoke(), null);
+  assert.equal((await invoke()).statusCode, 429);
 });

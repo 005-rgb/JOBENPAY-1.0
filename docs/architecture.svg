@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 330" role="img" aria-labelledby="title description">
+  <title id="title">JOBENPAY request and payout architecture</title>
+  <desc id="description">A payout request passes through deterministic gates and an AI check, then any required human approval, server execution, verified webhook reconciliation, and the ledger.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="1118" height="328" rx="18" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#0f172a">
+    <g font-size="16" font-weight="700">
+      <rect x="28" y="104" width="132" height="76" rx="12" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+      <text x="94" y="148">Request</text>
+      <rect x="188" y="104" width="132" height="76" rx="12" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+      <text x="254" y="148">Gate</text>
+      <rect x="348" y="104" width="132" height="76" rx="12" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+      <text x="414" y="148">AI check</text>
+      <rect x="508" y="104" width="132" height="76" rx="12" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+      <text x="574" y="148">Approval</text>
+      <rect x="668" y="104" width="132" height="76" rx="12" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+      <text x="734" y="148">Execution</text>
+      <rect x="828" y="104" width="132" height="76" rx="12" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+      <text x="894" y="148">Webhook</text>
+      <rect x="988" y="104" width="104" height="76" rx="12" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+      <text x="1040" y="148">Ledger</text>
+    </g>
+    <g stroke="#334155" stroke-width="3" marker-end="url(#arrow)">
+      <path d="M160 142 H181"/>
+      <path d="M320 142 H341"/>
+      <path d="M480 142 H501"/>
+      <path d="M640 142 H661"/>
+      <path d="M800 142 H821"/>
+      <path d="M960 142 H981"/>
+    </g>
+    <g font-size="13">
+      <text x="254" y="205">Deterministic policy</text>
+      <text x="414" y="205">Can only tighten</text>
+      <text x="574" y="205">When required</text>
+      <text x="734" y="205">PayPal Sandbox</text>
+      <text x="894" y="205">Signature verified</text>
+      <text x="560" y="274" font-size="15" font-weight="700">Decision evidence and payout reconciliation are recorded in a verifiable chain</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,658 @@
+.pageStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-6);
+  min-width: 0;
+}
+
+.pageToolbar,
+.cardHeading,
+.inlineActions,
+.pagination {
+  align-items: center;
+  display: flex;
+  gap: var(--jp-space-4);
+  justify-content: space-between;
+}
+
+.pageToolbar h2,
+.cardHeading h2,
+.cardHeading p,
+.formCard h2,
+.formCard h3,
+.policyGroup h3,
+.actionCard h2,
+.actionCard h3 {
+  margin: 0;
+}
+
+.primaryLink {
+  align-items: center;
+  background: var(--jp-black);
+  border-radius: var(--jp-radius-pill);
+  color: var(--jp-white);
+  display: inline-flex;
+  font-size: var(--jp-font-size-button-md);
+  font-weight: var(--jp-font-weight-bold);
+  gap: var(--jp-space-2);
+  height: var(--jp-btn-h-md);
+  justify-content: center;
+  padding: 0 var(--jp-space-4);
+  text-decoration: none;
+}
+
+.primaryLink:hover {
+  background: var(--jp-button-hover);
+}
+
+.primaryLink svg,
+.iconLink svg {
+  height: var(--jp-nav-icon-size);
+  width: var(--jp-nav-icon-size);
+}
+
+.loadingRows {
+  display: grid;
+  gap: var(--jp-space-4);
+}
+
+.loadingRows > div {
+  min-height: var(--jp-table-row-h);
+}
+
+.tableCard {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.dataTable {
+  border-collapse: collapse;
+  min-width: 100%;
+  text-align: left;
+  width: max-content;
+}
+
+.dataTable th {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+  font-weight: var(--jp-font-weight-medium);
+}
+
+.dataTable th,
+.dataTable td {
+  border-bottom: var(--jp-border-width) solid var(--jp-border);
+  height: var(--jp-table-row-h);
+  padding: var(--jp-space-4);
+  white-space: nowrap;
+}
+
+.dataTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.dataTable tbody tr:hover {
+  background: var(--jp-surface-sidebar);
+}
+
+.dataTable a {
+  color: var(--jp-link);
+  text-decoration: underline;
+  text-underline-offset: var(--jp-space-1);
+}
+
+.dataTable code,
+.detailsList code,
+.diffPreview {
+  font-family: var(--jp-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.cellDescription,
+.muted {
+  color: var(--jp-text-muted);
+}
+
+.cellDescription {
+  display: block;
+  font-size: var(--jp-font-size-caption);
+}
+
+.tableActions {
+  align-items: center;
+  display: flex;
+  gap: var(--jp-space-2);
+}
+
+.amountCell {
+  text-align: right !important;
+}
+
+.pagination {
+  padding: var(--jp-space-4);
+}
+
+.pagination > span {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.pagination > div {
+  display: flex;
+  gap: var(--jp-space-2);
+}
+
+.pagination button {
+  min-width: var(--jp-small-icon-button);
+  padding: 0;
+}
+
+.formCard,
+.actionCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+  min-width: 0;
+}
+
+.formCard > p,
+.actionCard > p {
+  margin: 0;
+}
+
+.formCard > p,
+.cardHeading p,
+.muted {
+  color: var(--jp-text-muted);
+}
+
+.inlineActions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.builderTop,
+.editorGrid,
+.filters {
+  display: grid;
+  gap: var(--jp-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--jp-card-tile-min-w)), 1fr));
+}
+
+.editorField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-2);
+  min-width: 0;
+}
+
+.editorField > span,
+.editorField legend {
+  font-size: var(--jp-font-size-caption);
+  font-weight: var(--jp-font-weight-medium);
+}
+
+.editorField textarea {
+  background: var(--jp-surface);
+  border: var(--jp-border-width) solid var(--jp-border-input);
+  border-radius: var(--jp-radius-input);
+  color: var(--jp-text);
+  font: inherit;
+  min-height: var(--jp-feedback-textarea-h);
+  padding: var(--jp-space-4);
+  resize: vertical;
+  width: 100%;
+}
+
+.editorField textarea:focus-visible,
+.searchField:focus-within {
+  border-color: var(--jp-blue);
+  outline: var(--jp-focus-ring-width) solid var(--jp-blue);
+  outline-offset: var(--jp-focus-ring-offset);
+}
+
+.editorField small,
+.formError {
+  color: var(--jp-error);
+}
+
+.editorField fieldset,
+fieldset.editorField {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.choiceGrid {
+  display: grid;
+  gap: var(--jp-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--jp-card-tile-min-w)), 1fr));
+}
+
+.checkLine {
+  align-items: center;
+  display: flex;
+  gap: var(--jp-space-2);
+  min-height: var(--jp-control-size);
+}
+
+.checkLine input {
+  accent-color: var(--jp-text);
+  height: var(--jp-control-size);
+  width: var(--jp-control-size);
+}
+
+.formError {
+  margin: 0;
+}
+
+.policyGroups {
+  display: grid;
+  gap: var(--jp-space-4);
+}
+
+.policyGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+}
+
+.diffPreview {
+  background: var(--jp-surface-sidebar);
+  border-radius: var(--jp-radius-card);
+  font-size: var(--jp-code-font-size);
+  max-height: var(--jp-sheet-max-height);
+  overflow: auto;
+  padding: var(--jp-space-4);
+  white-space: pre-wrap;
+}
+
+.detailsList {
+  display: grid;
+  gap: var(--jp-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--jp-card-tile-min-w)), 1fr));
+  margin: 0;
+}
+
+.detailsList > div,
+.policySummary dl > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-1);
+  min-width: 0;
+}
+
+.detailsList dt,
+.policySummary dt {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.detailsList dd,
+.policySummary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.policySummary {
+  display: grid;
+  gap: var(--jp-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--jp-card-tile-min-w)), 1fr));
+}
+
+.policySummary section {
+  border-top: var(--jp-border-width) solid var(--jp-border);
+  padding-top: var(--jp-space-3);
+}
+
+.versionsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-3);
+}
+
+.versionsList > div {
+  align-items: center;
+  border-top: var(--jp-border-width) solid var(--jp-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jp-space-3);
+  padding-top: var(--jp-space-3);
+}
+
+.versionsList span,
+.versionsList small {
+  color: var(--jp-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.policySummary h3 {
+  font-size: var(--jp-font-size-section-title);
+  margin: 0 0 var(--jp-space-3);
+}
+
+.policySummary dl {
+  display: grid;
+  gap: var(--jp-space-3);
+  margin: 0;
+}
+
+.budgetCard,
+.nestedCard {
+  border: var(--jp-border-width) solid var(--jp-border);
+  border-radius: var(--jp-radius-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-3);
+  padding: var(--jp-space-4);
+}
+
+.budgetCard progress,
+.uploadZone progress {
+  accent-color: var(--jp-blue);
+  width: 100%;
+}
+
+.budgetCard p,
+.budgetCard small {
+  margin: 0;
+}
+
+.budgetCard small,
+.budgetCard .cardHeading > span {
+  color: var(--jp-text-muted);
+}
+
+.uploadZone {
+  align-items: center;
+  border-style: dashed;
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-3);
+  text-align: center;
+}
+
+.uploadZone > svg {
+  height: var(--jp-icon-size);
+  width: var(--jp-icon-size);
+}
+
+.uploadZone h2,
+.uploadZone p {
+  margin: 0;
+}
+
+.uploadZone input[type="file"] {
+  max-width: 100%;
+}
+
+.uploadZone progress {
+  max-width: var(--jp-main-content-max);
+}
+
+.uploadDragging {
+  border-color: var(--jp-blue);
+  background: var(--jp-info-bg);
+}
+
+.flagText,
+.flagList li {
+  align-items: center;
+  color: var(--jp-warning-text);
+  display: flex;
+  gap: var(--jp-space-2);
+}
+
+.flagText {
+  font-size: var(--jp-font-size-caption);
+}
+
+.flagText svg,
+.flagList svg {
+  flex: 0 0 var(--jp-nav-icon-size);
+  height: var(--jp-nav-icon-size);
+  width: var(--jp-nav-icon-size);
+}
+
+.flagSection ul,
+.flagList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.flagSection li {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jp-space-2);
+}
+
+.flagSection li small {
+  color: var(--jp-text-muted);
+}
+
+.iconLink {
+  align-items: center;
+  border: var(--jp-border-width) solid var(--jp-border);
+  border-radius: var(--jp-radius-pill);
+  color: var(--jp-text);
+  display: inline-flex;
+  height: var(--jp-small-icon-button);
+  justify-content: center;
+  text-decoration: none;
+  width: var(--jp-small-icon-button);
+}
+
+.filters {
+  align-items: center;
+}
+
+.filterPill {
+  align-items: center;
+  background: var(--jp-surface);
+  border: var(--jp-border-width) solid var(--jp-border);
+  border-radius: var(--jp-radius-pill);
+  display: inline-flex;
+  gap: var(--jp-space-2);
+  min-height: var(--jp-btn-h-md);
+  padding: 0 var(--jp-space-3);
+}
+
+.filterPill > span {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.filterPill select {
+  background: var(--jp-transparent);
+  border: 0;
+  color: var(--jp-text);
+  font: inherit;
+  max-width: 100%;
+  outline: 0;
+}
+
+.filterPill:focus-within {
+  border-color: var(--jp-blue);
+  outline: var(--jp-focus-ring-width) solid var(--jp-blue);
+  outline-offset: var(--jp-focus-ring-offset);
+}
+
+.searchField {
+  align-items: center;
+  border: var(--jp-border-width) solid var(--jp-border-input);
+  border-radius: var(--jp-radius-input);
+  display: flex;
+  gap: var(--jp-space-2);
+  min-height: var(--jp-input-h);
+  padding: 0 var(--jp-space-4);
+}
+
+.searchField svg {
+  color: var(--jp-text-muted);
+  height: var(--jp-nav-icon-size);
+  width: var(--jp-nav-icon-size);
+}
+
+.searchField input {
+  background: transparent;
+  border: 0;
+  color: var(--jp-text);
+  font: inherit;
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+
+.detailColumns {
+  align-items: start;
+  display: grid;
+  gap: var(--jp-space-6);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+.actionCard {
+  position: sticky;
+  top: var(--jp-space-4);
+}
+
+.actionCard section {
+  border-top: var(--jp-border-width) solid var(--jp-border);
+  padding-top: var(--jp-space-4);
+}
+
+.decisionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jp-space-3);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.timeline li {
+  display: grid;
+  gap: var(--jp-space-3);
+  grid-template-columns: var(--jp-control-size) minmax(0, 1fr);
+  min-height: var(--jp-table-row-h);
+  position: relative;
+}
+
+.timeline li:not(:last-child)::before {
+  border-left: var(--jp-border-width) solid var(--jp-border);
+  bottom: 0;
+  content: "";
+  left: calc(var(--jp-control-size) / 2);
+  position: absolute;
+  top: var(--jp-control-size);
+}
+
+.timelineDot {
+  background: var(--jp-text);
+  border: var(--jp-border-width) solid var(--jp-surface);
+  border-radius: var(--jp-radius-pill);
+  height: var(--jp-space-3);
+  margin: var(--jp-space-1) auto 0;
+  position: relative;
+  width: var(--jp-space-3);
+}
+
+.timeline li > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-1);
+  padding-bottom: var(--jp-space-4);
+}
+
+.timeline small,
+.timeline code,
+.reasonCode {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.timeline p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.timeline a,
+.iconLink {
+  color: var(--jp-link);
+}
+
+.reasonCodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jp-space-2);
+}
+
+.reasonCodes code,
+.reasonCode {
+  background: var(--jp-neutral-bg);
+  border-radius: var(--jp-radius-card);
+  padding: var(--jp-space-1) var(--jp-space-2);
+}
+
+@media (--jp-tablet-down) {
+  .detailColumns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actionCard {
+    position: static;
+  }
+}
+
+@media (--jp-mobile-down) {
+  .pageToolbar,
+  .cardHeading,
+  .inlineActions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .tableScroll {
+    overflow: visible;
+  }
+
+  .dataTable,
+  .dataTable tbody,
+  .dataTable tr,
+  .dataTable td {
+    display: block;
+    width: 100%;
+  }
+
+  .dataTable thead {
+    display: none;
+  }
+
+  .dataTable tr {
+    border-bottom: var(--jp-border-width) solid var(--jp-border);
+    padding: var(--jp-space-2) 0;
+  }
+
+  .dataTable td {
+    border: 0;
+    height: auto;
+    padding: var(--jp-space-2) var(--jp-space-4);
+    white-space: normal;
+  }
+
+  .amountCell {
+    text-align: left !important;
+  }
+}

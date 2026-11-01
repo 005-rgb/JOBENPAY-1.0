@@ -33,3 +33,38 @@ export async function markWebhookReceived(orgId, eventId, db) {
   `, [orgId, eventId]);
   return result.rowCount;
 }
+
+export async function getVerifiedWebhookEvent(orgId, eventId, db) {
+  assertOrgId(orgId);
+  const result = await db.query(
+    `SELECT id, org_id, paypal_event_id, event_type, payload, status, processed_at
+     FROM webhook_events
+     WHERE org_id = $1 AND paypal_event_id = $2 AND verified = true
+     LIMIT 1`,
+    [orgId, eventId],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function lockVerifiedWebhookEvent(tx, orgId, eventId) {
+  assertOrgId(orgId);
+  const result = await tx.query(
+    `SELECT id, org_id, paypal_event_id, event_type, payload, status, processed_at
+     FROM webhook_events
+     WHERE org_id = $1 AND paypal_event_id = $2 AND verified = true
+     LIMIT 1
+     FOR UPDATE`,
+    [orgId, eventId],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function markWebhookProcessed(tx, orgId, eventId, status = 'PROCESSED') {
+  assertOrgId(orgId);
+  await tx.query(
+    `UPDATE webhook_events
+     SET status = $3, processed_at = now()
+     WHERE org_id = $1 AND paypal_event_id = $2 AND verified = true`,
+    [orgId, eventId, status],
+  );
+}

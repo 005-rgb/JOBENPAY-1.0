@@ -42,17 +42,37 @@ test('PayPal client caches OAuth, keeps credentials out of errors, retries trans
 
   try {
     const paypal = await paypalFor(orgId, { db: credentialsDb(), encryptionKey });
+    fake.setTransientFailures('/v1/payments/payouts', 503, 1);
     const first = await paypal.request('POST', '/v1/payments/payouts', {
-      body: { sender_batch_header: { sender_batch_id: 'test-batch' } },
+      body: {
+        sender_batch_header: { sender_batch_id: 'test-batch' },
+        items: [{ recipient_type: 'EMAIL', receiver: 'test@example.test', amount: { value: '1.00', currency: 'USD' } }],
+      },
       idempotencyId: 'test-request-id',
     });
     const duplicate = await paypal.request('POST', '/v1/payments/payouts', {
-      body: { sender_batch_header: { sender_batch_id: 'test-batch' } },
+      body: {
+        sender_batch_header: { sender_batch_id: 'test-batch' },
+        items: [{ recipient_type: 'EMAIL', receiver: 'test@example.test', amount: { value: '1.00', currency: 'USD' } }],
+      },
       idempotencyId: 'test-request-id',
     });
     assert.deepEqual(duplicate, first);
     assert.equal(fake.uniquePayoutCount, 1);
+    assert.equal(fake.getRequestCount('/v1/payments/payouts'), 3);
     assert.equal(fake.oauthCalls, 1);
+
+    fake.setTransientFailures('/v1/payments/payouts', 503, 1);
+    await assert.rejects(
+      () => paypal.request('POST', '/v1/payments/payouts', {
+        body: {
+          sender_batch_header: { sender_batch_id: 'unsafe-batch' },
+          items: [{ recipient_type: 'EMAIL', receiver: 'test@example.test', amount: { value: '1.00', currency: 'USD' } }],
+        },
+      }),
+      (error) => error.code === 'PAYPAL_UNAVAILABLE',
+    );
+    assert.equal(fake.getRequestCount('/v1/payments/payouts'), 4);
 
     fake.setTransientFailures('/v1/payments/payouts/PAYOUT-1', 503, 1);
     const payout = await paypal.request('GET', '/v1/payments/payouts/PAYOUT-1');

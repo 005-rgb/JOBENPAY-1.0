@@ -10,14 +10,16 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
-import { pino } from 'pino';
+import { z } from 'zod';
 
 import { env } from './config.js';
 import { query } from './db/pool.js';
 import { withTx } from './db/tx.js';
-import { errorHandler } from './lib/errors.js';
+import { AppError, errorHandler } from './lib/errors.js';
 import { decrypt, encrypt, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
 import { appendAudit } from './repositories/audit.js';
+import { listAuditEvents } from './repositories/auditListing.js';
+import { listLedgerEntries } from './repositories/ledger.js';
 import { getDashboardSummary } from './repositories/dashboard.js';
 import {
   createAgent,
@@ -29,7 +31,7 @@ import {
   revokeAgentKey,
   updateAgent,
 } from './repositories/agents.js';
-import { getMembership } from './repositories/memberships.js';
+import { findFirstMembership, getMembership } from './repositories/memberships.js';
 import { getCurrentOrg, setFrozenStatus } from './repositories/orgs.js';
 import {
   createPayee,
@@ -40,7 +42,7 @@ import {
   updatePayee,
   updatePayeeTrust,
 } from './repositories/payees.js';
-import { rateLimit } from './repositories/rateLimit.js';
+import { enforceRateLimit, rateLimit } from './repositories/rateLimit.js';
 import { insertVerifiedWebhookEvent } from './repositories/webhookEvents.js';
 import {
   deletePaypalConnection,
@@ -52,6 +54,13 @@ import {
 } from './repositories/paypalConnections.js';
 import { listNotifications, markNotificationRead } from './repositories/notifications.js';
 import {
+  getActiveAgentBudget,
+  getAgentRequest,
+  listRequests,
+  getRequestTimeline,
+} from './repositories/requests.js';
+import { listApprovals, getApprovalDetail } from './repositories/approvals.js';
+import {
   getDocument,
   getDocumentExtraction,
   listDocuments,
@@ -59,11 +68,12 @@ import {
 } from './repositories/documents.js';
 import { consumeGrant, createGrant, useGrant } from './repositories/stepUp.js';
 import { createSession, deleteSession, findSessionByCookie } from './repositories/sessions.js';
-import { createUser, findUserByEmail, findUserById, resetLoginFailure, updateLoginFailure } from './repositories/users.js';
-import { enqueue } from './jobs/queue.js';
+import { createUser, findUserByEmail, findUserById, recordLoginFailure, resetLoginFailure } from './repositories/users.js';
+import { enqueue, queueStats } from './jobs/queue.js';
 import { agentAuth } from './auth/agentAuth.js';
+import { effectiveRole } from './auth/permissions.js';
 import { clearPaypalTokenCache, paypalFor } from './paypal/client.js';
-import { appendEntry, LEDGER_TYPES } from './services/ledger.js';
+import { appendEntry, exportLedger, LEDGER_TYPES, verifyChain } from './services/ledger.js';
 import { createAgentApiKey, hashAgentApiKey } from './lib/agentApiKeys.js';
 import { preparePayeeIdentifier } from './lib/payeeIdentifiers.js';
 import { uploadMultipartDocument } from './documents/multipart.js';
@@ -82,9 +92,16 @@ import {
 } from './services/mandates.js';
 import { getBudget } from './services/budget.js';
 import { submitPaymentRequest } from './services/requests.js';
+import { resetDemoBudget } from './services/simulator.js';
+import { resetDemoOrganization } from './services/demoReset.js';
+import { cancelRequest, decideApproval } from './services/approvals.js';
+import { onFreeze } from './services/freeze.js';
+import { AGENT_MCP_TOOLS, createMcpRequestHandler, mcpOriginGuard } from './agent/mcp.js';
+import { logger } from './lib/logger.js';
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000000';
 const MIGRATIONS_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
+const INTEGRATION_DOC_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../docs/INTEGRATION.md');
 const WEB_BUILD_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 const WEB_INDEX_FILE = path.join(WEB_BUILD_DIRECTORY, 'index.html');
 const STEP_UP_PURPOSES = new Set([
@@ -98,6 +115,96 @@ const AGENT_STATUSES = new Set(['ACTIVE', 'DISABLED']);
 const PAYEE_KINDS = new Set(['EMAIL', 'PAYPAL_ID', 'PHONE']);
 const PAYEE_TRUST_STATES = new Set(['TRUSTED', 'BLOCKED', 'PENDING_REVIEW']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const agentPayoutSchema = z.object({
+  payeeId: z.string().uuid(),
+  amountMinor: z.union([
+    z.number().int().positive().safe(),
+    z.string().regex(/^[1-9]\d*$/),
+  ]),
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  documentId: z.string().uuid().optional(),
+  reason: z.string().max(2000).optional(),
+}).strict();
+const mcpPayoutSchema = agentPayoutSchema.extend({
+  idempotencyKey: z.string().trim().min(1).max(200),
+}).strict();
+const mcpRequestStatusSchema = z.object({
+  requestId: z.string().uuid(),
+}).strict();
+const mcpBudgetStatusSchema = z.object({}).strict();
+
+function agentValidationError() {
+  return buildError('VALIDATION_FAILED', 'Invalid payout proposal fields.', 400);
+}
+
+function agentBudgetPayload(budget) {
+  return {
+    limitMinor: String(budget?.limit_minor ?? '0'),
+    reservedMinor: String(budget?.reserved_minor ?? '0'),
+    spentMinor: String(budget?.spent_minor ?? '0'),
+  };
+}
+
+async function submitAgentPayout(agent, input, idempotencyKey) {
+  const parsed = agentPayoutSchema.safeParse(input);
+  if (!parsed.success) throw agentValidationError();
+  if (typeof idempotencyKey !== 'string' || !idempotencyKey.trim() || idempotencyKey.length > 200) {
+    throw buildError('VALIDATION_FAILED', 'Idempotency-Key header is required and must be at most 200 characters.', 400);
+  }
+  const body = parsed.data;
+  if (body.documentId) {
+    const document = await getDocument(agent.orgId, body.documentId);
+    if (!document || document.uploader_kind !== 'AGENT' || document.uploader_id !== agent.id) {
+      throw buildError('NOT_FOUND', 'Document not found.', 404);
+    }
+  }
+  const request = await submitPaymentRequest({
+    orgId: agent.orgId,
+    agentId: agent.id,
+    action: 'PAYOUT',
+    payeeId: body.payeeId,
+    amountMinor: body.amountMinor,
+    currency: body.currency,
+    documentId: body.documentId,
+    reason: body.reason,
+    idempotencyKey: idempotencyKey.trim(),
+  });
+  const budget = await getActiveAgentBudget(agent.orgId, agent.id);
+  return {
+    requestId: request.id,
+    status: request.status,
+    decision: request.decision ?? null,
+    reasonCodes: request.reasonCodes ?? request.reason_codes ?? [],
+    message: request.explanation || 'Request evaluated.',
+    budget: agentBudgetPayload(budget),
+  };
+}
+
+async function getAgentRequestStatus(agent, requestId) {
+  if (!validUuid(requestId)) throw buildError('VALIDATION_FAILED', 'requestId must be a UUID.', 400);
+  const request = await getAgentRequest(agent.orgId, agent.id, requestId);
+  if (!request) throw buildError('NOT_FOUND', 'Request not found.', 404);
+  return {
+    requestId: request.id,
+    status: request.status,
+    decision: request.decision,
+    reasonCodes: request.reason_codes ?? [],
+    message: request.explanation || 'Request status retrieved.',
+  };
+}
+
+async function getAgentBudgetStatus(agent) {
+  const budget = await getActiveAgentBudget(agent.orgId, agent.id);
+  return {
+    decision: null,
+    reasonCodes: [],
+    message: budget ? 'Active mandate budget retrieved.' : 'No active mandate budget.',
+    budget: {
+      ...agentBudgetPayload(budget),
+      currency: budget?.currency?.trim() || null,
+    },
+  };
+}
 
 function validUuid(value) {
   return UUID_PATTERN.test(String(value || ''));
@@ -154,8 +261,7 @@ function cookieOptions() {
 }
 
 function buildError(code, message, statusCode) {
-  const error = new Error(message || code);
-  error.code = code;
+  const error = new AppError(code, message || code);
   error.statusCode = statusCode;
   return error;
 }
@@ -169,12 +275,13 @@ function requireSession(req, _res, next) {
 
   const sessionId = String(rawToken).trim();
   findSessionByCookie(GLOBAL_ORG_ID, sessionId)
-    .then((session) => {
+    .then(async (session) => {
       if (!session) {
         next(buildError('UNAUTHENTICATED', 'Authentication required.', 401));
         return;
       }
 
+      await enforceRateLimit(`session:${session.id}`, 300, 60);
       req.session = session;
       next();
     })
@@ -196,7 +303,16 @@ function requireCsrf(req, _res, next) {
     return;
   }
 
-  next();
+  const orgId = session.current_org_id || GLOBAL_ORG_ID;
+  query('SELECT archived_at FROM organizations WHERE id = $1', [orgId])
+    .then(({ rows }) => {
+      if (rows[0]?.archived_at) {
+        next(buildError('ORG_ARCHIVED', 'This organization is archived and read-only.', 409));
+        return;
+      }
+      next();
+    })
+    .catch(next);
 }
 
 function requireRole(...roles) {
@@ -204,13 +320,17 @@ function requireRole(...roles) {
     try {
       const session = req.session;
       const user = await findUserById(GLOBAL_ORG_ID, session.user_id);
-      const membership = await getMembership(GLOBAL_ORG_ID, user.id, session.current_org_id || GLOBAL_ORG_ID);
-      if (!membership || !roles.includes(membership.role)) {
+      const orgId = session.current_org_id || GLOBAL_ORG_ID;
+      const membership = await getMembership(orgId, user.id, orgId);
+      const org = membership?.is_judge ? await getCurrentOrg(orgId, user.id) : null;
+      const role = effectiveRole(membership, org?.slug);
+      if (!membership || !roles.includes(role)) {
         next(buildError('FORBIDDEN', 'Insufficient role privileges.', 403));
         return;
       }
       req.user = user;
       req.membership = membership;
+      req.role = role;
       next();
     } catch (error) {
       next(error);
@@ -245,15 +365,36 @@ async function loadSessionUser(req) {
   }
 
   const user = await findUserById(GLOBAL_ORG_ID, session.user_id);
-  const org = await getCurrentOrg(GLOBAL_ORG_ID, user.id);
-  const membership = await getMembership(GLOBAL_ORG_ID, user.id, org?.id || session.current_org_id || GLOBAL_ORG_ID);
+  const orgId = session.current_org_id || GLOBAL_ORG_ID;
+  const org = await getCurrentOrg(orgId, user.id);
+  const membership = await getMembership(orgId, user.id, org?.id || orgId);
 
   return { user, org, membership, session };
 }
 
 export function createApp() {
   const app = express();
-  const logger = pino();
+  const mcpHandler = createMcpRequestHandler({
+    invokeTool: async (name, args, agent) => {
+      if (name === 'propose_payout') {
+        const parsed = mcpPayoutSchema.safeParse(args);
+        if (!parsed.success) throw agentValidationError();
+        const { idempotencyKey, ...input } = parsed.data;
+        return submitAgentPayout(agent, input, idempotencyKey);
+      }
+      if (name === 'get_request_status') {
+        const parsed = mcpRequestStatusSchema.safeParse(args);
+        if (!parsed.success) throw agentValidationError();
+        return getAgentRequestStatus(agent, parsed.data.requestId);
+      }
+      if (name === 'get_budget_status') {
+        const parsed = mcpBudgetStatusSchema.safeParse(args);
+        if (!parsed.success) throw agentValidationError();
+        return getAgentBudgetStatus(agent);
+      }
+      throw buildError('VALIDATION_FAILED', 'Unknown MCP tool.', 400);
+    },
+  });
 
   app.disable('x-powered-by');
   app.use(helmet({
@@ -271,6 +412,7 @@ export function createApp() {
         formAction: ["'self'"],
       },
     },
+    referrerPolicy: { policy: 'same-origin' },
   }));
   app.use(readRequestId);
   app.use(pinoHttp({
@@ -316,6 +458,8 @@ export function createApp() {
     }
   });
 
+  app.post('/mcp', mcpOriginGuard, agentAuth, mcpHandler);
+
   app.get('/readyz', async (req, res) => {
     try {
       const migrations = (await readdir(MIGRATIONS_DIRECTORY))
@@ -330,7 +474,7 @@ export function createApp() {
       `);
       let ready = Boolean(latestMigration && applied.rows[0]?.filename === latestMigration);
 
-      if (ready && env.WORKER_ENABLED === 1) {
+      if (ready) {
         const heartbeat = await query(`
           SELECT 1
           FROM jobs
@@ -357,14 +501,18 @@ export function createApp() {
   app.post('/webhooks/paypal/:webhookToken', async (req, res, next) => {
     try {
       const { webhookToken } = req.params;
+      const exceeded = await rateLimit(`webhook:${sha256Hex(webhookToken)}`, 120, 60);
+      if (exceeded) {
+        return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Rate limit exceeded.' } });
+      }
       const connection = await findPaypalConnectionByWebhookToken(webhookToken);
       if (!connection) {
         return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Webhook endpoint not found.' } });
       }
 
-      const exceeded = await rateLimit(`webhook:${sha256Hex(webhookToken)}`, 120, 60);
-      if (exceeded) {
-        return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Rate limit exceeded.' } });
+      const archived = await query('SELECT archived_at FROM organizations WHERE id = $1', [connection.org_id]);
+      if (archived.rows[0]?.archived_at) {
+        return res.status(410).json({ error: { code: 'ORG_ARCHIVED', message: 'This organization is archived.' } });
       }
 
       if (!Buffer.isBuffer(req.body)) {
@@ -418,6 +566,7 @@ export function createApp() {
         if (inserted) {
           await enqueue(tx, {
             type: 'process_webhook',
+            orgId: connection.org_id,
             payload: { orgId: connection.org_id, eventId: event.id },
             dedupeKey: `wh:${event.id}`,
           });
@@ -432,10 +581,328 @@ export function createApp() {
 
   const api = express.Router();
 
+  api.use('/agent/v1', agentAuth);
+
+  api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
+    mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,
+    protocolVersions: ['2026-07-28', '2025-11-25'],
+    tools: AGENT_MCP_TOOLS.map(({ name, description, inputSchema }) => ({
+      name,
+      description,
+      inputSchema,
+    })),
+  }));
+
+  api.get('/developer/integration-docs', requireSession, (_req, res, next) => {
+    res.sendFile(INTEGRATION_DOC_FILE, (error) => {
+      if (error) next(error);
+    });
+  });
+
+  api.get('/ledger', requireSession, requireRole('OWNER', 'ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER', 'JUDGE'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const queryValue = (name) => {
+        const value = req.query[name];
+        return typeof value === 'string' ? value : undefined;
+      };
+      const limit = queryValue('limit') || '25';
+      const cursor = queryValue('cursor');
+      const seqFrom = queryValue('seqFrom');
+      const seqTo = queryValue('seqTo');
+      const q = queryValue('q');
+      const type = queryValue('type');
+      const subject = queryValue('subject');
+      if (!/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 100
+        || !Number.isSafeInteger(Number(limit)) || (cursor && (!/^\d+$/.test(cursor) || Number(cursor) < 1))
+        || (seqFrom && !/^\d+$/.test(seqFrom)) || (seqTo && !/^\d+$/.test(seqTo))
+        || (q && q.length > 200) || (type && type.length > 80) || (subject && subject.length > 100)
+        || (cursor && !Number.isSafeInteger(Number(cursor)))
+        || (seqFrom && !Number.isSafeInteger(Number(seqFrom)))
+        || (seqTo && !Number.isSafeInteger(Number(seqTo)))
+        || (seqFrom && Number(seqFrom) < 1) || (seqTo && Number(seqTo) < 1)) {
+        throw buildError('VALIDATION_FAILED', 'Ledger filters are invalid.', 400);
+      }
+      return res.status(200).json(await listLedgerEntries(orgId, {
+        limit: Number(limit),
+        cursor,
+        type,
+        subject,
+        seqFrom: seqFrom ? Number(seqFrom) : undefined,
+        seqTo: seqTo ? Number(seqTo) : undefined,
+        q,
+      }));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/ledger/verify', requireSession, requireRole('OWNER', 'ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER', 'JUDGE'), async (req, res, next) => {
+    try {
+      return res.status(200).json(await verifyChain(req.session.current_org_id || GLOBAL_ORG_ID));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/ledger/export', requireSession, requireRole('OWNER', 'ADMIN', 'APPROVER', 'VIEWER', 'JUDGE'), async (req, res, next) => {
+    try {
+      if (req.query.format !== 'json') {
+        throw buildError('VALIDATION_FAILED', 'Only JSON ledger export is supported.', 400);
+      }
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.setHeader('content-disposition', 'attachment; filename="ledger.json"');
+      res.setHeader('x-content-type-options', 'nosniff');
+      for await (const chunk of exportLedger(req.session.current_org_id || GLOBAL_ORG_ID, { format: 'json' })) {
+        if (!res.write(chunk)) await new Promise((resolve) => res.once('drain', resolve));
+      }
+      return res.end();
+    } catch (error) {
+      if (res.headersSent) return res.destroy(error);
+      return next(error);
+    }
+  });
+
+  api.get('/audit', requireSession, requireRole('OWNER', 'ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER', 'JUDGE'), async (req, res, next) => {
+    try {
+      const queryValue = (name) => {
+        const value = req.query[name];
+        return typeof value === 'string' ? value : undefined;
+      };
+      const limit = queryValue('limit') || '25';
+      const q = queryValue('q');
+      const action = queryValue('action');
+      const cursor = queryValue('cursor');
+      if (!/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 100
+        || !Number.isSafeInteger(Number(limit)) || (q && q.length > 200) || (action && action.length > 100)
+        || (cursor && cursor.length > 500)) {
+        throw buildError('VALIDATION_FAILED', 'Audit filters are invalid.', 400);
+      }
+      return res.status(200).json(await listAuditEvents(
+        req.session.current_org_id || GLOBAL_ORG_ID,
+        { limit: Number(limit), cursor, action, q },
+      ));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/simulator/scenarios', requireSession, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), (_req, res) => res.status(200).json({
+    scenarios: [
+      { id: 'legit', label: 'Legit invoice', group: 'legit' },
+      { id: 'injection', label: 'Prompt injection', group: 'attack' },
+      { id: 'inflated', label: 'Inflated invoice', group: 'attack' },
+    ],
+  }));
+
+  api.post('/simulator/run', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const org = await getCurrentOrg(orgId, req.user.id);
+      if (org?.slug !== 'jobenpay-demo') {
+        throw buildError('FORBIDDEN', 'Simulator scenarios only run in the synthetic demo organization.', 403);
+      }
+      const selected = req.body?.scenario;
+      if (!['legit', 'attack-pack', 'all'].includes(selected)) {
+        throw buildError('VALIDATION_FAILED', 'scenario must be legit, attack-pack, or all.', 400);
+      }
+      const dryRun = req.body?.dryRun !== false;
+      if (!dryRun && (selected !== 'legit' || !['OWNER', 'JUDGE'].includes(req.role))) {
+        throw buildError('FORBIDDEN', 'Only OWNER or JUDGE may explicitly run one legitimate sandbox payout.', 403);
+      }
+      const fixtures = await query(
+        `SELECT agent.id AS agent_id, payee.id AS payee_id,
+                clean.id AS clean_document_id, injected.id AS injected_document_id,
+                inflated.id AS inflated_document_id
+         FROM agents agent
+         JOIN payees payee ON payee.org_id = agent.org_id
+           AND payee.display_name = 'SYNTHETIC Trusted Payee' AND payee.trust = 'TRUSTED'
+         LEFT JOIN documents clean ON clean.org_id = agent.org_id
+           AND clean.filename = 'SYNTHETIC-clean-invoice.txt' AND clean.status <> 'DELETED'
+         LEFT JOIN documents injected ON injected.org_id = agent.org_id
+           AND injected.filename = 'SYNTHETIC-injected-invoice.txt' AND injected.status <> 'DELETED'
+         LEFT JOIN documents inflated ON inflated.org_id = agent.org_id
+           AND inflated.filename = 'SYNTHETIC-inflated-invoice.txt' AND inflated.status <> 'DELETED'
+         WHERE agent.org_id = $1 AND agent.name = 'Demo Payables Agent' AND agent.status = 'ACTIVE'
+         ORDER BY agent.created_at LIMIT 1`,
+        [orgId],
+      );
+      const fixture = fixtures.rows[0];
+      if (!fixture?.agent_id || !fixture.payee_id || !fixture.clean_document_id
+        || !fixture.injected_document_id || !fixture.inflated_document_id) {
+        throw buildError('NOT_FOUND', 'Synthetic simulator fixtures are unavailable. Run the demo seed first.', 409);
+      }
+      const definitions = selected === 'legit'
+        ? [{ id: 'legit', amountMinor: '1000', documentId: fixture.clean_document_id, attack: false }]
+        : selected === 'attack-pack'
+          ? [
+            { id: 'injection', amountMinor: '1000', documentId: fixture.injected_document_id, attack: true },
+            { id: 'inflated', amountMinor: '1000000', documentId: fixture.inflated_document_id, attack: true },
+          ]
+          : [
+            { id: 'legit', amountMinor: '1000', documentId: fixture.clean_document_id, attack: false },
+            { id: 'injection', amountMinor: '1000', documentId: fixture.injected_document_id, attack: true },
+            { id: 'inflated', amountMinor: '1000000', documentId: fixture.inflated_document_id, attack: true },
+          ];
+      const results = [];
+      for (const scenario of definitions) {
+        try {
+          const result = await submitPaymentRequest({
+            orgId,
+            agentId: fixture.agent_id,
+            action: 'PAYOUT',
+            payeeId: fixture.payee_id,
+            amountMinor: scenario.amountMinor,
+            currency: 'USD',
+            documentId: scenario.documentId,
+            reason: `Synthetic simulator: ${scenario.id}`,
+            idempotencyKey: `sim-${scenario.id}-${crypto.randomUUID()}`,
+          }, { dryRun: dryRun || scenario.id !== 'legit' });
+          const safeOutcome = ['REJECT', 'REQUIRE_APPROVAL'].includes(result.decision);
+          results.push({
+            scenario: scenario.id,
+            passed: scenario.attack ? safeOutcome : result.decision !== 'REJECT',
+            requestId: result.id,
+            status: result.status,
+            decision: result.decision,
+            reasonCodes: result.reasonCodes ?? result.reason_codes ?? [],
+          });
+        } catch (error) {
+          results.push({
+            scenario: scenario.id,
+            passed: scenario.attack && [
+              'ORG_FROZEN', 'CAP_EXCEEDED', 'DUPLICATE_SUSPECTED', 'DOC_INJECTION_SUSPECTED',
+              'INVOICE_REQUIRED', 'INVOICE_MISMATCH_AMOUNT', 'AI_UNAVAILABLE', 'AI_HIGH_RISK',
+              'AI_INJECTION_SUSPECTED', 'AI_INTENT_MISMATCH', 'AI_ANOMALY',
+            ].includes(error.code),
+            status: 'BLOCKED',
+            decision: 'REJECT',
+            reasonCodes: [error.code || 'INTERNAL'],
+          });
+        }
+      }
+      return res.status(200).json({ results });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/simulator/reset-budget', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'JUDGE'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const result = await resetDemoBudget(orgId, req.user.id);
+      return res.status(200).json({ reset: true, ...result });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/admin/demo-reset', requireSession, requireCsrf, requireRole('OWNER', 'JUDGE'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const organization = await getCurrentOrg(orgId, req.user.id);
+      if (organization?.slug !== 'jobenpay-demo') {
+        throw buildError('FORBIDDEN', 'Demo data reset is only available in the synthetic demo organization.', 403);
+      }
+      const result = await resetDemoOrganization();
+      return res.status(200).json({ reset: true, ...result });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/agent/v1/payout-requests', async (req, res, next) => {
+    try {
+      const request = await submitAgentPayout(
+        req.agent,
+        req.body,
+        req.get('idempotency-key'),
+      );
+      return res.status(200).json(request);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/agent/v1/requests/:id', async (req, res, next) => {
+    try {
+      const request = await getAgentRequestStatus(req.agent, req.params.id);
+      return res.status(200).json(request);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/agent/v1/budget', async (req, res, next) => {
+    try {
+      return res.status(200).json(await getAgentBudgetStatus(req.agent));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/agent/v1/documents', async (req, res, next) => {
+    try {
+      const document = await uploadMultipartDocument(req, {
+        orgId: req.agent.orgId,
+        uploaderId: req.agent.id,
+        uploaderKind: 'AGENT',
+      });
+      return res.status(201).json({
+        document: {
+          id: document.id,
+          filename: document.filename,
+          sha256: document.sha256,
+          status: document.status,
+        },
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/agent/v1/refund-requests', (_req, _res, next) => {
+    next(buildError('NOT_IMPLEMENTED', 'Refund requests are not available in Tier A.', 501));
+  });
+
+  api.post('/agent/v1/dispute-accept-requests', (_req, _res, next) => {
+    next(buildError('NOT_IMPLEMENTED', 'Dispute acceptance requests are not available in Tier A.', 501));
+  });
+
   api.get('/dashboard/summary', requireSession, async (req, res, next) => {
     try {
-      const summary = await getDashboardSummary(req.session.current_org_id || GLOBAL_ORG_ID);
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const summary = await getDashboardSummary(orgId);
+      const sessionUser = await loadSessionUser(req);
+      const role = effectiveRole(sessionUser?.membership, sessionUser?.org?.slug);
+      if (['OWNER', 'ADMIN', 'JUDGE'].includes(role)) {
+        summary.queue = await queueStats(orgId);
+        const aiUsage = await query(`
+          SELECT COALESCE(sum(cost_usd + reserved_cost_usd), 0)::text AS used_usd
+          FROM ai_usage
+          WHERE org_id = $1
+            AND created_at >= (date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+            AND created_at < (date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') + interval '1 day'
+        `, [orgId]);
+        const usedUsd = Number(aiUsage.rows[0].used_usd);
+        const budgetUsd = env.AI_DAILY_BUDGET_USD;
+        summary.aiDailyUsage = {
+          usedUsd,
+          budgetUsd,
+          usedPct: budgetUsd > 0 ? Math.floor((usedUsd / budgetUsd) * 100) : (usedUsd > 0 ? 100 : 0),
+          warning: budgetUsd === 0 ? usedUsd > 0 : usedUsd >= budgetUsd * 0.8,
+        };
+      }
       return res.status(200).json(summary);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/admin/queue', requireSession, requireRole('OWNER', 'JUDGE'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      return res.status(200).json(await queueStats(orgId));
     } catch (error) {
       return next(error);
     }
@@ -443,8 +910,117 @@ export function createApp() {
 
   api.get('/notifications', requireSession, async (req, res, next) => {
     try {
-      const notifications = await listNotifications(req.session.current_org_id || GLOBAL_ORG_ID);
+      const notifications = await listNotifications(
+        req.session.current_org_id || GLOBAL_ORG_ID,
+        req.session.user_id,
+      );
       return res.status(200).json({ notifications });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/requests', requireSession, async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const requestStatuses = new Set([
+        'RECEIVED', 'EVALUATING', 'REJECTED', 'PENDING_APPROVAL', 'APPROVED', 'EXPIRED',
+        'CANCELLED', 'EXECUTING', 'EXECUTED', 'RECONCILED', 'MISMATCH', 'FAILED',
+      ]);
+      if (req.query.status && !requestStatuses.has(String(req.query.status))) {
+        throw buildError('VALIDATION_FAILED', 'status is not a valid request state.', 400);
+      }
+      if (req.query.agentId && !validUuid(req.query.agentId)) {
+        throw buildError('VALIDATION_FAILED', 'agentId must be a UUID.', 400);
+      }
+      if (req.query.q && String(req.query.q).length > 200) {
+        throw buildError('VALIDATION_FAILED', 'q must be at most 200 characters.', 400);
+      }
+      const result = await listRequests(orgId, {
+        limit: req.query.limit,
+        cursor: req.query.cursor,
+        status: req.query.status || null,
+        agentId: req.query.agentId || null,
+        q: req.query.q || null,
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/requests/:id', requireSession, async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) throw buildError('NOT_FOUND', 'Request not found.', 404);
+      const result = await getRequestTimeline(
+        req.session.current_org_id || GLOBAL_ORG_ID,
+        req.params.id,
+      );
+      if (!result.request) throw buildError('NOT_FOUND', 'Request not found.', 404);
+      return res.status(200).json({ ...result, timeline: result.timeline });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/requests/:id/cancel', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'APPROVER'), async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) throw buildError('NOT_FOUND', 'Request not found.', 404);
+      const request = await cancelRequest(
+        req.session.current_org_id || GLOBAL_ORG_ID,
+        req.params.id,
+        req.user.id,
+      );
+      return res.status(200).json({ request });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/approvals', requireSession, async (req, res, next) => {
+    try {
+      const approvalStatuses = new Set(['PENDING', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELLED']);
+      if (req.query.status && !approvalStatuses.has(String(req.query.status))) {
+        throw buildError('VALIDATION_FAILED', 'status is not a valid approval state.', 400);
+      }
+      const result = await listApprovals(
+        req.session.current_org_id || GLOBAL_ORG_ID,
+        { limit: req.query.limit, cursor: req.query.cursor, status: req.query.status || 'PENDING' },
+      );
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/approvals/:id', requireSession, async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) throw buildError('NOT_FOUND', 'Approval not found.', 404);
+      const detail = await getApprovalDetail(
+        req.session.current_org_id || GLOBAL_ORG_ID,
+        req.params.id,
+      );
+      if (!detail) throw buildError('NOT_FOUND', 'Approval not found.', 404);
+      return res.status(200).json(detail);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.post('/approvals/:id/decision', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'APPROVER'), async (req, res, next) => {
+    try {
+      if (!validUuid(req.params.id)) throw buildError('NOT_FOUND', 'Approval not found.', 404);
+      const result = await decideApproval({
+        orgId: req.session.current_org_id || GLOBAL_ORG_ID,
+        approvalId: req.params.id,
+        userId: req.user.id,
+        sessionId: req.session.id,
+        requestHash: req.body?.requestHash,
+        decision: req.body?.decision,
+        comment: req.body?.comment,
+        stepUpGrantId: req.get('x-step-up-grant') || req.body?.stepUpGrantId,
+      });
+      return res.status(200).json({ result, reasonCodes: result.reasonCodes ?? [] });
     } catch (error) {
       return next(error);
     }
@@ -459,7 +1035,7 @@ export function createApp() {
     }
   });
 
-  api.post('/mandates', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.post('/mandates', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       const agent = await getAgent(orgId, req.body?.agentId);
@@ -477,7 +1053,7 @@ export function createApp() {
     }
   });
 
-  api.post('/mandates/draft-from-text', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.post('/mandates/draft-from-text', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       const agent = await getAgent(orgId, req.body?.agentId);
@@ -496,11 +1072,12 @@ export function createApp() {
           },
           orgId,
         });
-      } catch (error) {
-        error.code = 'AI_UNAVAILABLE';
-        error.statusCode = 503;
-        error.message = 'AI is unavailable. Use the manual policy editor.';
-        return next(error);
+      } catch {
+        return next(buildError(
+          'AI_UNAVAILABLE',
+          'AI is unavailable. Use the manual policy editor.',
+          503,
+        ));
       }
       const previous = await query(
         `SELECT v.policy FROM mandates m JOIN mandate_versions v ON v.id = m.current_version_id
@@ -513,6 +1090,10 @@ export function createApp() {
         ...policy,
         payees: { ...policy.payees, ids: policy.payees.ids.filter((id) => knownPayeeIds.has(id)) },
       };
+      const warnings = ['Review AI assumptions and thresholds before activating this mandate.'];
+      if (unknownPayees.length) {
+        warnings.push('AI returned a payee that is not in this organization; it was removed from the draft.');
+      }
       return res.status(200).json({
         draft: {
           agentId: agent.id,
@@ -521,9 +1102,7 @@ export function createApp() {
           promptVersion: MANDATE_PROMPT_VERSION,
         },
         diff: { previous: previous.rows[0]?.policy || null, next: mappedPolicy },
-        warnings: unknownPayees.length
-          ? ['AI returned a payee that is not in this organization; it was removed from the draft.']
-          : [],
+        warnings,
       });
     } catch (error) {
       return next(error);
@@ -540,7 +1119,7 @@ export function createApp() {
     }
   });
 
-  api.post('/mandates/:id/versions', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.post('/mandates/:id/versions', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const version = await withTx((tx) => addMandateVersion(tx, {
         orgId: req.session.current_org_id || GLOBAL_ORG_ID,
@@ -554,7 +1133,7 @@ export function createApp() {
     }
   });
 
-  api.post('/mandates/:id/activate', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  api.post('/mandates/:id/activate', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'JUDGE'), async (req, res, next) => {
     try {
       const versionId = req.body?.versionId;
       if (!validUuid(req.params.id) || !validUuid(versionId)) throw buildError('VALIDATION_FAILED', 'A valid mandate and version are required.', 400);
@@ -573,7 +1152,7 @@ export function createApp() {
   });
 
   for (const [action, status] of [['suspend', 'SUSPENDED'], ['revoke', 'REVOKED']]) {
-    api.post(`/mandates/:id/${action}`, requireSession, requireCsrf, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+    api.post(`/mandates/:id/${action}`, requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'JUDGE'), async (req, res, next) => {
       try {
         const mandate = await withTx((tx) => changeMandateStatus(tx, {
           orgId: req.session.current_org_id || GLOBAL_ORG_ID,
@@ -617,6 +1196,7 @@ export function createApp() {
       const notification = await markNotificationRead(
         req.session.current_org_id || GLOBAL_ORG_ID,
         req.params.id,
+        req.session.user_id,
       );
       if (!notification) {
         return next(buildError('NOT_FOUND', 'Notification not found.', 404));
@@ -680,9 +1260,15 @@ export function createApp() {
       }
       const filePath = await storedDocumentPath(document.storage_key);
       await access(filePath);
-      const downloadName = safeFilename(document.filename).replace(/[^A-Za-z0-9._ -]/g, '_').slice(0, 120) || 'document';
+      const originalName = safeFilename(document.filename);
+      const downloadName = originalName
+        .replace(/[^A-Za-z0-9._ -]/g, '_')
+        .slice(0, 120)
+        .replace(/["\\]/g, '_') || 'document';
+      const encodedName = encodeURIComponent(originalName)
+        .replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
       res.setHeader('content-type', 'application/octet-stream');
-      res.setHeader('content-disposition', `attachment; filename="${downloadName}"`);
+      res.setHeader('content-disposition', `attachment; filename="${downloadName}"; filename*=UTF-8''${encodedName}`);
       res.setHeader('x-content-type-options', 'nosniff');
       const stream = createReadStream(filePath);
       stream.once('error', next);
@@ -774,7 +1360,7 @@ export function createApp() {
     }
   });
 
-  api.get('/agents', requireSession, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.get('/agents', requireSession, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       const agents = await listAgents(orgId);
@@ -784,7 +1370,7 @@ export function createApp() {
     }
   });
 
-  api.post('/agents', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.post('/agents', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
       const description = req.body?.description;
@@ -805,7 +1391,7 @@ export function createApp() {
     }
   });
 
-  api.get('/agents/:id', requireSession, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.get('/agents/:id', requireSession, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       if (!validUuid(req.params.id)) {
@@ -822,7 +1408,7 @@ export function createApp() {
     }
   });
 
-  api.patch('/agents/:id', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.patch('/agents/:id', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const { name, description, status } = req.body || {};
       if (!validUuid(req.params.id)
@@ -847,7 +1433,7 @@ export function createApp() {
     }
   });
 
-  api.post('/agents/:id/keys', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.post('/agents/:id/keys', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       if (!validUuid(req.params.id)) {
         return next(buildError('NOT_FOUND', 'Agent not found.', 404));
@@ -867,7 +1453,7 @@ export function createApp() {
     }
   });
 
-  api.post('/agents/:id/keys/:keyId/revoke', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), requireStepUp('ROTATE_CREDENTIALS'), async (req, res, next) => {
+  api.post('/agents/:id/keys/:keyId/revoke', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), requireStepUp('ROTATE_CREDENTIALS'), async (req, res, next) => {
     try {
       if (!validUuid(req.params.id) || !validUuid(req.params.keyId)) {
         return next(buildError('NOT_FOUND', 'API key not found.', 404));
@@ -886,7 +1472,7 @@ export function createApp() {
     }
   });
 
-  api.post('/agents/:id/keys/rotate', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.post('/agents/:id/keys/rotate', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       if (!validUuid(req.params.id)) {
         return next(buildError('NOT_FOUND', 'Agent not found.', 404));
@@ -943,7 +1529,7 @@ export function createApp() {
     }
   });
 
-  api.post('/payees', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.post('/payees', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
       const { kind, identifier } = req.body || {};
@@ -968,7 +1554,7 @@ export function createApp() {
     }
   });
 
-  api.patch('/payees/:id', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR'), async (req, res, next) => {
+  api.patch('/payees/:id', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       if (!validUuid(req.params.id)) {
         return next(buildError('NOT_FOUND', 'Payee not found.', 404));
@@ -1041,7 +1627,7 @@ export function createApp() {
     }
   });
 
-  api.post('/payees/:id/trust', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  api.post('/payees/:id/trust', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'JUDGE'), async (req, res, next) => {
     try {
       if (!validUuid(req.params.id) || !PAYEE_TRUST_STATES.has(req.body?.trust)) {
         return next(buildError('VALIDATION_FAILED', 'Invalid payee trust update.', 400));
@@ -1084,7 +1670,7 @@ export function createApp() {
   api.post('/auth/login', async (req, res, next) => {
     try {
       const ipKey = `login:${req.ip}`;
-      await rateLimit(ipKey, 10, 60);
+      await enforceRateLimit(ipKey, 10, 60);
       const email = String(req.body?.email || '').trim().toLowerCase();
       const password = String(req.body?.password || '');
       const user = await findUserByEmail(GLOBAL_ORG_ID, email);
@@ -1092,12 +1678,7 @@ export function createApp() {
       const passwordMatches = user ? await verifyPassword(password, user.password_hash) : false;
       if (!user || !passwordMatches) {
         if (user) {
-          const failedCount = Number(user.failed_login_count || 0) + 1;
-          const lockoutExpiry = failedCount >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null;
-          await updateLoginFailure(GLOBAL_ORG_ID, user.id, {
-            failedLoginCount: failedCount,
-            lockedUntil: lockoutExpiry,
-          });
+          const failedCount = await recordLoginFailure(GLOBAL_ORG_ID, user.id);
           await appendAudit({
             orgId: GLOBAL_ORG_ID,
             actorId: user.id,
@@ -1114,7 +1695,7 @@ export function createApp() {
       }
 
       await resetLoginFailure(GLOBAL_ORG_ID, user.id);
-      const activeMembership = await getMembership(GLOBAL_ORG_ID, user.id, GLOBAL_ORG_ID);
+      const activeMembership = await findFirstMembership(GLOBAL_ORG_ID, user.id);
       const currentOrgId = activeMembership?.org_id || GLOBAL_ORG_ID;
       const csrfSecret = crypto.randomBytes(32).toString('hex');
       const sessionInfo = await createSession(GLOBAL_ORG_ID, {
@@ -1161,8 +1742,8 @@ export function createApp() {
           display_name: user.display_name,
         },
         org: org ? { id: org.id, name: org.name, frozen: Boolean(org.frozen_at) } : null,
-        role: membership?.role || 'VIEWER',
-        isJudge: Boolean(membership?.is_judge),
+        role: effectiveRole(membership, org?.slug) || 'VIEWER',
+        isJudge: Boolean(membership?.is_judge && org?.slug === 'jobenpay-demo'),
         csrfToken: req.session.csrf_secret,
         frozen: Boolean(org?.frozen_at),
         aiMode: env.AI_PROVIDER === 'replay' ? 'replay' : 'live',
@@ -1228,10 +1809,12 @@ export function createApp() {
           aad: `paypal_connections:client_id_enc:${orgId}`,
         })
         : '';
+      const { membership } = await loadSessionUser(req);
+      const canViewWebhookUrl = membership?.role === 'OWNER' && !membership.is_judge;
       return res.status(200).json({
         client_id_masked: clientId.length > 4 ? `****${clientId.slice(-4)}` : '****',
         status: connection.status || 'UNTESTED',
-        webhookUrl: connection.webhook_token
+        webhookUrl: canViewWebhookUrl && connection.webhook_token
           ? `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/paypal/${connection.webhook_token}`
           : null,
         webhookId: connection.webhook_id,
@@ -1423,10 +2006,10 @@ export function createApp() {
     }
   });
 
-  api.post('/org/freeze', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  api.post('/org/freeze', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'JUDGE'), async (req, res, next) => {
     try {
       const session = req.session;
-      const purpose = req.body?.purpose || 'FREEZE_TOGGLE';
+      const purpose = 'FREEZE_TOGGLE';
       const grant = await useGrant(GLOBAL_ORG_ID, {
         grantId: req.get('x-step-up-grant') || req.body?.grantId,
         purpose,
@@ -1439,6 +2022,7 @@ export function createApp() {
       const orgId = session.current_org_id || GLOBAL_ORG_ID;
       await withTx(async (tx) => {
         await setFrozenStatus(tx, orgId, { frozenBy: req.user.id, frozen: true });
+        await onFreeze(tx, orgId);
         await appendEntry(tx, {
           orgId,
           type: LEDGER_TYPES.ORG_FROZEN,
@@ -1460,10 +2044,10 @@ export function createApp() {
     }
   });
 
-  api.post('/org/unfreeze', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  api.post('/org/unfreeze', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'JUDGE'), async (req, res, next) => {
     try {
       const session = req.session;
-      const purpose = req.body?.purpose || 'FREEZE_TOGGLE';
+      const purpose = 'FREEZE_TOGGLE';
       const grant = await useGrant(GLOBAL_ORG_ID, {
         grantId: req.get('x-step-up-grant') || req.body?.grantId,
         purpose,

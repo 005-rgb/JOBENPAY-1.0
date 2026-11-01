@@ -11,6 +11,7 @@ export const LEDGER_TYPES = Object.freeze({
   MANDATE_REVOKED: 'MANDATE_REVOKED',
   MANDATE_EXPIRED: 'MANDATE_EXPIRED',
   REQUEST_RECEIVED: 'REQUEST_RECEIVED',
+  REQUEST_EVALUATING: 'REQUEST_EVALUATING',
   REQUEST_DECIDED: 'REQUEST_DECIDED',
   APPROVAL_DECIDED: 'APPROVAL_DECIDED',
   REQUEST_CANCELLED: 'REQUEST_CANCELLED',
@@ -266,10 +267,16 @@ export async function verifyChain(orgId) {
     }
   }
 
+  if (!headRow && checkedEntries > 0) {
+    firstBrokenSeq = checkedEntries;
+    reason = 'ledger head is missing';
+    return { valid: false, checkedEntries, firstBrokenSeq, reason };
+  }
+
   if (headRow) {
     const lastSeq = Number(headRow.last_seq ?? 0);
     if (lastSeq !== checkedEntries) {
-      firstBrokenSeq = checkedEntries + 1;
+      firstBrokenSeq = Math.min(lastSeq, checkedEntries) + 1;
       reason = `ledger_heads.last_seq mismatch: expected ${checkedEntries}, found ${lastSeq}`;
       return { valid: false, checkedEntries, firstBrokenSeq, reason };
     }

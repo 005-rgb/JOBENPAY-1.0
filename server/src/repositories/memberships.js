@@ -24,6 +24,23 @@ export async function listMemberships(orgId, userId) {
   return result.rows;
 }
 
+export async function findFirstMembership(orgId, userId) {
+  if (!orgId) {
+    throw new Error('orgId is required for memberships repository methods.');
+  }
+
+  const result = await query(
+    `SELECT membership.*
+     FROM memberships membership
+     JOIN organizations organization ON organization.id = membership.org_id
+     WHERE membership.user_id = $1 AND organization.archived_at IS NULL
+     ORDER BY membership.created_at ASC, membership.org_id ASC
+     LIMIT 1`,
+    [userId],
+  );
+  return result.rows[0] ?? null;
+}
+
 export async function updateRole(orgId, userId, targetOrgId, role) {
   if (!orgId) {
     throw new Error('orgId is required for memberships repository methods.');
@@ -56,6 +73,7 @@ export async function createMembership(orgId, { userId, targetOrgId, role, isJud
 export default {
   getMembership,
   listMemberships,
+  findFirstMembership,
   updateRole,
   createMembership,
 };

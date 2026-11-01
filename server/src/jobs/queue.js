@@ -20,18 +20,19 @@ function getErrorMessage(error) {
 
 export async function enqueue(dbOrPool, {
   type,
+  orgId = null,
   payload = {},
-  runAt = new Date(),
+  runAt = null,
   dedupeKey,
 } = {}) {
   assertJobType(type);
   const db = dbOrPool || pool;
   const result = await db.query(`
-    INSERT INTO jobs (type, payload, run_at, dedupe_key, status)
-    VALUES ($1, $2, $3, $4, 'PENDING')
+    INSERT INTO jobs (org_id, type, payload, run_at, dedupe_key, status)
+    VALUES ($1, $2, $3, COALESCE($4::timestamptz, now()), $5, 'PENDING')
     ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
     RETURNING *
-  `, [type, payload, runAt, dedupeKey ?? null]);
+  `, [orgId, type, payload, runAt, dedupeKey ?? null]);
 
   if (result.rowCount > 0) {
     return result.rows[0];
@@ -155,19 +156,21 @@ export async function fail(jobId, error, { retryAt, maxAttempts = DEFAULT_MAX_AT
   return result.rows[0];
 }
 
-export async function queueStats(dbOrPool = pool) {
+export async function queueStats(orgId = null, dbOrPool = pool) {
   const [statuses, webhook] = await Promise.all([
     dbOrPool.query(`
       SELECT status, count(*)::integer AS count
       FROM jobs
       WHERE type <> '_worker_heartbeat'
+        AND ($1::uuid IS NULL OR org_id = $1)
       GROUP BY status
-    `),
+    `, [orgId]),
     dbOrPool.query(`
       SELECT extract(epoch FROM (now() - min(coalesce(received_at, created_at))))::integer AS age_seconds
       FROM webhook_events
       WHERE processed_at IS NULL
-    `),
+        AND ($1::uuid IS NULL OR org_id = $1)
+    `, [orgId]),
   ]);
 
   const byStatus = { PENDING: 0, RUNNING: 0, COMPLETED: 0, DEAD: 0 };
@@ -179,6 +182,7 @@ export async function queueStats(dbOrPool = pool) {
 
   return {
     byStatus,
+    depth: byStatus.PENDING + byStatus.RUNNING,
     dead: byStatus.DEAD,
     oldestUnprocessedWebhookAgeSeconds: webhook.rows[0].age_seconds == null
       ? null

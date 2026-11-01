@@ -1,9 +1,10 @@
-import { env } from './config.js';
+import { assertRuntimeSecrets, env } from './config.js';
 import app from './app.js';
 import { startWorker } from './jobs/worker.js';
 import { logger } from './lib/logger.js';
 
-export function startServer(port = env.PORT) {
+export function startServer(port = env.PORT, { requireSecrets = false } = {}) {
+  if (requireSecrets) assertRuntimeSecrets();
   const server = app.listen(port, () => {
     console.log(`JOBENPAY listening on http://localhost:${port}`);
   });
@@ -24,7 +25,7 @@ export function startServer(port = env.PORT) {
 
 const isDirectRun = process.argv[1] && process.argv[1].endsWith('server.js');
 if (isDirectRun) {
-  startServer();
+  startServer(env.PORT, { requireSecrets: true });
 }
 
 export { app };

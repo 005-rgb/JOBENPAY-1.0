@@ -23,14 +23,46 @@ check(fileExists('app.cjs'), 'app.cjs is required.');
 check(fileExists('server/src/server.js'), 'server/src/server.js is required.');
 check(fileExists('server/src/config.js'), 'server/src/config.js is required.');
 check(fileExists('.github/workflows/ci.yml'), '.github/workflows/ci.yml is required.');
+check(fileExists('THIRD_PARTY_NOTICES.md'), 'THIRD_PARTY_NOTICES.md is required.');
 
 const licenseText = fileExists('LICENSE') ? readText('LICENSE') : '';
 check(/MIT License/i.test(licenseText), 'LICENSE must be MIT.');
 
 const readmeText = readText('README.md');
-check(/## Overview/i.test(readmeText), 'README.md must contain Overview section.');
-check(/## Quick start/i.test(readmeText), 'README.md must contain Quick start section.');
-check(/## Architecture/i.test(readmeText), 'README.md must contain Architecture section.');
+const requiredReadmeSections = [
+  '1. What it is and the problem',
+  '2. Demo: hosted URL + judge credentials',
+  '3. Run it yourself',
+  '4. How PayPal is used and how AI is used',
+  '5. Architecture',
+  '6. Security model and honest limits',
+  '7. Built during the submission period',
+  '8. Testing instructions',
+  "9. What's next",
+  '10. License',
+];
+const readmeSections = [...readmeText.matchAll(/^##\s+(.+)$/gm)].map((match) => match[1]);
+check(
+  JSON.stringify(readmeSections) === JSON.stringify(requiredReadmeSections),
+  'README.md must contain the ten required numbered sections in order.',
+);
+const isReleaseTag = process.env.GITHUB_REF_TYPE === 'tag'
+  || /^refs\/tags\//.test(process.env.GITHUB_REF || '');
+if (isReleaseTag) {
+  check(!/\{\{[^{}]+\}\}/.test(readmeText), 'README.md must not contain placeholders on a release tag.');
+}
+const readmeSecretPatterns = [
+  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
+  /\bAKIA[0-9A-Z]{16}\b/,
+  /\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{30,})\b/,
+  /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/,
+  /\bsk_(?:live|test)_[A-Za-z0-9]{20,}\b/,
+  /(?:api[_-]?key|client[_-]?secret|password|token)\s*[:=]\s*['"`]?(?!\{\{)[A-Za-z0-9/+_=.-]{12,}/i,
+];
+check(
+  !readmeSecretPatterns.some((pattern) => pattern.test(readmeText)),
+  'README.md must not contain credentials or secrets.',
+);
 
 const packageJson = JSON.parse(readText('package.json'));
 check(packageJson.type === 'module', 'package.json must use type: module');
@@ -71,6 +103,16 @@ const nativeCandidates = ['node-gyp', 'sqlite3', 'better-sqlite3', 'sharp', 'bcr
 const dependencyNames = Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies });
 const hasNativeDependency = dependencyNames.some((name) => nativeCandidates.includes(name));
 check(!hasNativeDependency, 'Native dependencies are not allowed in S00.');
+
+const notices = spawnSync(process.execPath, ['scripts/gen-notices.js', '--check'], {
+  cwd: root,
+  encoding: 'utf8',
+});
+if (notices.error) {
+  errors.push(`Dependency license validation could not run: ${notices.error.message}`);
+} else if (notices.status !== 0) {
+  errors.push(`Dependency license validation failed.\n${notices.stdout || ''}${notices.stderr || ''}`);
+}
 
 const scanPaths = repoFiles.filter((file) => !file.startsWith('.git') && !file.startsWith('node_modules') && !file.includes('package-lock.json'));
 for (const file of scanPaths) {

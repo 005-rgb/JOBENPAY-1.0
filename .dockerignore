@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+node_modules
+web/node_modules
+web/dist
+.git
+coverage
+var
+npm-debug.log

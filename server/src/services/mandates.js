@@ -4,12 +4,12 @@ import { canonicalJson } from '../../../shared/canonical.js';
 import { parsePolicy } from '../../../shared/policy.schema.js';
 import { env } from '../config.js';
 import { query } from '../db/pool.js';
+import { AppError } from '../lib/errors.js';
 import { appendEntry, LEDGER_TYPES } from './ledger.js';
 import { kidFromPublicKey, signEd25519 } from '../lib/crypto.js';
 
 function mandateError(code, message, statusCode = 400) {
-  const error = new Error(message);
-  error.code = code;
+  const error = new AppError(code, message);
   error.statusCode = statusCode;
   return error;
 }
@@ -55,18 +55,27 @@ export async function createMandate(tx, { orgId, agentId, name, policy, purposeT
      VALUES ($1, $2, 1, $3, $4, $5, $6, $7) RETURNING *`,
     [orgId, mandate.rows[0].id, purposeText ?? parsed.purpose, parsed, promptVersion ?? null, parsed.validFrom, parsed.validTo],
   );
-  return { mandate: mandate.rows[0], version: publicPolicyRow(version.rows[0]) };
+  await tx.query(
+    'UPDATE mandates SET current_version_id = $1 WHERE org_id = $2 AND id = $3',
+    [version.rows[0].id, orgId, mandate.rows[0].id],
+  );
+  return {
+    mandate: { ...mandate.rows[0], current_version_id: version.rows[0].id },
+    version: publicPolicyRow(version.rows[0]),
+  };
 }
 
 export async function addMandateVersion(tx, { orgId, mandateId, policy, purposeText, promptVersion }) {
   const parsed = validatePolicy(policy);
-  const latest = await tx.query(
-    `SELECT m.id, COALESCE(MAX(v.version), 0) AS version
-     FROM mandates m LEFT JOIN mandate_versions v ON v.mandate_id = m.id
-     WHERE m.org_id = $1 AND m.id = $2 GROUP BY m.id`,
+  const locked = await tx.query(
+    'SELECT id FROM mandates WHERE org_id = $1 AND id = $2 FOR UPDATE',
     [orgId, mandateId],
   );
-  if (!latest.rowCount) throw mandateError('NOT_FOUND', 'Mandate not found.', 404);
+  if (!locked.rowCount) throw mandateError('NOT_FOUND', 'Mandate not found.', 404);
+  const latest = await tx.query(
+    'SELECT COALESCE(MAX(version), 0) AS version FROM mandate_versions WHERE org_id = $1 AND mandate_id = $2',
+    [orgId, mandateId],
+  );
   const version = await tx.query(
     `INSERT INTO mandate_versions (org_id, mandate_id, version, purpose_text, policy, prompt_version, valid_from, valid_to)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -86,7 +95,17 @@ export async function getMandate(orgId, mandateId, db = query) {
   );
   if (!result.rows[0]) return null;
   const row = result.rows[0];
-  return { ...row, currentVersion: row.version_id ? publicPolicyRow({ ...row, id: row.version_id, mandate_id: row.id, created_at: row.version_created_at }) : null };
+  const versions = await db(
+    `SELECT * FROM mandate_versions
+     WHERE org_id = $1 AND mandate_id = $2
+     ORDER BY version DESC`,
+    [orgId, mandateId],
+  );
+  return {
+    ...row,
+    currentVersion: row.version_id ? publicPolicyRow({ ...row, id: row.version_id, mandate_id: row.id, created_at: row.version_created_at }) : null,
+    versions: versions.rows.map(publicPolicyRow),
+  };
 }
 
 export async function listMandates(orgId, db = { query }) {
@@ -114,6 +133,7 @@ export async function activateMandate(tx, {
   );
   const version = latest.rows[0];
   if (!version || version.id !== versionId) throw mandateError('VALIDATION_FAILED', 'Only the latest mandate version can be activated.', 409);
+  if (version.activated_at) throw mandateError('VALIDATION_FAILED', 'An activated mandate version is immutable; create a new version.', 409);
   const other = await tx.query(
     `SELECT id FROM mandates WHERE org_id = $1 AND agent_id = $2 AND status = 'ACTIVE' AND id <> $3 FOR UPDATE`,
     [orgId, mandate.agent_id, mandateId],
@@ -128,7 +148,8 @@ export async function activateMandate(tx, {
     );
     if (!grant.rowCount) throw mandateError('STEP_UP_REQUIRED', 'Step-up authentication required.', 403);
   }
-  const canonical = canonicalJson(version.policy);
+  const policy = validatePolicy(version.policy);
+  const canonical = canonicalJson(policy);
   const hash = crypto.createHash('sha256').update(canonical).digest('hex');
   const privateKey = env.JOBENPAY_LEDGER_SIGNING_KEY;
   if (!privateKey) throw new Error('JOBENPAY_LEDGER_SIGNING_KEY is required for mandate activation.');
@@ -139,9 +160,9 @@ export async function activateMandate(tx, {
   const updated = await tx.query(
     `UPDATE mandate_versions
      SET policy_canonical = $1, policy_hash = $2, signature = $3, signing_kid = $4,
-         activated_by = $5, activated_at = now()
-     WHERE id = $6 RETURNING *`,
-    [canonical, hash, signature, kidFromPublicKey(publicKey), systemActor ? null : actorId, version.id],
+         activated_by = $5, activated_at = now(), valid_from = $6, valid_to = $7
+     WHERE id = $8 RETURNING *`,
+    [canonical, hash, signature, kidFromPublicKey(publicKey), systemActor ? null : actorId, policy.validFrom, policy.validTo, version.id],
   );
   await tx.query(
     `UPDATE mandates SET status = 'ACTIVE', current_version_id = $1 WHERE id = $2 AND org_id = $3`,
@@ -182,7 +203,12 @@ export async function expireMandates(tx) {
      WHERE m.status = 'ACTIVE' AND EXISTS (
        SELECT 1 FROM mandate_versions v
        WHERE v.id = m.current_version_id AND v.valid_to < now()
-     ) RETURNING m.id, m.org_id`,
+     )
+     AND EXISTS (
+       SELECT 1 FROM organizations o
+       WHERE o.id = m.org_id AND o.archived_at IS NULL
+     )
+     RETURNING m.id, m.org_id`,
   );
   for (const mandate of result.rows) {
     await appendEntry(tx, {

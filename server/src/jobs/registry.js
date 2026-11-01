@@ -2,6 +2,10 @@ import { runCleanup } from './cleanup.js';
 import { processWebhook } from './webhook.js';
 import { extractDocument } from './extractDocument.js';
 import { evaluateRequestJob } from './evaluateRequest.js';
+import { expireApprovals } from './expireApprovals.js';
+import { executeRequest } from './handlers/executeRequest.js';
+import { reconcileRequest } from './handlers/reconcileRequest.js';
+import { resetDemoDataJob } from './resetDemoData.js';
 
 export const JOB_TYPES = Object.freeze([
   'extract_document',
@@ -15,6 +19,7 @@ export const JOB_TYPES = Object.freeze([
   'send_email',
   'expire_approvals',
   'cleanup',
+  'reset_demo_data',
 ]);
 
 const handlers = new Map();
@@ -32,6 +37,10 @@ handlers.set('cleanup', runCleanup);
 handlers.set('process_webhook', processWebhook);
 handlers.set('extract_document', extractDocument);
 handlers.set('evaluate_request', evaluateRequestJob);
+handlers.set('expire_approvals', expireApprovals);
+handlers.set('execute_request', executeRequest);
+handlers.set('reconcile_request', reconcileRequest);
+handlers.set('reset_demo_data', resetDemoDataJob);
 
 export function registerHandler(type, handler) {
   if (!JOB_TYPES.includes(type)) {

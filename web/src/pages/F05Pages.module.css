@@ -1,0 +1,262 @@
+.pageStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-6);
+  min-width: 0;
+}
+
+.pageToolbar,
+.actions,
+.filterBar,
+.pagination {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jp-space-3);
+  justify-content: space-between;
+}
+
+.pageToolbar h2,
+.pageStack > h2,
+.developerCard h3 {
+  margin: 0;
+}
+
+.actions {
+  justify-content: flex-start;
+}
+
+.tableCard {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.filterBar {
+  border-bottom: var(--jp-border-width) solid var(--jp-border);
+  justify-content: flex-start;
+  padding: var(--jp-space-4);
+}
+
+.filterPill,
+.searchBox {
+  align-items: center;
+  border: var(--jp-border-width) solid var(--jp-border);
+  border-radius: var(--jp-radius-pill);
+  display: inline-flex;
+  gap: var(--jp-space-2);
+  min-height: var(--jp-control-size);
+  padding: 0 var(--jp-space-4);
+}
+
+.filterPill select,
+.filterPill input,
+.searchBox input {
+  background: var(--jp-transparent);
+  border: 0;
+  color: var(--jp-text);
+  min-width: var(--jp-dropdown-min-w);
+  outline: 0;
+}
+
+.searchBox svg {
+  height: var(--jp-icon-size);
+  width: var(--jp-icon-size);
+}
+
+.visuallyHidden {
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: var(--jp-space-1);
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: var(--jp-space-1);
+}
+
+.virtualTable {
+  max-height: var(--jp-sheet-max-height);
+  overflow: auto;
+  position: relative;
+}
+
+.virtualRow {
+  align-items: center;
+  border-bottom: var(--jp-border-width) solid var(--jp-border);
+  display: grid;
+  grid-auto-columns: minmax(var(--jp-card-tile-min-w), 1fr);
+  grid-auto-flow: column;
+  left: 0;
+  min-width: max-content;
+  position: absolute;
+  right: 0;
+}
+
+.virtualHeader {
+  background: var(--jp-surface-sidebar);
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+  font-weight: var(--jp-font-weight-medium);
+  min-height: var(--jp-table-row-h);
+  position: sticky;
+  top: 0;
+  z-index: var(--jp-popover-z);
+}
+
+.virtualBody {
+  min-width: max-content;
+  position: relative;
+}
+
+.virtualCell {
+  overflow: hidden;
+  padding: var(--jp-space-3) var(--jp-space-4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.virtualCell a,
+.developerCard a {
+  align-items: center;
+  color: var(--jp-link);
+  display: inline-flex;
+  gap: var(--jp-space-1);
+  text-decoration: underline;
+  text-underline-offset: var(--jp-space-1);
+}
+
+.virtualCell code,
+.virtualCell button,
+.reasonCodes {
+  font-family: var(--jp-font-mono);
+  font-size: var(--jp-font-size-caption);
+}
+
+.copyHash {
+  background: var(--jp-transparent);
+  border: 0;
+  color: var(--jp-link);
+  cursor: pointer;
+  padding: 0;
+}
+
+.brokenRow,
+.brokenEntry {
+  background: var(--jp-error-bg);
+  outline: var(--jp-focus-ring-width) solid var(--jp-error);
+}
+
+.brokenEntry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-2);
+  padding: var(--jp-space-4);
+}
+
+.brokenEntry strong {
+  align-items: center;
+  display: flex;
+  gap: var(--jp-space-2);
+}
+
+.pagination {
+  padding: var(--jp-space-4);
+}
+
+.pagination > span {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+}
+
+.pagination > div {
+  display: flex;
+  gap: var(--jp-space-2);
+}
+
+.pageButton {
+  height: var(--jp-small-icon-button);
+  min-width: var(--jp-small-icon-button);
+  padding: 0;
+  width: var(--jp-small-icon-button);
+}
+
+.loadingRows {
+  display: grid;
+  gap: var(--jp-space-3);
+  padding: var(--jp-space-4);
+}
+
+.loadingRows > div {
+  min-height: var(--jp-table-row-h);
+}
+
+.simulatorCard,
+.developerCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.resultTable,
+.reasonTable {
+  border: var(--jp-border-width) solid var(--jp-border);
+  border-radius: var(--jp-radius-card);
+  overflow: auto;
+}
+
+.resultHeader,
+.resultRow,
+.reasonRow {
+  align-items: center;
+  border-bottom: var(--jp-border-width) solid var(--jp-border);
+  display: grid;
+  gap: var(--jp-space-3);
+  grid-template-columns: repeat(5, minmax(var(--jp-card-tile-min-w), 1fr));
+  min-width: max-content;
+  padding: var(--jp-space-3) var(--jp-space-4);
+}
+
+.resultHeader {
+  background: var(--jp-surface-sidebar);
+  font-weight: var(--jp-font-weight-bold);
+}
+
+.resultRow:last-child,
+.reasonRow:last-child {
+  border-bottom: 0;
+}
+
+.resultRow a {
+  align-items: center;
+  color: var(--jp-link);
+  display: inline-flex;
+  gap: var(--jp-space-1);
+}
+
+.reasonRow {
+  grid-template-columns: minmax(var(--jp-card-tile-min-w), 1fr) repeat(2, minmax(var(--jp-card-tile-min-w), 2fr));
+}
+
+.reasonRow code {
+  font-family: var(--jp-font-mono);
+}
+
+.developerCard ul {
+  display: grid;
+  gap: var(--jp-space-2);
+  margin: 0;
+  padding-inline-start: var(--jp-space-6);
+}
+
+.developerCard code {
+  font-family: var(--jp-font-mono);
+}
+
+@media (--jp-mobile-down) {
+  .pageToolbar,
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

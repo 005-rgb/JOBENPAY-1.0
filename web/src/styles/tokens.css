@@ -1,3 +1,6 @@
+@custom-media --jp-tablet-down (max-width: 1199px);
+@custom-media --jp-mobile-down (max-width: 767px);
+
 :root {
   --jp-surface: #ffffff;
   --jp-surface-sidebar: #f5f7fa;

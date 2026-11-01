@@ -150,8 +150,18 @@ function MetricCard({ label, value, hasData, t }) {
   );
 }
 
+function QueueMetricCard({ label, value }) {
+  return (
+    <Card className={styles.metricCard} padding="section">
+      <span className={styles.metricLabel}>{label}</span>
+      <strong className={styles.metricValue}>{value}</strong>
+    </Card>
+  );
+}
+
 export function DashboardPage() {
   const { t } = useTranslation();
+  const auth = useAuth();
   const navigate = useNavigate();
   const summaryQuery = usePageQuery(['dashboard', 'summary'], () => apiClient.get('/dashboard/summary'));
   const { data, error, isPending, refetch } = summaryQuery;
@@ -211,6 +221,11 @@ export function DashboardPage() {
           {t('app.manageMandates')} <ChevronDown aria-hidden="true" />
         </Button>
       </section>
+      {['OWNER', 'ADMIN', 'JUDGE'].includes(auth.role) && data.aiDailyUsage?.warning ? (
+        <Banner title="AI daily budget warning">
+          AI usage is at {data.aiDailyUsage.usedPct}% of the daily budget ({data.aiDailyUsage.usedUsd.toFixed(2)} of {data.aiDailyUsage.budgetUsd.toFixed(2)} USD).
+        </Banner>
+      ) : null}
 
       <section aria-label={t('app.setupCards')} className={styles.setupCards}>
         {setupCards.filter((card) => !card.done).map((card) => (
@@ -258,6 +273,24 @@ export function DashboardPage() {
         </div>
         {!hasData ? <EmptyState title={t('app.noData')} description={t('app.noPerformanceData')} /> : null}
       </section>
+
+      {data.queue ? (
+        <section aria-label={t('app.queueMetrics')} className={styles.performance}>
+          <div className={styles.performanceHeading}>
+            <h2>{t('app.queueMetrics')}</h2>
+          </div>
+          <div className={styles.metricsGrid}>
+            <QueueMetricCard label={t('app.queueDepth')} value={data.queue.depth} />
+            <QueueMetricCard label={t('app.deadJobs')} value={data.queue.dead} />
+            <QueueMetricCard
+              label={t('app.oldestWebhook')}
+              value={data.queue.oldestUnprocessedWebhookAgeSeconds == null
+                ? '-'
+                : `${data.queue.oldestUnprocessedWebhookAgeSeconds}s`}
+            />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -442,8 +475,10 @@ export function AgentDetailPage() {
 export function PayeesPage({ initialCreate = false }) {
   const { t } = useTranslation();
   const auth = useAuth();
+  const canWrite = ['OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'].includes(auth.role);
+  const canTrust = ['OWNER', 'ADMIN', 'JUDGE'].includes(auth.role);
   const queryClient = useQueryClient();
-  const [dialogOpen, setDialogOpen] = useState(initialCreate);
+  const [dialogOpen, setDialogOpen] = useState(initialCreate && canWrite);
   const [editing, setEditing] = useState(null);
   const [page, setPage] = useState(0);
   const [trustTarget, setTrustTarget] = useState(null);
@@ -451,11 +486,10 @@ export function PayeesPage({ initialCreate = false }) {
   const [formError, setFormError] = useState('');
   const location = useLocation();
   useEffect(() => {
-    if (initialCreate) setDialogOpen(true);
-  }, [initialCreate, location.pathname]);
+    if (initialCreate && canWrite) setDialogOpen(true);
+    if (!canWrite) setDialogOpen(false);
+  }, [canWrite, initialCreate, location.pathname]);
   const payeesQuery = usePageQuery(['payees'], async () => (await apiClient.get('/payees')).payees, { active: true });
-  const canWrite = ['OWNER', 'ADMIN', 'OPERATOR'].includes(auth.role);
-  const canTrust = ['OWNER', 'ADMIN'].includes(auth.role);
   const rows = payeesQuery.data || [];
   const pageSize = 10;
   const pages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -536,7 +570,7 @@ export function PayeesPage({ initialCreate = false }) {
           <Pagination page={page} pages={pages} onPage={setPage} />
         </Card>
       )}
-      <Modal
+      {canWrite ? <Modal
         footer={<><Button onClick={closeForm} variant="secondary">{t('app.cancel')}</Button><Button form="payee-form" type="submit">{t('app.save')}</Button></>}
         onOpenChange={setDialogOpen}
         open={dialogOpen}
@@ -553,7 +587,7 @@ export function PayeesPage({ initialCreate = false }) {
           {editing ? <p className={styles.fieldHint}>{t('app.maskedIdentifierHint', { identifier: editing.identifierMasked })}</p> : null}
           {formError ? <p className={styles.formError} role="alert">{formError}</p> : null}
         </form>
-      </Modal>
+      </Modal> : null}
       <StepUpDialog
         onConfirm={changeTrust}
         onOpenChange={(open) => {
@@ -710,7 +744,7 @@ export function SecurityPage() {
   const queryClient = useQueryClient();
   const [pendingAction, setPendingAction] = useState('');
   const [stepUp, setStepUp] = useState(false);
-  const canFreeze = ['OWNER', 'ADMIN'].includes(auth.role);
+  const canFreeze = ['OWNER', 'ADMIN', 'JUDGE'].includes(auth.role);
   const action = auth.org?.frozen ? 'unfreeze' : 'freeze';
   const confirm = async (grantId) => {
     await apiClient.post(`/org/${action}`, {}, { stepUpGrant: grantId });

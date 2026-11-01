@@ -1,49 +1,301 @@
 # Third-party notices
 
-This project uses the following dependencies that are permitted under the repository policy.
+Generated from the complete server and web npm lockfiles by `npm run notices:generate`.
+Only dependencies with licenses in the repository allowlist are included.
 
-## express
-- License: MIT
-- Source: https://github.com/expressjs/express
+## Server dependency tree
 
-## cookie-parser
-- License: MIT
-- Source: https://github.com/expressjs/cookie-parser
+- `@bcoe/v8-coverage` 0.2.3 — MIT
+- `@istanbuljs/schema` 0.1.6 — MIT
+- `@jridgewell/resolve-uri` 3.1.2 — MIT
+- `@jridgewell/sourcemap-codec` 1.6.0 — MIT
+- `@jridgewell/trace-mapping` 0.3.31 — MIT
+- `@pinojs/redact` 0.4.0 — MIT
+- `@types/istanbul-lib-coverage` 2.0.6 — MIT
+- `accepts` 2.0.0 — MIT
+- `ansi-regex` 5.0.1 — MIT
+- `ansi-styles` 4.3.0 — MIT
+- `atomic-sleep` 1.0.0 — MIT
+- `balanced-match` 1.0.2 — MIT
+- `body-parser` 2.4.0 — MIT
+- `brace-expansion` 1.1.21 — MIT
+- `busboy` 1.6.0 — MIT
+- `bytes` 3.1.2 — MIT
+- `c8` 9.1.0 — ISC
+- `call-bind-apply-helpers` 1.0.2 — MIT
+- `call-bound` 1.0.4 — MIT
+- `cliui` 8.0.1 — ISC
+- `color-convert` 2.0.1 — MIT
+- `color-name` 1.1.4 — MIT
+- `concat-map` 0.0.1 — MIT
+- `content-disposition` 2.0.1 — MIT
+- `content-type` 2.1.0 — MIT
+- `convert-source-map` 2.0.0 — MIT
+- `cookie` 0.7.2 — MIT
+- `cookie-parser` 1.4.7 — MIT
+- `cookie-parser/node_modules/cookie-signature` 1.0.6 — MIT
+- `cookie-signature` 1.2.2 — MIT
+- `cross-spawn` 7.0.6 — MIT
+- `debug` 4.4.3 — MIT
+- `depd` 2.0.0 — MIT
+- `dunder-proto` 1.0.1 — MIT
+- `ee-first` 1.1.1 — MIT
+- `emoji-regex` 8.0.0 — MIT
+- `encodeurl` 2.0.1 — MIT
+- `es-define-property` 1.0.1 — MIT
+- `es-errors` 1.3.0 — MIT
+- `es-object-atoms` 1.1.2 — MIT
+- `escalade` 3.2.0 — MIT
+- `escape-html` 1.0.3 — MIT
+- `etag` 1.8.1 — MIT
+- `express` 5.3.0 — MIT
+- `finalhandler` 2.1.1 — MIT
+- `find-up` 5.0.0 — MIT
+- `foreground-child` 3.3.1 — ISC
+- `forwarded` 0.2.0 — MIT
+- `fresh` 2.0.0 — MIT
+- `fs.realpath` 1.0.0 — ISC
+- `function-bind` 1.1.2 — MIT
+- `get-caller-file` 2.0.5 — ISC
+- `get-intrinsic` 1.3.0 — MIT
+- `get-proto` 1.0.1 — MIT
+- `glob` 7.2.3 — ISC
+- `gopd` 1.2.0 — MIT
+- `has-flag` 4.0.0 — MIT
+- `has-symbols` 1.1.0 — MIT
+- `hasown` 2.0.4 — MIT
+- `helmet` 8.3.0 — MIT
+- `html-escaper` 2.0.2 — MIT
+- `http-errors` 2.0.1 — MIT
+- `iconv-lite` 0.7.3 — MIT
+- `inflight` 1.0.6 — ISC
+- `inherits` 2.0.4 — ISC
+- `ipaddr.js` 1.9.1 — MIT
+- `is-fullwidth-code-point` 3.0.0 — MIT
+- `is-promise` 4.0.0 — MIT
+- `isexe` 2.0.0 — ISC
+- `istanbul-lib-coverage` 3.2.2 — BSD-3-Clause
+- `istanbul-lib-report` 3.0.1 — BSD-3-Clause
+- `istanbul-reports` 3.2.0 — BSD-3-Clause
+- `locate-path` 6.0.0 — MIT
+- `make-dir` 4.0.0 — MIT
+- `make-dir/node_modules/semver` 7.8.5 — ISC
+- `math-intrinsics` 1.1.0 — MIT
+- `media-typer` 1.1.1 — MIT
+- `merge-descriptors` 2.0.0 — MIT
+- `mime-db` 1.54.0 — MIT
+- `mime-types` 3.0.2 — MIT
+- `minimatch` 3.1.5 — ISC
+- `ms` 2.1.3 — MIT
+- `negotiator` 1.1.0 — MIT
+- `object-inspect` 1.13.4 — MIT
+- `on-exit-leak-free` 2.1.2 — MIT
+- `on-finished` 2.4.2 — MIT
+- `once` 1.4.0 — ISC
+- `p-limit` 3.1.0 — MIT
+- `p-locate` 5.0.0 — MIT
+- `parseurl` 1.3.3 — MIT
+- `path-exists` 4.0.0 — MIT
+- `path-is-absolute` 1.0.1 — MIT
+- `path-key` 3.1.1 — MIT
+- `path-to-regexp` 8.4.2 — MIT
+- `pg` 8.23.1 — MIT
+- `pg-cloudflare` 1.4.1 — MIT
+- `pg-connection-string` 2.14.1 — MIT
+- `pg-int8` 1.0.1 — ISC
+- `pg-pool` 3.14.0 — MIT
+- `pg-protocol` 1.16.1 — MIT
+- `pg-types` 2.2.0 — MIT
+- `pgpass` 1.0.5 — MIT
+- `pino` 9.14.0 — MIT
+- `pino-abstract-transport` 2.0.0 — MIT
+- `pino-http` 10.5.0 — MIT
+- `pino-std-serializers` 7.1.0 — MIT
+- `postgres-array` 2.0.0 — MIT
+- `postgres-bytea` 1.0.1 — MIT
+- `postgres-date` 1.0.7 — MIT
+- `postgres-interval` 1.2.0 — MIT
+- `prettier` 3.9.10 — MIT
+- `process-warning` 5.1.1 — MIT
+- `proxy-addr` 2.0.8 — MIT
+- `qs` 6.17.1 — BSD-3-Clause
+- `quick-format-unescaped` 4.0.4 — MIT
+- `range-parser` 1.3.0 — MIT
+- `raw-body` 3.0.2 — MIT
+- `real-require` 0.2.0 — MIT
+- `require-directory` 2.1.1 — MIT
+- `router` 2.2.0 — MIT
+- `safe-stable-stringify` 2.5.0 — MIT
+- `safer-buffer` 2.1.2 — MIT
+- `send` 1.2.1 — MIT
+- `serve-static` 2.2.1 — MIT
+- `setprototypeof` 1.2.0 — ISC
+- `shebang-command` 2.0.0 — MIT
+- `shebang-regex` 3.0.0 — MIT
+- `side-channel` 1.1.1 — MIT
+- `side-channel-list` 1.0.1 — MIT
+- `side-channel-map` 1.0.1 — MIT
+- `side-channel-weakmap` 1.0.2 — MIT
+- `signal-exit` 4.1.0 — ISC
+- `sonic-boom` 4.2.1 — MIT
+- `split2` 4.2.0 — ISC
+- `statuses` 2.0.2 — MIT
+- `streamsearch` 1.1.0 — MIT
+- `string-width` 4.2.3 — MIT
+- `strip-ansi` 6.0.1 — MIT
+- `supports-color` 7.2.0 — MIT
+- `test-exclude` 6.0.0 — ISC
+- `thread-stream` 3.2.0 — MIT
+- `toidentifier` 1.0.1 — MIT
+- `type-is` 2.1.0 — MIT
+- `unpdf` 1.9.1 — MIT
+- `unpipe` 1.0.0 — MIT
+- `v8-to-istanbul` 9.3.0 — ISC
+- `vary` 1.1.2 — MIT
+- `which` 2.0.2 — ISC
+- `wrap-ansi` 7.0.0 — MIT
+- `wrappy` 1.0.2 — ISC
+- `xtend` 4.0.2 — MIT
+- `y18n` 5.0.8 — ISC
+- `yargs` 17.7.3 — MIT
+- `yargs-parser` 21.1.1 — ISC
+- `yocto-queue` 0.1.0 — MIT
+- `zod` 4.6.7 — MIT
 
-## pg
-- License: MIT
-- Source: https://github.com/brianc/node-postgres
+## Web dependency tree
 
-## zod
-- License: MIT
-- Source: https://github.com/colinhacks/zod
-
-## pino
-- License: MIT
-- Source: https://github.com/pinojs/pino
-
-## pino-http
-- License: MIT
-- Source: https://github.com/pinojs/pino-http
-
-## helmet
-- License: MIT
-- Source: https://github.com/helmetjs/helmet
-
-## React and Vite web dependencies
-- `react`, `react-dom`: MIT
-- `react-router-dom`: MIT
-- `@tanstack/react-query`: MIT
-- `i18next`, `react-i18next`: MIT
-- `lucide-react`: ISC
-- `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-popover`, `@radix-ui/react-tabs`, `@radix-ui/react-tooltip`: MIT
-- `zod`: MIT
-- `vite`, `@vitejs/plugin-react`: MIT
-- `stylelint`, `stylelint-config-standard`, `eslint-plugin-react-hooks`: MIT
-- `postcss-custom-media`: MIT
-- `@playwright/test`: Apache-2.0
-- `pixelmatch`, `pngjs`: MIT
-
-## Additional runtime notes
-- `pg-native` is not used in this project.
-- `@axe-core/playwright` is not installed because its MPL-2.0 license is outside the project's allowlist. F01 uses Playwright's built-in role locators for later accessibility smoke checks instead.
+- `@babel/runtime` 7.29.10 — MIT
+- `@csstools/cascade-layer-name-parser` 3.0.2 — MIT
+- `@csstools/css-parser-algorithms` 4.0.2 — MIT
+- `@csstools/css-tokenizer` 4.0.2 — MIT
+- `@csstools/media-query-list-parser` 5.0.2 — MIT
+- `@esbuild/aix-ppc64` 0.24.0 — MIT
+- `@esbuild/android-arm` 0.24.0 — MIT
+- `@esbuild/android-arm64` 0.24.0 — MIT
+- `@esbuild/android-x64` 0.24.0 — MIT
+- `@esbuild/darwin-arm64` 0.24.0 — MIT
+- `@esbuild/darwin-x64` 0.24.0 — MIT
+- `@esbuild/freebsd-arm64` 0.24.0 — MIT
+- `@esbuild/freebsd-x64` 0.24.0 — MIT
+- `@esbuild/linux-arm` 0.24.0 — MIT
+- `@esbuild/linux-arm64` 0.24.0 — MIT
+- `@esbuild/linux-ia32` 0.24.0 — MIT
+- `@esbuild/linux-loong64` 0.24.0 — MIT
+- `@esbuild/linux-mips64el` 0.24.0 — MIT
+- `@esbuild/linux-ppc64` 0.24.0 — MIT
+- `@esbuild/linux-riscv64` 0.24.0 — MIT
+- `@esbuild/linux-s390x` 0.24.0 — MIT
+- `@esbuild/linux-x64` 0.24.0 — MIT
+- `@esbuild/netbsd-x64` 0.24.0 — MIT
+- `@esbuild/openbsd-arm64` 0.24.0 — MIT
+- `@esbuild/openbsd-x64` 0.24.0 — MIT
+- `@esbuild/sunos-x64` 0.24.0 — MIT
+- `@esbuild/win32-arm64` 0.24.0 — MIT
+- `@esbuild/win32-ia32` 0.24.0 — MIT
+- `@esbuild/win32-x64` 0.24.0 — MIT
+- `@floating-ui/core` 1.8.0 — MIT
+- `@floating-ui/dom` 1.8.0 — MIT
+- `@floating-ui/react-dom` 2.1.9 — MIT
+- `@floating-ui/utils` 0.2.12 — MIT
+- `@napi-rs/lzma-linux-x64-gnu` 1.5.1 — MIT
+- `@playwright/test` 1.51.1 — Apache-2.0
+- `@radix-ui/primitive` 1.1.1 — MIT
+- `@radix-ui/react-arrow` 1.1.1 — MIT
+- `@radix-ui/react-collection` 1.1.1 — MIT
+- `@radix-ui/react-compose-refs` 1.1.1 — MIT
+- `@radix-ui/react-context` 1.1.1 — MIT
+- `@radix-ui/react-dialog` 1.1.4 — MIT
+- `@radix-ui/react-direction` 1.1.0 — MIT
+- `@radix-ui/react-dismissable-layer` 1.1.3 — MIT
+- `@radix-ui/react-dropdown-menu` 2.1.4 — MIT
+- `@radix-ui/react-focus-guards` 1.1.1 — MIT
+- `@radix-ui/react-focus-scope` 1.1.1 — MIT
+- `@radix-ui/react-id` 1.1.0 — MIT
+- `@radix-ui/react-menu` 2.1.4 — MIT
+- `@radix-ui/react-popover` 1.1.4 — MIT
+- `@radix-ui/react-popper` 1.2.1 — MIT
+- `@radix-ui/react-portal` 1.1.3 — MIT
+- `@radix-ui/react-presence` 1.1.2 — MIT
+- `@radix-ui/react-primitive` 2.0.1 — MIT
+- `@radix-ui/react-roving-focus` 1.1.1 — MIT
+- `@radix-ui/react-slot` 1.1.1 — MIT
+- `@radix-ui/react-tabs` 1.1.2 — MIT
+- `@radix-ui/react-tooltip` 1.1.6 — MIT
+- `@radix-ui/react-use-callback-ref` 1.1.0 — MIT
+- `@radix-ui/react-use-controllable-state` 1.1.0 — MIT
+- `@radix-ui/react-use-escape-keydown` 1.1.0 — MIT
+- `@radix-ui/react-use-layout-effect` 1.1.0 — MIT
+- `@radix-ui/react-use-rect` 1.1.0 — MIT
+- `@radix-ui/react-use-size` 1.1.0 — MIT
+- `@radix-ui/react-visually-hidden` 1.1.1 — MIT
+- `@radix-ui/rect` 1.1.0 — MIT
+- `@remix-run/router` 1.23.4 — MIT
+- `@rollup/rollup-android-arm-eabi` 4.67.2 — MIT
+- `@rollup/rollup-android-arm64` 4.67.2 — MIT
+- `@rollup/rollup-android-x64` 4.67.2 — MIT
+- `@rollup/rollup-darwin-arm64` 4.67.2 — MIT
+- `@rollup/rollup-darwin-x64` 4.67.2 — MIT
+- `@rollup/rollup-freebsd-arm64` 4.67.2 — MIT
+- `@rollup/rollup-freebsd-x64` 4.67.2 — MIT
+- `@rollup/rollup-linux-arm-gnueabihf` 4.67.2 — MIT
+- `@rollup/rollup-linux-arm-musleabihf` 4.67.2 — MIT
+- `@rollup/rollup-linux-arm64-gnu` 4.67.2 — MIT
+- `@rollup/rollup-linux-arm64-musl` 4.67.2 — MIT
+- `@rollup/rollup-linux-loong64-gnu` 4.67.2 — MIT
+- `@rollup/rollup-linux-loong64-musl` 4.67.2 — MIT
+- `@rollup/rollup-linux-ppc64-gnu` 4.67.2 — MIT
+- `@rollup/rollup-linux-ppc64-musl` 4.67.2 — MIT
+- `@rollup/rollup-linux-riscv64-gnu` 4.67.2 — MIT
+- `@rollup/rollup-linux-riscv64-musl` 4.67.2 — MIT
+- `@rollup/rollup-linux-s390x-gnu` 4.67.2 — MIT
+- `@rollup/rollup-linux-x64-gnu` 4.67.2 — MIT
+- `@rollup/rollup-linux-x64-musl` 4.67.2 — MIT
+- `@rollup/rollup-openbsd-x64` 4.67.2 — MIT
+- `@rollup/rollup-openharmony-arm64` 4.67.2 — MIT
+- `@rollup/rollup-win32-arm64-msvc` 4.67.2 — MIT
+- `@rollup/rollup-win32-ia32-msvc` 4.67.2 — MIT
+- `@rollup/rollup-win32-x64-gnu` 4.67.2 — MIT
+- `@rollup/rollup-win32-x64-msvc` 4.67.2 — MIT
+- `@tanstack/query-core` 5.62.7 — MIT
+- `@tanstack/react-query` 5.62.7 — MIT
+- `@tanstack/react-table` 8.21.3 — MIT
+- `@tanstack/react-virtual` 3.14.24 — MIT
+- `@tanstack/table-core` 8.21.3 — MIT
+- `@tanstack/virtual-core` 3.19.9 — MIT
+- `@types/estree` 1.0.10 — MIT
+- `aria-hidden` 1.2.6 — MIT
+- `detect-node-es` 1.1.0 — MIT
+- `esbuild` 0.24.0 — MIT
+- `fsevents` 2.3.2 — MIT
+- `get-nonce` 1.0.1 — MIT
+- `html-parse-stringify` 3.1.0 — MIT
+- `i18next` 24.0.5 — MIT
+- `js-tokens` 4.0.0 — MIT
+- `loose-envify` 1.4.0 — MIT
+- `lucide-react` 0.468.0 — ISC
+- `nanoid` 3.3.20 — MIT
+- `picocolors` 1.1.1 — ISC
+- `pixelmatch` 6.0.0 — ISC
+- `playwright` 1.51.1 — Apache-2.0
+- `playwright-core` 1.51.1 — Apache-2.0
+- `pngjs` 7.0.0 — MIT
+- `postcss` 8.5.32 — MIT
+- `postcss-custom-media` 12.0.3 — MIT
+- `react` 18.3.1 — MIT
+- `react-dom` 18.3.1 — MIT
+- `react-i18next` 15.1.1 — MIT
+- `react-remove-scroll` 2.7.2 — MIT
+- `react-remove-scroll-bar` 2.3.8 — MIT
+- `react-router` 6.30.6 — MIT
+- `react-router-dom` 6.30.6 — MIT
+- `react-style-singleton` 2.2.3 — MIT
+- `rollup` 4.67.2 — MIT
+- `scheduler` 0.23.2 — MIT
+- `source-map-js` 1.2.2 — BSD-3-Clause
+- `tslib` 2.9.1 — 0BSD
+- `use-callback-ref` 1.3.3 — MIT
+- `use-sidecar` 1.1.3 — MIT
+- `vite` 6.0.5 — MIT
+- `vite/node_modules/fsevents` 2.3.3 — MIT
+- `void-elements` 3.1.0 — MIT
+- `zod` 4.6.7 — MIT

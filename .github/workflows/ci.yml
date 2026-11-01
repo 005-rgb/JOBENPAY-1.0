@@ -5,35 +5,47 @@ on:
   pull_request:
 
 jobs:
-  validate:
+  server:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: jobenpay_test
+          POSTGRES_USER: jobenpay
+          POSTGRES_PASSWORD: jobenpay
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jobenpay -d jobenpay_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://jobenpay:jobenpay@localhost:5432/jobenpay_test
+      SEED_OWNER_PASSWORD: E2E-Owner-Password-2026!
+      SEED_JUDGE_PASSWORD: E2E-Judge-Password-2026!
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22.13.0'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install web dependencies
-        run: npm --prefix web ci
-
-      - name: Build web
-        run: npm --prefix web run build
-
-      - name: Guard checks
-        run: npm run guard
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix web
+      - name: Configure ephemeral test keys
+        run: |
+          node --input-type=module -e "import { appendFileSync } from 'node:fs'; import { generateKeyPairSync, randomBytes } from 'node:crypto'; const signingKey = generateKeyPairSync('ed25519').privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'); const values = { JOBENPAY_ENC_KEY: randomBytes(32).toString('base64'), JOBENPAY_LEDGER_SIGNING_KEY: signingKey, JOBENPAY_HMAC_PEPPER: randomBytes(32).toString('base64') }; appendFileSync(process.env.GITHUB_ENV, Object.entries(values).map(([key, value]) => key + '=' + value).join('\n') + '\n');"
+      - run: npm test
+      - run: npm run coverage
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm --prefix web audit --omit=dev --audit-level=high
+      - run: npm run lint
+      - run: npm run secret-scan
+      - run: npm run guard
 
   ui:
     runs-on: ubuntu-latest
@@ -41,51 +53,122 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: jobenpay_test
+          POSTGRES_USER: jobenpay
+          POSTGRES_PASSWORD: jobenpay
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d jobenpay_test"
-          --health-interval 10s
+          --health-cmd "pg_isready -U jobenpay -d jobenpay_test"
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 12
     env:
-      NODE_ENV: test
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/jobenpay_test
-      TEST_DATABASE_URL: postgres://postgres:postgres@postgres:5432/jobenpay_test
+      TEST_DATABASE_URL: postgresql://jobenpay:jobenpay@localhost:5432/jobenpay_test
       SEED_OWNER_PASSWORD: E2E-Owner-Password-2026!
-    container:
-      image: mcr.microsoft.com/playwright:v1.51.1-noble
+      SEED_JUDGE_PASSWORD: E2E-Judge-Password-2026!
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22.13.0'
-          cache: 'npm'
-          cache-dependency-path: web/package-lock.json
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Configure ephemeral test keys
+        run: |
+          node --input-type=module -e "import { appendFileSync } from 'node:fs'; import { generateKeyPairSync, randomBytes } from 'node:crypto'; const signingKey = generateKeyPairSync('ed25519').privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'); const values = { JOBENPAY_ENC_KEY: randomBytes(32).toString('base64'), JOBENPAY_LEDGER_SIGNING_KEY: signingKey, JOBENPAY_HMAC_PEPPER: randomBytes(32).toString('base64') }; appendFileSync(process.env.GITHUB_ENV, Object.entries(values).map(([key, value]) => key + '=' + value).join('\n') + '\n');"
+      - run: npm --prefix web run build
+      - run: npm --prefix web run lint:css
+      - run: npm --prefix web run test:geometry
+      - run: npm --prefix web run test:e2e
 
-      - name: Install server dependencies
-        run: npm ci
+  docker-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Configure ephemeral app secrets
+        run: |
+          node --input-type=module -e "import { appendFileSync } from 'node:fs'; import { generateKeyPairSync, randomBytes } from 'node:crypto'; const signingKey = generateKeyPairSync('ed25519').privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'); const values = { JOBENPAY_ENC_KEY: randomBytes(32).toString('base64'), JOBENPAY_LEDGER_SIGNING_KEY: signingKey, JOBENPAY_HMAC_PEPPER: randomBytes(32).toString('base64'), PUBLIC_BASE_URL: 'https://localhost:3000' }; appendFileSync(process.env.GITHUB_ENV, Object.entries(values).map(([key, value]) => key + '=' + value).join('\n') + '\n');"
+      - run: docker compose up --build --detach
+      - name: Wait for /healthz
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:3000/healthz; then exit 0; fi
+            sleep 2
+          done
+          docker compose logs app
+          exit 1
+      - if: always()
+        run: docker compose down --volumes
 
-      - name: Install web dependencies
-        run: npm --prefix web ci
-
-      - name: Build web
-        run: npm --prefix web run build
-
-      - name: Run database integration tests
-        run: npm test
-
-      - name: Lint CSS
-        run: npm --prefix web run lint:css
-
-      - name: Check geometry parity
-        run: npm --prefix web run test:geometry
-
-      - name: Run F03 end-to-end journey
-        run: npm --prefix web run test:e2e
+  fresh-clone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start clean setup timer
+        run: date +%s > "$RUNNER_TEMP/fresh-clone-start"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - name: Start PostgreSQL from Compose
+        run: docker compose up --detach postgres
+      - run: npm ci
+      - name: Configure replay-mode demo
+        run: |
+          cp .env.example .env
+          node scripts/gen-keys.js >> .env
+          printf '\nSEED_JUDGE_PASSWORD=FreshClone-Judge-Password-2026!\n' >> .env
+      - name: Install, build, migrate, and seed
+        run: |
+          setup_log="$RUNNER_TEMP/jobenpay-setup.log"
+          if ! npm run setup >"$setup_log" 2>&1; then
+            sed '/Demo agent API key:/d' "$setup_log"
+            exit 1
+          fi
+          sed '/Demo agent API key:/d' "$setup_log"
+      - name: Start app and run judge smoke
+        env:
+          JUDGE_SMOKE_URL: http://localhost:3000
+          JUDGE_SMOKE_EMAIL: judge@jobenpay.test
+          JUDGE_SMOKE_PASSWORD: FreshClone-Judge-Password-2026!
+        run: |
+          set -euo pipefail
+          log_file="$RUNNER_TEMP/jobenpay-fresh-clone.log"
+          npm start >"$log_file" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:3000/healthz >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat "$log_file"
+            exit 1
+          fi
+          node --env-file=.env scripts/judge-smoke.js
+          elapsed=$(( $(date +%s) - $(cat "$RUNNER_TEMP/fresh-clone-start") ))
+          echo "Fresh-clone setup and judge smoke completed in ${elapsed}s."
+          if [ "$elapsed" -gt 600 ]; then
+            echo "Fresh-clone setup exceeded the 10-minute limit."
+            exit 1
+          fi
+      - if: always()
+        run: docker compose down --volumes

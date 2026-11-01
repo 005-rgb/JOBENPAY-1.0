@@ -10,7 +10,6 @@ export function requestHash({
   amountMinor,
   currency,
   payeeId = null,
-  targetRef = null,
   documentSha256 = null,
 }) {
   const payload = {
@@ -21,7 +20,7 @@ export function requestHash({
     amountMinor: BigInt(amountMinor).toString(),
     currency,
     payeeId,
-    targetRef,
+    targetRef: null,
     documentSha256,
   };
   return crypto.createHash('sha256').update(canonicalJson(payload), 'utf8').digest('hex');

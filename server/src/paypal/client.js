@@ -96,7 +96,7 @@ async function waitBeforeRetry(attempt) {
   await new Promise((resolve) => setTimeout(resolve, delay));
 }
 
-async function fetchWithRetry(url, options, secrets) {
+async function fetchWithRetry(url, options, secrets, { retryable = true, includeStatus = false } = {}) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let response;
     let text;
@@ -115,15 +115,20 @@ async function fetchWithRetry(url, options, secrets) {
         }
         throw error;
       }
+      if (!retryable) {
+        const networkError = new AppError('PAYPAL_NETWORK_ERROR', 'Could not reach PayPal sandbox.');
+        networkError.statusCode = 503;
+        throw networkError;
+      }
       await waitBeforeRetry(attempt);
       continue;
     }
 
     const body = parseResponse(text);
     if (response.ok) {
-      return body;
+      return includeStatus ? { body, status: response.status } : body;
     }
-    if ((response.status === 429 || response.status >= 500) && attempt < MAX_ATTEMPTS) {
+    if (retryable && (response.status === 429 || response.status >= 500) && attempt < MAX_ATTEMPTS) {
       await waitBeforeRetry(attempt);
       continue;
     }
@@ -215,9 +220,12 @@ export async function paypalFor(orgId, {
       body,
       headers = {},
       idempotencyId,
+      retryable,
+      includeStatus = false,
     } = {}) {
       const url = assertApiPath(path);
       const token = await accessToken();
+      const requestMethod = String(method).toUpperCase();
       const requestHeaders = new globalThis.Headers(headers);
       requestHeaders.set('authorization', `Bearer ${token}`);
       if (body !== undefined) {
@@ -227,11 +235,18 @@ export async function paypalFor(orgId, {
         requestHeaders.set('PayPal-Request-Id', idempotencyId);
       }
 
+      const requestCanRetry = retryable ?? (
+        ['GET', 'HEAD', 'OPTIONS'].includes(requestMethod)
+          || Boolean(requestHeaders.get('PayPal-Request-Id'))
+      );
       const responseBody = await fetchWithRetry(url, {
-        method: String(method).toUpperCase(),
+        method: requestMethod,
         headers: requestHeaders,
         body: body === undefined ? undefined : JSON.stringify(body),
-      }, [...secrets, token, `Bearer ${token}`]);
+      }, [...secrets, token, `Bearer ${token}`], {
+        retryable: requestCanRetry,
+        includeStatus,
+      });
       return responseBody;
     },
   };

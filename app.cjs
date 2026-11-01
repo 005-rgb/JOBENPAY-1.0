@@ -1,4 +1,6 @@
 (async () => {
+  const { assertRuntimeSecrets } = await import('./server/src/config.js');
+  assertRuntimeSecrets();
   const { startServer } = await import('./server/src/server.js');
   startServer();
 })().catch((error) => {

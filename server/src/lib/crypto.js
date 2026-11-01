@@ -122,7 +122,7 @@ export function verifyEd25519(publicKeyBase64, signatureBase64, message) {
 
 export function kidFromPublicKey(publicKeyBase64) {
   const raw = Buffer.from(publicKeyBase64, 'base64');
-  return sha256Hex(raw).slice(0, 16);
+  return crypto.createHash('sha256').update(raw).digest('hex').slice(0, 16);
 }
 
 export function signEd25519(privateKeyBase64, message) {

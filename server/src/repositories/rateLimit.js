@@ -1,4 +1,5 @@
 import { query } from '../db/pool.js';
+import { AppError } from '../lib/errors.js';
 
 export async function rateLimit(key, limit, windowSec) {
   if (!key || !limit || !windowSec) {
@@ -22,8 +23,7 @@ export async function rateLimit(key, limit, windowSec) {
 export async function enforceRateLimit(key, limit, windowSec) {
   const exceeded = await rateLimit(key, limit, windowSec);
   if (exceeded) {
-    const err = new Error('Rate limit exceeded.');
-    err.code = 'RATE_LIMITED';
+    const err = new AppError('RATE_LIMITED', 'Rate limit exceeded.');
     err.statusCode = 429;
     throw err;
   }

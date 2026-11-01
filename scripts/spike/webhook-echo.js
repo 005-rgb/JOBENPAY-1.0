@@ -67,7 +67,7 @@ app.post('/echo', async (req, res) => {
       {
         receivedAt: new Date().toISOString(),
         headers: recordedHeaders,
-        body: parsedBody,
+        body: rawBody,
       },
       null,
       2,

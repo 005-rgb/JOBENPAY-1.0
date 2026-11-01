@@ -13,6 +13,11 @@ import {
   policySchema as mandatePolicySchema,
   PROMPT_VERSION as MANDATE_DRAFT_VERSION,
 } from './mandateDraft.js';
+import {
+  buildIntentCheckPrompt,
+  intentCheckSchema,
+  PROMPT_VERSION as INTENT_CHECK_VERSION,
+} from './intentCheck.js';
 
 export const PROMPTS = Object.freeze({
   extractInvoice: {
@@ -29,5 +34,10 @@ export const PROMPTS = Object.freeze({
     buildPrompt: buildMandateDraftPrompt,
     schema: mandatePolicySchema,
     version: MANDATE_DRAFT_VERSION,
+  },
+  intentCheck: {
+    buildPrompt: buildIntentCheckPrompt,
+    schema: intentCheckSchema,
+    version: INTENT_CHECK_VERSION,
   },
 });

@@ -8,17 +8,27 @@
     "node": ">=22.13 <23"
   },
   "scripts": {
-    "dev": "node --watch app.cjs",
-    "start": "node app.cjs",
-    "migrate": "node server/scripts/migrate.js",
-    "seed": "node server/scripts/seed.js",
-    "propose": "node server/scripts/propose.js",
-    "verify-ledger": "node server/scripts/verify-ledger.js",
+    "dev": "node --env-file-if-exists=.env --watch app.cjs",
+    "start": "node --env-file-if-exists=.env app.cjs",
+    "migrate": "node --env-file-if-exists=.env server/scripts/migrate.js",
+    "seed": "node --env-file-if-exists=.env server/scripts/seed.js",
+    "setup": "npm --prefix web ci && npm --prefix web run build && npm run migrate && npm run seed",
+    "propose": "node --env-file-if-exists=.env server/scripts/propose.js",
+    "verify-ledger": "node --env-file-if-exists=.env server/scripts/verify-ledger.js",
+    "demo:tamper": "node --env-file-if-exists=.env server/scripts/demo-tamper.js",
     "keys:gen": "node scripts/gen-keys.js",
     "guard": "node scripts/guard.js",
-    "lint": "eslint . --ext .js",
+    "notices:generate": "node scripts/gen-notices.js",
+    "secret-scan": "node scripts/secret-scan.js",
+    "lint": "node scripts/lint-js.js",
     "format": "prettier . --write",
-    "test": "node --test \"server/test/**/*.test.js\""
+    "test": "node --env-file-if-exists=.env scripts/test-suite.js",
+    "coverage": "c8 --all --include=server/src/services/decision/**/*.js --include=server/src/services/ledger.js --include=server/src/jobs/handlers/executeRequest.js --include=server/src/jobs/webhook.js --reporter=text-summary --check-coverage --lines=90 --branches=90 node --env-file-if-exists=.env scripts/test-suite.js",
+    "test:unit": "node --env-file-if-exists=.env --import=./server/test/setup.js --test \"server/test/unit/**/*.test.js\"",
+    "validate:static": "node scripts/validate/static.js",
+    "validate:schema": "node scripts/validate/schema.js",
+    "validate:ledger": "node scripts/validate/ledger-crosscheck.js",
+    "validate": "npm run validate:static && npm run validate:schema"
   },
   "dependencies": {
     "busboy": "^1.6.0",
@@ -29,13 +39,10 @@
     "pino": "^9.5.0",
     "pino-http": "^10.0.0",
     "unpdf": "1.9.1",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@eslint/js": "^9.12.0",
-    "eslint": "^9.12.0",
-    "eslint-config-prettier": "^10.0.0",
-    "eslint-plugin-import": "^2.31.0",
+    "c8": "^9.1.0",
     "prettier": "^3.4.0"
   }
 }

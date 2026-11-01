@@ -4,6 +4,30 @@ import { FLAGS_B } from './flagsB.js';
 import { explainReasonCodes } from './explain.js';
 import { RULES_A } from './rulesA.js';
 
+const DECISION_RANK = Object.freeze({
+  AUTO_APPROVE: 0,
+  REQUIRE_APPROVAL: 1,
+  REJECT: 2,
+});
+
+export function combineDecisions(deterministic, ai) {
+  const deterministicDecision = typeof deterministic === 'string' ? deterministic : deterministic?.decision;
+  const aiDecision = ai?.decision ?? 'AUTO_APPROVE';
+  if (!Object.hasOwn(DECISION_RANK, deterministicDecision) || !Object.hasOwn(DECISION_RANK, aiDecision)) {
+    throw new TypeError('Decision must be AUTO_APPROVE, REQUIRE_APPROVAL, or REJECT.');
+  }
+  const decision = DECISION_RANK[deterministicDecision] >= DECISION_RANK[aiDecision]
+    ? deterministicDecision
+    : aiDecision;
+  return {
+    decision,
+    reasonCodes: [...new Set([
+      ...(typeof deterministic === 'object' ? deterministic.reasonCodes ?? [] : []),
+      ...(ai?.reasonCodes ?? []),
+    ])],
+  };
+}
+
 function safeRule(name, fn, context) {
   try {
     return fn(context);
@@ -39,6 +63,7 @@ export async function evaluateRequest({ tx, request, context }) {
   };
   if (failures.length) {
     result.explanation = explainReasonCodes(result.reasonCodes);
+    result.reasonCodes = result.explanation.reasonCodes;
     return result;
   }
 
@@ -66,6 +91,7 @@ export async function evaluateRequest({ tx, request, context }) {
     result.decision = 'REJECT';
   }
   result.explanation = explainReasonCodes(result.reasonCodes);
+  result.reasonCodes = result.explanation.reasonCodes;
   return result;
 }
 
