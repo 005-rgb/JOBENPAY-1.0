@@ -26,13 +26,23 @@ function isWithin(directory, target) {
 export async function getUploadDirectory(directory = env.UPLOAD_DIR) {
   const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
   const configured = directory || path.join(projectRoot, 'var', 'uploads');
+  if (env.NODE_ENV === 'production' && !path.isAbsolute(configured)) {
+    throw new Error('UPLOAD_DIR must be an absolute path outside the public web root in production.');
+  }
   const uploadPath = path.resolve(process.cwd(), configured);
   const webRoot = path.resolve(projectRoot, 'web');
+  const applicationRoot = path.resolve(process.cwd());
+  if (env.NODE_ENV === 'production' && isWithin(applicationRoot, uploadPath)) {
+    throw new Error('UPLOAD_DIR must be outside the application root in production.');
+  }
   if (isWithin(webRoot, uploadPath)) {
     throw new Error('UPLOAD_DIR must be outside the web root.');
   }
   await mkdir(uploadPath, { recursive: true, mode: 0o700 });
   const actualPath = await realpath(uploadPath);
+  if (env.NODE_ENV === 'production' && isWithin(applicationRoot, actualPath)) {
+    throw new Error('UPLOAD_DIR must resolve outside the application root in production.');
+  }
   if (isWithin(webRoot, actualPath)) {
     throw new Error('UPLOAD_DIR must resolve outside the web root.');
   }

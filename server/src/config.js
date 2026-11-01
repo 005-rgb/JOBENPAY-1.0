@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import crypto from 'node:crypto';
+import path from 'node:path';
 import { PAYPAL_API_BASE } from './paypal/constants.js';
 
 const nodeMajor = Number(process.versions.node.split('.')[0]);
@@ -32,6 +33,7 @@ const ledgerPrivateKey = z.string().trim().optional().refine((value) => {
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
+  DATABASE_SSL_CA: z.string().optional(),
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/jobenpay'),
   TEST_DATABASE_URL: z.string().optional(),
   PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
@@ -79,6 +81,38 @@ if (env.NODE_ENV === 'production' && !process.env.PUBLIC_BASE_URL) {
 }
 if (env.NODE_ENV === 'production' && !env.PUBLIC_BASE_URL.startsWith('https://')) {
   throw new Error('PUBLIC_BASE_URL must use HTTPS in production.');
+}
+if (env.NODE_ENV === 'production') {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL must be explicitly configured in production.');
+  }
+  let databaseUrl;
+  try {
+    databaseUrl = new URL(env.DATABASE_URL);
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL in production.');
+  }
+  if (!['postgres:', 'postgresql:'].includes(databaseUrl.protocol)) {
+    throw new Error('DATABASE_URL must use the PostgreSQL protocol in production.');
+  }
+  const sslMode = databaseUrl.searchParams.get('sslmode')?.toLowerCase();
+  const sslEnabled = databaseUrl.searchParams.get('ssl')?.toLowerCase() === 'true'
+    || ['require', 'verify-ca', 'verify-full'].includes(sslMode);
+  if (!sslEnabled) {
+    throw new Error('DATABASE_URL must enable TLS in production (sslmode=require or stronger).');
+  }
+  if (!env.UPLOAD_DIR || !path.isAbsolute(env.UPLOAD_DIR)) {
+    throw new Error('UPLOAD_DIR must be an absolute path outside the public web root in production.');
+  }
+  const uploadPath = path.resolve(env.UPLOAD_DIR);
+  const appRoot = path.resolve(process.cwd());
+  const relativeUploadPath = path.relative(appRoot, uploadPath);
+  if (relativeUploadPath === ''
+    || (!relativeUploadPath.startsWith(`..${path.sep}`)
+      && relativeUploadPath !== '..'
+      && !path.isAbsolute(relativeUploadPath))) {
+    throw new Error('UPLOAD_DIR must be outside the application root in production.');
+  }
 }
 
 export function assertRuntimeSecrets() {

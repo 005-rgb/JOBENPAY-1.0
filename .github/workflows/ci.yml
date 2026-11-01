@@ -48,7 +48,7 @@ jobs:
       - run: npm run guard
 
   ui:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -124,6 +124,9 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             web/package-lock.json
+      - name: Configure ephemeral app secrets
+        run: |
+          node --input-type=module -e "import { appendFileSync } from 'node:fs'; import { generateKeyPairSync, randomBytes } from 'node:crypto'; const signingKey = generateKeyPairSync('ed25519').privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'); const values = { JOBENPAY_ENC_KEY: randomBytes(32).toString('base64'), JOBENPAY_LEDGER_SIGNING_KEY: signingKey, JOBENPAY_HMAC_PEPPER: randomBytes(32).toString('base64'), PUBLIC_BASE_URL: 'https://localhost:3000' }; appendFileSync(process.env.GITHUB_ENV, Object.entries(values).map(([key, value]) => key + '=' + value).join('\n') + '\n');"
       - name: Start PostgreSQL from Compose
         run: docker compose up --detach postgres
       - run: npm ci

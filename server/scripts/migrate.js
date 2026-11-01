@@ -4,13 +4,17 @@ import { pathToFileURL } from 'node:url';
 import pg from 'pg';
 
 import { env } from '../src/config.js';
+import { databaseConnectionOptions } from '../src/db/connection.js';
 
 const { Client } = pg;
 const migrationDir = path.resolve(process.cwd(), 'server/migrations');
 const lockKey = 20261030;
 
 export async function runMigrations(connectionString = env.DATABASE_URL) {
-  const client = new Client({ connectionString, statement_timeout: 10000 });
+  const client = new Client({
+    ...databaseConnectionOptions(connectionString),
+    statement_timeout: 10000,
+  });
   await client.connect();
 
   try {

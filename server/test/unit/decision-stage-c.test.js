@@ -140,6 +140,51 @@ test('Stage C sends payee and invoice names only as masked values', async () => 
   assert.doesNotMatch(JSON.stringify(aiInput), /SYNTHETIC Supplier|INV-001/);
 });
 
+test('Stage C safely uses mandate and request fallbacks when optional context is absent', async () => {
+  let aiInput;
+  await evaluateStageC({
+    request: request({ agent_reason: null }),
+    context: context({
+      version: null,
+      document: null,
+      extraction: null,
+      payee: null,
+      history: null,
+    }),
+    orgId: 'org-synthetic',
+    generate: async ({ input }) => {
+      aiInput = input;
+      return {
+        riskScore: 0,
+        intentMatch: 'MATCH',
+        anomalies: [],
+        injectionSuspected: false,
+        explanation: '',
+      };
+    },
+  });
+
+  assert.equal(aiInput.mandatePurpose, policy.purpose);
+  assert.equal(aiInput.invoiceFacts, null);
+  assert.equal(aiInput.requestFacts.payeeName, '[UNKNOWN PAYEE]');
+  assert.deepEqual(aiInput.history, {
+    requestsLastHour: 0,
+    payeePayoutsToday: 0,
+    duplicate: false,
+    payeeChanges30Days: 0,
+  });
+  assert.equal(aiInput.agentReason, '');
+});
+
+test('Stage C propagates unexpected non-AI exceptions', async () => {
+  await assert.rejects(() => evaluateStageC({
+    request: request(),
+    context: context(),
+    orgId: 'org-synthetic',
+    generate: async () => { throw new Error('programming failure'); },
+  }), /programming failure/);
+});
+
 for (const [label, outcome, expectedDecision, expectedReasonCodes] of outcomes) {
   test(`Stage C ${label} never lowers deterministic decisions`, async () => {
     const ai = await evaluateStageC({

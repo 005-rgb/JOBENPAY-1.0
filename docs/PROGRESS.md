@@ -1,9 +1,9 @@
 # PROGRESS
 
 ## Status ringkas
-- Langkah terakhir dikerjakan: S18 (submission docs, architecture, notices, threat model)
-- Langkah berikutnya: jalankan workflow `fresh-clone` di CI remote; pemilik harus mengisi placeholder hosted demo dan meninjau syarat provider sebelum rilis.
-- Hasil validasi lokal S18: clean install/setup/build/seed/start dan `judge-smoke.js` selesai dalam 76 detik pada PostgreSQL sementara; `npm run guard`, `npm run lint`, `npm run secret-scan`, dan parse YAML workflow lulus. Uji guard pada tag gagal hanya karena placeholder rilis yang memang belum diisi. CI remote belum dijalankan.
+- Langkah terakhir dikerjakan: memperbaiki blocker CI dan menyiapkan deployment cPanel.
+- Langkah berikutnya: push perbaikan ke `main`, verifikasi workflow CI baru, lalu lanjutkan deployment hanya setelah PostgreSQL TLS dan pengaturan cPanel tersedia.
+- Validasi lokal terbaru: 217 tes lulus tanpa gagal/skip; coverage baris 96,73% dan cabang 90,38% (470/520); guard dan lint lulus. CI run `41320315107` masih merupakan hasil lama; workflow lokal kini mematok UI ke Ubuntu 24.04 dan menyiapkan secrets ephemeral untuk Compose. Fresh-clone lokal sebelumnya selesai dalam 76 detik.
 
 ## Tabel langkah
 | Langkah | Status (TODO/WIP/DONE) | Commit | Jam aktual | Catatan |
@@ -97,8 +97,21 @@
 - Workflow `fresh-clone` mengukur setup dari awal sampai judge smoke dan membatasi waktu 10 menit. Reproduksi lokal clean dengan PostgreSQL terisolasi berhasil dalam 76 detik. PayPal API terms dan kebijakan penyedia AI yang tidak dapat diverifikasi penuh ditandai untuk tinjauan manual, tanpa klaim syarat yang tidak berdasar.
 - Validasi pasca-perubahan: `npm run guard`, `npm run lint`, `npm run secret-scan`, parse YAML workflow, dan simulasi penolakan placeholder pada tag lulus sesuai ekspektasi. Job GitHub Actions belum dijalankan karena checkout ini tidak memiliki metadata `.git`; perubahan tidak dikomit/push.
 
+## Checkpoint cPanel production preparation
+- Ditambahkan `docs/CPANEL_DEPLOYMENT.md` dengan detail Node 22, application root, domain, Passenger, PostgreSQL, environment, key generation, build/migrasi, readiness, serta pemeriksaan agar source di bawah `public_html` tidak tersaji langsung.
+- Produksi kini menolak DATABASE_URL non-PostgreSQL/tanpa TLS, DATABASE_URL implisit/default, dan UPLOAD_DIR relatif/di dalam application root. Pool dan migrasi memakai TLS dengan verifikasi sertifikat serta CA opsional melalui `DATABASE_SSL_CA`; penyimpanan unggahan produksi harus di luar application root.
+- Validasi lokal: `npm test` 211/211 tanpa skip; guard, JS lint, secret scan, dan diff check lulus. Frontend build serta CSS lint lulus sebelum perubahan konfigurasi final; tidak ada perubahan UI.
+- Deployment belum dilakukan: kredensial/database PostgreSQL dan akses cPanel bukan bagian workspace. Aplikasi tetap sandbox-only dan tidak mengizinkan PayPal live.
+
+## Checkpoint CI blockers
+- Runner UI dipatok ke `ubuntu-24.04` agar Chromium Playwright tersedia; job fresh-clone menyediakan nilai secret sementara sebelum Compose memvalidasi konfigurasi semua service.
+- Tes webhook dan Stage C ditambah untuk jalur validasi, event payout tak cocok/tertunda, eskalasi retry, fallback konteks opsional, serta propagasi exception non-AI.
+- `npm run coverage`: 217 tes lulus, pemeriksaan ledger akhir lulus (5 ledger valid; 6/6 jenis tamper terdeteksi), coverage baris 96,73%, cabang 90,38% (470/520), fungsi 100%; gate 90% lulus. `npm run guard`, `npm run lint`, dan `git diff --check` juga lulus.
+- Hasil tersebut baru lokal. Push dan workflow remote belum dijalankan; deployment cPanel tetap ditahan sampai CI remote hijau serta prasyarat database/hosting terpenuhi.
+
 ## Blockers
-- S18: workflow `fresh-clone` belum dijalankan di CI remote karena checkout tidak memiliki metadata `.git`; pemilik perlu mengisi `{{HOSTED_URL}}` dan `{{JUDGE_PASSWORD}}` serta meninjau persyaratan provider sebelum rilis. Reproduksi lokal selesai dalam 76 detik.
+- cPanel: belum ada akses shell/hosting atau detail server PostgreSQL eksternal. Sebelum aktif, atur secrets di cPanel, verifikasi URL source di `public_html` mengembalikan 403/404, lalu cek `/readyz`.
+- CI remote: perbaikan coverage, runner UI, dan Compose telah lolos validasi lokal; perlu push dan workflow baru untuk memastikan hasil GitHub Actions. Pemilik tetap perlu mengisi `{{HOSTED_URL}}` dan `{{JUDGE_PASSWORD}}` serta meninjau persyaratan provider sebelum rilis.
 - F05 local checks/E2E pass; requested commit, push, and remote CI remain blocked because this checkout has no `.git` metadata or configured remote. Existing test DB was not modified; a clean temporary DB was used for browser E2E after the existing ledger reported an unknown key.
 - S14 implementation and local validation are complete, but the requested commit/push cannot be performed because this checkout has no `.git` metadata or configured remote.
 - S13 menunggu M-REAL untuk memastikan perilaku/status/event PayPal Sandbox riil sesuai SPIKE; tes fake bukan penggantinya. Commit/push/CI remote terhalang karena checkout tidak memiliki `.git`.
