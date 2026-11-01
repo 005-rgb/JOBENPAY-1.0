@@ -33,7 +33,7 @@ const expectedErrorCodes = [
   'RATE_LIMITED', 'IDEMPOTENCY_CONFLICT', 'STEP_UP_REQUIRED', 'REGISTRATION_DISABLED', 'INTERNAL',
 ];
 const requiredScripts = [
-  'dev', 'start', 'migrate', 'seed', 'setup', 'test', 'test:unit', 'lint', 'guard',
+  'dev', 'start', 'build', 'migrate', 'seed', 'setup', 'test', 'test:unit', 'lint', 'guard',
   'keys:gen', 'verify-ledger',
 ];
 
@@ -270,18 +270,18 @@ for (const file of walk('web/src', (name) => /\.(?:jsx|js)$/i.test(name))) {
 record('ST-11', paypalFindings.length === 0, paypalFindings.length ? `Unapproved PayPal branding: ${paypalFindings.join(', ')}` : 'UI PayPal references are factual/allowlisted.');
 
 const distFiles = walk('web/dist');
+const distGitPaths = distFiles.map((file) => file.split(path.sep).join('/'));
 const parityFiles = distFiles.filter((file) => read(file).includes('__parity'));
-let distTracked = false;
+let untrackedDistFiles = [];
 if (gitAvailable) {
-  try {
-    execFileSync('git', ['ls-files', '--error-unmatch', 'web/dist'], { cwd: root, stdio: 'ignore' });
-    distTracked = true;
-  } catch {
-    distTracked = false;
-  }
+  const trackedDistFiles = new Set(execFileSync('git', ['ls-files', '-z', '--', 'web/dist'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).split('\0').filter(Boolean));
+  untrackedDistFiles = distFiles.filter((file, index) => !trackedDistFiles.has(distGitPaths[index]));
 }
-record('ST-12', gitAvailable && !distTracked && parityFiles.length === 0,
-  `${distTracked ? 'web/dist is tracked; ' : ''}${parityFiles.length ? `parity string in ${parityFiles.join(', ')}` : 'no parity strings in production output'}${!gitAvailable ? '; Git tracking status unavailable' : ''}.`);
+record('ST-12', gitAvailable && distGitPaths.includes('web/dist/index.html') && untrackedDistFiles.length === 0 && parityFiles.length === 0,
+  `${untrackedDistFiles.length ? `untracked production files: ${untrackedDistFiles.join(', ')}` : 'all production build files are tracked'}; ${parityFiles.length ? `parity string in ${parityFiles.join(', ')}` : 'no parity strings in production output'}${!gitAvailable ? '; Git tracking status unavailable' : ''}.`);
 
 const html = exists('web/index.html') ? read('web/index.html') : '';
 record('ST-13', exists('web/index.html') && !/<script\b(?![^>]*\bsrc\s*=)[^>]*>/i.test(html) && !/<style\b/i.test(html),

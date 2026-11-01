@@ -20,6 +20,7 @@ check(fileExists('README.md'), 'README.md is required.');
 check(fileExists('.nvmrc'), '.nvmrc is required.');
 check(fileExists('.env.example'), '.env.example is required.');
 check(fileExists('app.cjs'), 'app.cjs is required.');
+check(fileExists('deploy.sh'), 'deploy.sh is required for the manual cPanel release process.');
 check(fileExists('server/src/server.js'), 'server/src/server.js is required.');
 check(fileExists('server/src/config.js'), 'server/src/config.js is required.');
 check(fileExists('.github/workflows/ci.yml'), '.github/workflows/ci.yml is required.');

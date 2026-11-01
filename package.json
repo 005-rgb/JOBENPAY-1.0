@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "node --env-file-if-exists=.env --watch app.cjs",
     "start": "node --env-file-if-exists=.env app.cjs",
+    "build": "npm --prefix web run build",
     "migrate": "node --env-file-if-exists=.env server/scripts/migrate.js",
     "seed": "node --env-file-if-exists=.env server/scripts/seed.js",
     "setup": "npm --prefix web ci && npm --prefix web run build && npm run migrate && npm run seed",
