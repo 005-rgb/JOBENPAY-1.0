@@ -154,6 +154,27 @@ RewriteRule ^web/(src|node_modules|package(-lock)?\.json)(/|$) - [F,L,NC]
 EOF
     log INFO "Aturan penolakan akses source ditambahkan ke .htaccess."
   fi
+
+  if ! grep -Fq '# BEGIN JOBENPAY LITESPEED ROUTING' "$htaccess"; then
+    cat >> "$htaccess" <<'EOF'
+
+# BEGIN JOBENPAY LITESPEED ROUTING
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^(api(/|$)|agent(/|$)|mcp$|healthz$|readyz$|webhooks(/|$)) - [L,NC]
+RewriteRule ^$ web/dist/index.html [L]
+RewriteRule ^index\.html$ web/dist/index.html [L]
+RewriteRule ^assets/(.+)$ web/dist/assets/$1 [L]
+RewriteRule ^(manifest\.json|favicon\.svg|favicon\.ico|sw\.js|robots\.txt|og-image\.svg)$ web/dist/$1 [L]
+RewriteRule ^icons/(.+)$ web/dist/icons/$1 [L]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+RewriteRule ^ web/dist/index.html [L]
+</IfModule>
+# END JOBENPAY LITESPEED ROUTING
+EOF
+    log INFO "Routing LiteSpeed: SPA ke web/dist, endpoint API/health diteruskan ke Node."
+  fi
 }
 
 verify_public_routes() {
