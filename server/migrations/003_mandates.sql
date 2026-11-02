@@ -1,5 +1,5 @@
 CREATE TABLE mandates (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   agent_id uuid NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE mandates (
 );
 
 CREATE TABLE mandate_versions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   mandate_id uuid NOT NULL,
@@ -37,7 +37,7 @@ ALTER TABLE mandates
   FOREIGN KEY (current_version_id) REFERENCES mandate_versions (id);
 
 CREATE TABLE mandate_budget_periods (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   version_id uuid NOT NULL,

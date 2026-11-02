@@ -1,5 +1,5 @@
 CREATE TABLE executions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   request_id uuid NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE executions (
 );
 
 CREATE TABLE webhook_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   paypal_event_id text UNIQUE,
@@ -41,7 +41,7 @@ CREATE TABLE ledger_entries (
 );
 
 CREATE TABLE ledger_heads (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL UNIQUE,
   last_seq bigint,

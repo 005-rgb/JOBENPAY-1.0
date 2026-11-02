@@ -1,5 +1,5 @@
 CREATE TABLE ai_usage (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   task text NOT NULL,

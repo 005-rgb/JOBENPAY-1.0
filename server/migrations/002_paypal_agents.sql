@@ -1,5 +1,5 @@
 CREATE TABLE paypal_connections (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL UNIQUE,
   client_id_enc text,
@@ -12,7 +12,7 @@ CREATE TABLE paypal_connections (
 );
 
 CREATE TABLE agents (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   name text NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE agents (
 );
 
 CREATE TABLE agent_api_keys (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   agent_id uuid NOT NULL,

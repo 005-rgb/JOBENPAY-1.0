@@ -245,7 +245,7 @@ test('PostgreSQL jobs are deduplicated, claimed once, retried, recovered, and dr
     `);
     await db.query(`
       INSERT INTO sessions (id_hash, user_id, csrf_secret, expires_at)
-      VALUES ('expired-test-session', gen_random_uuid(), 'csrf', now() - interval '1 day')
+      VALUES ('expired-test-session', public.jobenpay_uuid_v4(), 'csrf', now() - interval '1 day')
     `);
     await db.query(`
       INSERT INTO jobs (type, status, created_at, run_at)
@@ -281,7 +281,7 @@ test('PostgreSQL jobs are deduplicated, claimed once, retried, recovered, and dr
     assert.equal(stats.oldestUnprocessedWebhookAgeSeconds, null);
     await db.query(`
       INSERT INTO webhook_events (org_id, event_type, status, received_at)
-      VALUES (gen_random_uuid(), 'TEST.EVENT', 'RECEIVED', now() - interval '2 hours')
+      VALUES (public.jobenpay_uuid_v4(), 'TEST.EVENT', 'RECEIVED', now() - interval '2 hours')
     `);
     const webhookStats = await queueStats(null, db);
     assert.ok(webhookStats.oldestUnprocessedWebhookAgeSeconds >= 7190);

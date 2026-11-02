@@ -1,5 +1,5 @@
 CREATE TABLE payees (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   display_name text NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE payees (
 );
 
 CREATE TABLE payee_revisions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   payee_id uuid NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE payee_revisions (
 );
 
 CREATE TABLE documents (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   uploader_kind text NOT NULL CHECK (uploader_kind IN ('USER', 'AGENT')),
@@ -38,7 +38,7 @@ CREATE TABLE documents (
 );
 
 CREATE TABLE document_extractions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   document_id uuid NOT NULL,

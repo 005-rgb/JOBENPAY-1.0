@@ -1,5 +1,5 @@
 CREATE TABLE payment_requests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   agent_id uuid NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE payment_requests (
 );
 
 CREATE TABLE request_evaluations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   request_id uuid NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE request_evaluations (
 );
 
 CREATE TABLE approvals (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   request_id uuid NOT NULL,
@@ -45,7 +45,7 @@ CREATE TABLE approvals (
 );
 
 CREATE TABLE approval_decisions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   approval_id uuid NOT NULL,

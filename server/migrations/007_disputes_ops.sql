@@ -1,5 +1,5 @@
 CREATE TABLE disputes (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   paypal_dispute_id text,
@@ -12,7 +12,7 @@ CREATE TABLE disputes (
 );
 
 CREATE TABLE dispute_cases (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   dispute_id uuid NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE dispute_cases (
 );
 
 CREATE TABLE notifications (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   kind text,
@@ -33,7 +33,7 @@ CREATE TABLE notifications (
 );
 
 CREATE TABLE email_outbox (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   to_email text,
@@ -44,7 +44,7 @@ CREATE TABLE email_outbox (
 );
 
 CREATE TABLE audit_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   actor_id uuid,
@@ -53,7 +53,7 @@ CREATE TABLE audit_events (
 );
 
 CREATE TABLE jobs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid,
   type text NOT NULL,

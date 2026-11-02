@@ -168,13 +168,13 @@ async function validate(client) {
     && createdAt?.column_default == null;
   record('SC-08', schemaValid, `ledger_entries PK=${ledgerEntriesPk}; ledger_heads PK=${ledgerHeadsPk}; created_at NOT NULL/no default=${createdAt?.is_nullable === 'NO' && createdAt?.column_default == null}.`);
 
-  const uuidFunction = await client.query(`SELECT to_regprocedure('gen_random_uuid()') IS NOT NULL AS available`);
+  const uuidFunction = await client.query(`SELECT to_regprocedure('public.jobenpay_uuid_v4()') IS NOT NULL AS available`);
   const idColumns = columns.filter((column) => column.column_name === 'id');
   const invalidIds = idColumns.filter((column) => column.udt_name !== 'uuid'
-    || !/gen_random_uuid\s*\(\s*\)/i.test(column.column_default || ''))
+    || !/jobenpay_uuid_v4\s*\(\s*\)/i.test(column.column_default || ''))
     .map((column) => column.table_name);
   record('SC-09', uuidFunction.rows[0].available && invalidIds.length === 0,
-    `gen_random_uuid available=${uuidFunction.rows[0].available}; invalid id defaults: ${invalidIds.join(', ') || 'none'}.`);
+    `jobenpay_uuid_v4 available=${uuidFunction.rows[0].available}; invalid id defaults: ${invalidIds.join(', ') || 'none'}.`);
 
   const migrationDir = path.resolve(process.cwd(), 'server/migrations');
   const migrationFiles = fs.readdirSync(migrationDir).filter((file) => /^\d+_.*\.sql$/i.test(file)).sort();
