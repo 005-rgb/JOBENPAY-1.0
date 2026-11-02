@@ -35,6 +35,8 @@ In **Setup Node.js App**, select Node 22, set the application root to `public_ht
 
 The HTTP server does not bind to `localhost` only: `app.listen(port)` uses Node's wildcard address when no host is specified. `PUBLIC_BASE_URL` configures generated public links and must be the HTTPS domain. Passenger/domain routing still has to be enabled in cPanel; changing PostgreSQL `sslmode` affects only the app-to-database connection, not browser access to the site.
 
+The root `.htaccess` must map `PassengerAppRoot` to the application root, `PassengerBaseURI "/"`, `PassengerStartupFile app.js`, and enable `PassengerEnabled On` inside the CloudLinux Passenger block. The deployment script ensures the enable directive and adds source-file deny rules, then checks that `/healthz` returns JOBENPAY JSON and sensitive source paths return 403/404. A deployment now stops with a clear error if the domain still returns the LiteSpeed “It works!” placeholder or exposes source. Do not ignore that error; verify that the subdomain's document root and cPanel Application URL both point at this app.
+
 ```sh
 source /home/smknwon2/nodevenv/public_html/jobenpay/22/bin/activate
 cd /home/smknwon2/public_html/jobenpay

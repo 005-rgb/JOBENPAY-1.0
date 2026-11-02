@@ -110,6 +110,96 @@ assert_release_files() {
   ' || fail "Artefak frontend tidak lengkap; build lokal dan push direktori web/dist."
 }
 
+configure_passenger_routing() {
+  local htaccess="$APP_DIR/.htaccess"
+  local passenger_end='# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END'
+
+  [ -f "$htaccess" ] || fail "File .htaccess cPanel tidak ditemukan. Buat/aplikasikan Node.js App untuk domain ini di cPanel sebelum deploy."
+  grep -Fq "PassengerAppRoot \"$APP_DIR\"" "$htaccess" ||
+    fail ".htaccess PassengerAppRoot tidak menunjuk ke $APP_DIR. Perbaiki Application Root di Setup Node.js App."
+  grep -Eq '^[[:space:]]*PassengerBaseURI[[:space:]]+"/"[[:space:]]*$' "$htaccess" ||
+    fail ".htaccess harus memiliki PassengerBaseURI \"/\" untuk domain root nh.jobenapp.cloud."
+  grep -Eq '^[[:space:]]*PassengerStartupFile[[:space:]]+app\.js[[:space:]]*$' "$htaccess" ||
+    fail ".htaccess harus memiliki PassengerStartupFile app.js."
+  grep -Fq "$passenger_end" "$htaccess" ||
+    fail ".htaccess tidak memiliki penanda akhir konfigurasi Passenger cPanel; perbaiki pemetaan aplikasi di cPanel."
+
+  if ! grep -Eiq '^[[:space:]]*PassengerEnabled[[:space:]]+On([[:space:]]|$)' "$htaccess"; then
+    local updated_htaccess="$BACKUP_DIR/.htaccess.passenger"
+    awk -v marker="$passenger_end" '
+      $0 == marker {
+        print "PassengerEnabled On"
+        inserted = 1
+      }
+      { print }
+      END { if (!inserted) exit 1 }
+    ' "$htaccess" > "$updated_htaccess" ||
+      fail "Tidak dapat menambahkan PassengerEnabled On ke konfigurasi cPanel."
+    chmod --reference="$htaccess" "$updated_htaccess"
+    mv -- "$updated_htaccess" "$htaccess"
+    log WARN "PassengerEnabled On diaktifkan di blok konfigurasi cPanel."
+  fi
+
+  if ! grep -Fq '# BEGIN JOBENPAY SOURCE ACCESS GUARD' "$htaccess"; then
+    cat >> "$htaccess" <<'EOF'
+
+# BEGIN JOBENPAY SOURCE ACCESS GUARD
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^(server|scripts|shared|docs|node_modules|\.git)(/|$) - [F,L,NC]
+RewriteRule ^(\.env(\..*)?|package(-lock)?\.json|app\.(js|cjs)|deploy\.sh)$ - [F,L,NC]
+RewriteRule ^web/(src|node_modules|package(-lock)?\.json)(/|$) - [F,L,NC]
+</IfModule>
+# END JOBENPAY SOURCE ACCESS GUARD
+EOF
+    log INFO "Aturan penolakan akses source ditambahkan ke .htaccess."
+  fi
+}
+
+verify_public_routes() {
+  local public_url="${PUBLIC_BASE_URL:-}"
+  local response_file="$BACKUP_DIR/public-healthz.response"
+  local attempt status private_path
+
+  if [ -z "$public_url" ] && [ -f "$APP_DIR/.htaccess" ]; then
+    public_url="$(awk '$1 == "SetEnv" && $2 == "PUBLIC_BASE_URL" { print $3; exit }' "$APP_DIR/.htaccess")"
+  fi
+  case "$public_url" in
+    https://*) ;;
+    *) fail "Tidak dapat memverifikasi domain: set PUBLIC_BASE_URL=https://... di environment cPanel atau .htaccess." ;;
+  esac
+  public_url="${public_url%/}"
+  command -v curl >/dev/null 2>&1 || fail "curl dibutuhkan untuk memverifikasi routing domain setelah Passenger restart."
+
+  for attempt in $(seq 1 15); do
+    if curl --silent --show-error --fail --max-time 5 "$public_url/healthz" -o "$response_file" 2>/dev/null &&
+      "$NODE_BIN" -e '
+        const fs = require("node:fs");
+        try {
+          const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+          process.exit(body.service === "jobenpay" && body.status === "healthy" ? 0 : 1);
+        } catch {
+          process.exit(1);
+        }
+      ' "$response_file" >/dev/null 2>&1; then
+      break
+    fi
+    if [ "$attempt" -eq 15 ]; then
+      fail "Domain $public_url masih tidak menuju aplikasi JOBENPAY (/healthz bukan JSON healthy). Periksa PassengerEnabled, Application URL/root, dan log Passenger; respons placeholder LiteSpeed bukan health check valid."
+    fi
+    sleep 2
+  done
+
+  for private_path in package.json app.js app.cjs server/src/config.js .env .git/config; do
+    status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 "$public_url/$private_path" || true)"
+    case "$status" in
+      403|404) ;;
+      *) fail "File source $private_path masih dapat diakses melalui $public_url (HTTP ${status:-request gagal}); jangan gunakan aplikasi sampai source tertutup." ;;
+    esac
+  done
+  log INFO "Routing Passenger dan perlindungan source terverifikasi di $public_url."
+}
+
 activate_cpanel_node
 NODE_BIN="$(command -v node 2>/dev/null || true)"
 [ -n "$NODE_BIN" ] || fail "Node.js tidak ditemukan; aktifkan aplikasi Node.js di cPanel."
@@ -199,6 +289,7 @@ for protected in .env .htaccess; do
   fi
 done
 
+configure_passenger_routing
 assert_release_files
 
 if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
@@ -221,6 +312,7 @@ else
   mkdir -p "$APP_DIR/tmp"
   touch "$APP_DIR/tmp/restart.txt"
   log INFO "Rilis $COMMIT_AFTER ($BRANCH; sebelumnya $PREVIOUS_COMMIT) siap; restart Passenger diminta."
+  verify_public_routes
 fi
 log INFO "Tidak ada build, instalasi paket, migrasi database, atau seed yang dijalankan oleh deploy.sh."
 
