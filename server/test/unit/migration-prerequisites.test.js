@@ -4,20 +4,19 @@ import test from 'node:test';
 
 const migrationDir = new URL('../../migrations/', import.meta.url);
 
-test('first migration defines its own UUID generator without procedural SQL or extensions', async () => {
+test('migrations use built-in SQL expressions for UUID defaults without extensions or functions', async () => {
   const migrationFiles = (await readdir(migrationDir))
     .filter((name) => /^\d+_.*\.sql$/i.test(name))
     .sort();
   const migrations = await Promise.all(migrationFiles.map((name) => readFile(new URL(name, migrationDir), 'utf8')));
   const firstMigration = migrations[0];
-  const functionIndex = firstMigration.search(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.jobenpay_uuid_v4\s*\(\s*\)/i);
-  const uuidDefaultIndex = firstMigration.search(/DEFAULT\s+public\.jobenpay_uuid_v4\s*\(\s*\)/i);
+  const allMigrations = migrations.join('\n');
 
   assert.ok(migrationFiles.length > 0, 'migration files must exist');
-  assert.doesNotMatch(migrations.join('\n'), /CREATE\s+EXTENSION|\bDO\s+\$\$/i, 'migrations must not require extensions or anonymous procedural blocks');
-  assert.notEqual(functionIndex, -1, 'migration must provide its UUID function');
-  assert.notEqual(uuidDefaultIndex, -1, 'migration must define UUID defaults');
-  assert.ok(functionIndex < uuidDefaultIndex, 'UUID function must be defined before UUID defaults');
-  assert.doesNotMatch(migrations.join('\n'), /DEFAULT\s+gen_random_uuid\s*\(\s*\)/i, 'all UUID defaults must use the portable function');
-  assert.match(firstMigration, /md5\(random\(\)::text[\s\S]*clock_timestamp\(\)::text[\s\S]*txid_current\(\)::text/i);
+  assert.doesNotMatch(firstMigration, /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION/i, 'UUID defaults must not require a custom UUID function');
+  assert.doesNotMatch(allMigrations, /CREATE\s+EXTENSION|\bDO\s+\$\$/i, 'migrations must not require extensions or anonymous procedural blocks');
+  assert.match(firstMigration, /DEFAULT\s+\(overlay\(overlay\(md5\(random\(\)::text[\s\S]*placing '4' from 13[\s\S]*placing CASE[\s\S]*from 17/i);
+  assert.doesNotMatch(allMigrations, /DEFAULT\s+(?:public\.)?(?:gen_random_uuid|jobenpay_uuid_v4)\s*\(\s*\)/i, 'UUID defaults must not depend on unavailable functions');
+  assert.doesNotMatch(allMigrations, /id\s+uuid\s+PRIMARY KEY\s+DEFAULT\s+(?!\(overlay\(overlay\(md5\()/i, 'all UUID id defaults must use the portable expression');
+  assert.match(firstMigration, /md5\(random\(\)::text[\s\S]*clock_timestamp\(\)::text[\s\S]*txid_current\(\)::text[\s\S]*pg_backend_pid\(\)::text/i);
 });

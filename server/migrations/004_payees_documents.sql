@@ -1,5 +1,5 @@
 CREATE TABLE payees (
-  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
+  id uuid PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   display_name text NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE payees (
 );
 
 CREATE TABLE payee_revisions (
-  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
+  id uuid PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   payee_id uuid NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE payee_revisions (
 );
 
 CREATE TABLE documents (
-  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
+  id uuid PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   uploader_kind text NOT NULL CHECK (uploader_kind IN ('USER', 'AGENT')),
@@ -38,7 +38,7 @@ CREATE TABLE documents (
 );
 
 CREATE TABLE document_extractions (
-  id uuid PRIMARY KEY DEFAULT public.jobenpay_uuid_v4(),
+  id uuid PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
   created_at timestamptz NOT NULL DEFAULT now(),
   org_id uuid NOT NULL,
   document_id uuid NOT NULL,

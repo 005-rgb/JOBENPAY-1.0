@@ -245,7 +245,7 @@ test('PostgreSQL jobs are deduplicated, claimed once, retried, recovered, and dr
     `);
     await db.query(`
       INSERT INTO sessions (id_hash, user_id, csrf_secret, expires_at)
-      VALUES ('expired-test-session', public.jobenpay_uuid_v4(), 'csrf', now() - interval '1 day')
+      VALUES ('expired-test-session', overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid, 'csrf', now() - interval '1 day')
     `);
     await db.query(`
       INSERT INTO jobs (type, status, created_at, run_at)
@@ -281,7 +281,7 @@ test('PostgreSQL jobs are deduplicated, claimed once, retried, recovered, and dr
     assert.equal(stats.oldestUnprocessedWebhookAgeSeconds, null);
     await db.query(`
       INSERT INTO webhook_events (org_id, event_type, status, received_at)
-      VALUES (public.jobenpay_uuid_v4(), 'TEST.EVENT', 'RECEIVED', now() - interval '2 hours')
+      VALUES (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid, 'TEST.EVENT', 'RECEIVED', now() - interval '2 hours')
     `);
     const webhookStats = await queueStats(null, db);
     assert.ok(webhookStats.oldestUnprocessedWebhookAgeSeconds >= 7190);
