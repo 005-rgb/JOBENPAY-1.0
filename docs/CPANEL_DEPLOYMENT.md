@@ -21,6 +21,7 @@ The requested application root is under `public_html`. Configure the cPanel Node
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/package.json
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/app.js
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/app.cjs
+curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/node_modules/
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/server/src/config.js
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/.env
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/.git/config
@@ -99,15 +100,26 @@ Only clone into an empty application root. If it contains files (including hidde
 
 After a successful first clone, verify `git status` and `git remote -v`, then install runtime dependencies once as described below. On later releases, `bash deploy.sh main` updates this existing checkout.
 
-### One-time runtime dependency install
+### Install production dependencies outside `public_html`
 
-The built frontend is committed to `web/dist`; cPanel does not need the frontend toolchain. Install root production dependencies once after cloning:
+Do not run `npm ci` in the application root; that puts the real dependency directory under `public_html`. Node.js ESM does not resolve packages from `NODE_PATH`, so Node needs a `node_modules` symlink in the app root pointing to a private dependency directory outside the web root.
 
 ```sh
-npm ci --omit=dev
+source /home/smknwon2/nodevenv/public_html/jobenpay/22/bin/activate
+cd /home/smknwon2/public_html/jobenpay
+bash scripts/cpanel-install-runtime.sh
 ```
 
-Repeat this command manually only when the root `package-lock.json` or runtime dependencies change. It is intentionally not run by `deploy.sh`. The script checks required runtime dependencies and stops with instructions if they are missing.
+The helper installs production dependencies in a private, lockfile-fingerprinted directory under `/home/smknwon2/private/jobenpay/node-runtime/` and atomically points `/home/smknwon2/public_html/jobenpay/node_modules` at it. This keeps the old dependency tree intact while a changed lockfile is installed. It stops rather than replacing an existing real `node_modules` directory or a symlink to a location outside the private runtime directory. Verify with:
+
+```sh
+ls -ld node_modules
+readlink -f node_modules
+```
+
+The resolved path must be under `/home/smknwon2/private/jobenpay/node-runtime/`, never under `public_html`. Keep the symlink itself inaccessible over HTTP; configure the web server to deny `/node_modules` while preserving cPanel's Passenger and CloudLinux-managed rules. Do not replace managed `.htaccess` contents; ask hosting support to add the deny rule if needed.
+
+The installer is intentionally not run by `deploy.sh`. If a release changes `package.json` or `package-lock.json`, run `bash deploy.sh main` first to sync the reviewed source. Deploy will stop without restarting Passenger when the current runtime does not match the new lockfile. Then run `bash scripts/cpanel-install-runtime.sh` and repeat `bash deploy.sh main`; the second run verifies the matching runtime and requests the restart. Do not install dependencies under the application root.
 
 ## 3. Build and publish each release locally
 
@@ -149,7 +161,7 @@ npm test
 `npm run build` generates `web/dist`. Those built files are intentionally tracked and pushed with the matching source so cPanel does not need to build. Review the generated diff, then commit and push the source and build output together:
 
 ```sh
-git add .gitignore package.json scripts/validate/static.js deploy.sh docs/CPANEL_DEPLOYMENT.md web/dist
+git add .gitignore package.json scripts/validate/static.js scripts/cpanel-install-runtime.sh deploy.sh docs/CPANEL_DEPLOYMENT.md web/dist
 git diff --cached --check
 git diff --cached --stat
 git commit -m "release: describe this release"
@@ -170,9 +182,9 @@ cd /home/smknwon2/public_html/jobenpay
 bash deploy.sh main
 ```
 
-The script verifies Node 22.13+, fetches `origin/main`, warns that local tracked source edits (including staged edits and line-ending changes) will be overwritten, protects untracked server files that collide with the release, verifies the tracked frontend build and production dependencies, and requests a Passenger restart using `tmp/restart.txt`. Keep `.env` and `.htaccess` untracked; the script refuses a release that tracks either file. Logs are written to `/home/smknwon2/logs/jobenpay-deploy.log`; temporary protections are stored outside the app root with private permissions. If a check fails, the script reports the retained backup path; inspect it and the log before retrying.
+The script verifies Node 22.13+, requires `node_modules` to be a symlink to the private runtime directory for the current package manifests, fetches `origin/main`, warns that local tracked source edits (including staged edits and line-ending changes) will be overwritten, protects untracked server files that collide with the release, verifies the tracked frontend build and production dependency imports, and requests a Passenger restart using `tmp/restart.txt`. Keep `.env` and `.htaccess` untracked; the script refuses a release that tracks either file. Logs are written to `/home/smknwon2/logs/jobenpay-deploy.log`; temporary protections are stored outside the app root with private permissions. If a check fails, the script reports the retained backup path; inspect it and the log before retrying.
 
-The script does **not** install packages, run `npm run build`, apply migrations, seed data, or alter database contents. If runtime dependencies changed, manually run `npm ci --omit=dev` in the activated cPanel environment before invoking `deploy.sh`.
+The script does **not** install packages, run `npm run build`, apply migrations, seed data, or alter database contents. For dependency changes, follow the two-pass deploy procedure above: sync with `deploy.sh`, run the private runtime installer, then rerun `deploy.sh`.
 
 ### Database migrations and first-time seed
 
