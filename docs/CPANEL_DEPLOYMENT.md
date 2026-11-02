@@ -70,7 +70,33 @@ mkdir -p /home/smknwon2/private/jobenpay/uploads /home/smknwon2/private/jobenpay
 chmod 700 /home/smknwon2/private/jobenpay /home/smknwon2/private/jobenpay/uploads /home/smknwon2/private/jobenpay/backups
 ```
 
-Clone the GitHub repository into the configured application root and ensure it has an `origin` remote. Keep `.env` and any server-owned `.htaccess` untracked. Configure GitHub read access for the cPanel account using a deploy key or another least-privilege method.
+### First deployment: clone the repository
+
+`deploy.sh` is part of the repository, so it cannot be used until the first clone has put the source into the application root. In cPanel Terminal:
+
+```sh
+source /home/smknwon2/nodevenv/public_html/jobenpay/22/bin/activate
+APP_DIR=/home/smknwon2/public_html/jobenpay
+cd "$APP_DIR"
+pwd
+git --version
+git status
+```
+
+If `git status` says this is not a repository, check whether the application root is empty before cloning:
+
+```sh
+if [ -n "$(find "$APP_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+  echo "STOP: application root is not empty; inspect its files before cloning."
+  ls -la "$APP_DIR"
+else
+  git clone --branch main --single-branch https://github.com/005-rgb/JOBENPAY-1.0.git "$APP_DIR"
+fi
+```
+
+Only clone into an empty application root. If it contains files (including hidden files such as a cPanel-generated `.htaccess`), do not delete or overwrite them; inspect and back them up outside `public_html` first, or clone through cPanel **Git Version Control** after arranging a clean application root. If the repository is private, configure a read-only GitHub deploy key in cPanel and use its SSH clone URL; never put a personal access token in the clone URL or paste it into chat.
+
+After a successful first clone, verify `git status` and `git remote -v`, then install runtime dependencies once as described below. On later releases, `bash deploy.sh main` updates this existing checkout.
 
 ### One-time runtime dependency install
 
@@ -143,7 +169,7 @@ cd /home/smknwon2/public_html/jobenpay
 bash deploy.sh main
 ```
 
-The script verifies Node 22.13+, fetches `origin/main`, refuses tracked local edits or tracked `.env`/`.htaccess`, protects untracked server files that collide with the release, verifies the tracked frontend build and production dependencies, and requests a Passenger restart using `tmp/restart.txt`. Logs are written to `/home/smknwon2/logs/jobenpay-deploy.log`; temporary protections are stored outside the app root with private permissions. If a check fails, the script reports the retained backup path; inspect it and the log before retrying.
+The script verifies Node 22.13+, fetches `origin/main`, warns that local tracked source edits (including staged edits and line-ending changes) will be overwritten, protects untracked server files that collide with the release, verifies the tracked frontend build and production dependencies, and requests a Passenger restart using `tmp/restart.txt`. Keep `.env` and `.htaccess` untracked; the script refuses a release that tracks either file. Logs are written to `/home/smknwon2/logs/jobenpay-deploy.log`; temporary protections are stored outside the app root with private permissions. If a check fails, the script reports the retained backup path; inspect it and the log before retrying.
 
 The script does **not** install packages, run `npm run build`, apply migrations, seed data, or alter database contents. If runtime dependencies changed, manually run `npm ci --omit=dev` in the activated cPanel environment before invoking `deploy.sh`.
 

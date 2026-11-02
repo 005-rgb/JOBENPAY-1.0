@@ -143,9 +143,10 @@ git -C "$APP_DIR" remote get-url origin >/dev/null 2>&1 || fail "Remote Git bern
 git check-ref-format --branch "$BRANCH" >/dev/null 2>&1 || fail "Nama branch tidak valid."
 
 if [ "$PHASE" != "--post-reset" ]; then
-  git -C "$APP_DIR" diff --quiet &&
-    git -C "$APP_DIR" diff --cached --quiet ||
-    fail "Ada perubahan file terlacak di cPanel. Simpan atau tinjau perubahan itu sebelum deploy."
+  if ! git -C "$APP_DIR" diff --quiet ||
+    ! git -C "$APP_DIR" diff --cached --quiet; then
+    log WARN "Perubahan lokal pada source terlacak, termasuk perubahan staged, akan ditimpa oleh origin/$BRANCH."
+  fi
 
   log INFO "Mengambil branch $BRANCH dari GitHub."
   git -C "$APP_DIR" fetch --quiet origin "$BRANCH"
