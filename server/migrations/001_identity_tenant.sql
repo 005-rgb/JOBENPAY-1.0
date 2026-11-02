@@ -1,4 +1,38 @@
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_proc
+    WHERE proname = 'gen_random_uuid'
+      AND pronargs = 0
+      AND pg_catalog.pg_function_is_visible(oid)
+  ) THEN
+    EXECUTE $create_function$
+      CREATE FUNCTION public.gen_random_uuid()
+      RETURNS uuid
+      LANGUAGE sql
+      VOLATILE
+      AS $uuid_body$
+        SELECT (
+          substr(value, 1, 8) || '-' || substr(value, 9, 4) || '-4'
+          || substr(value, 14, 3) || '-'
+          || CASE substr(value, 17, 1)
+            WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8'
+            WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9'
+            WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a'
+            ELSE 'b'
+          END
+          || substr(value, 18, 3) || '-' || substr(value, 21, 12)
+        )::uuid
+        FROM (
+          SELECT md5(random()::text || clock_timestamp()::text
+            || txid_current()::text || pg_backend_pid()::text) AS value
+        ) AS source
+      $uuid_body$
+    $create_function$;
+  END IF;
+END
+$$;
 
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
