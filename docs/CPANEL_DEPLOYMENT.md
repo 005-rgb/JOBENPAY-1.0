@@ -45,7 +45,7 @@ The detected version must be 22.13 or newer and below 23. Configure these values
 |---|---|
 | `NODE_ENV` | `production` |
 | `PUBLIC_BASE_URL` | `https://nh.jobenapp.cloud` |
-| `DATABASE_URL` | PostgreSQL connection URL with `sslmode=require` or stronger |
+| `DATABASE_URL` | PostgreSQL URL; remote hosts require `sslmode=require` or stronger. Local `localhost` may use `sslmode=disable` if cPanel PostgreSQL does not support TLS. |
 | `DATABASE_SSL_CA` | Empty for publicly trusted certificates; otherwise provider CA PEM |
 | `UPLOAD_DIR` | `/home/smknwon2/private/jobenpay/uploads` |
 | `BACKUP_DIR` | `/home/smknwon2/private/jobenpay/backups` |
@@ -55,7 +55,7 @@ The detected version must be 22.13 or newer and below 23. Configure these values
 | `AI_DAILY_BUDGET_USD` | `5` or a smaller owner-approved limit |
 | `SEED_OWNER_PASSWORD`, `SEED_JUDGE_PASSWORD`, `SEED_APPROVER_PASSWORD`, `SEED_VIEWER_PASSWORD` | Unique passwords of at least 12 characters, only if initializing a new demo database |
 
-PostgreSQL is required; cPanel MySQL/MariaDB is not a substitute. Use a reachable managed PostgreSQL instance, a database user restricted to this app, TLS, and the provider's outbound-IP allowlist. Production startup rejects a missing/non-TLS database URL, non-HTTPS public URL, missing signing/encryption secrets, and a relative or application-root upload directory.
+PostgreSQL is required; cPanel MySQL/MariaDB is not a substitute. Remote PostgreSQL connections must use TLS and a database user restricted to this app. If the cPanel PostgreSQL server is local and does not support TLS, production accepts a no-TLS URL only for `localhost`, `127.0.0.1`, or `::1`; set `sslmode=disable` explicitly. Never use this exception for a remote database. Production still rejects non-HTTPS public URLs, missing signing/encryption secrets, and relative or application-root upload directories.
 
 Generate the three cryptographic secrets once using the activated Node environment:
 

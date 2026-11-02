@@ -3,6 +3,13 @@ import test from 'node:test';
 
 import { databaseConnectionOptions } from '../../src/db/connection.js';
 
+test('database connections explicitly disabled for loopback do not enable TLS', () => {
+  const connectionString = 'postgresql://localhost/jobenpay?sslmode=disable';
+  const options = databaseConnectionOptions(connectionString);
+
+  assert.deepEqual(options, { connectionString });
+});
+
 test('database connections using sslmode=require verify the server certificate', () => {
   const options = databaseConnectionOptions('postgresql://user:pass@db.example/jobenpay?sslmode=require');
 

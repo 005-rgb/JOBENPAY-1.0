@@ -99,7 +99,7 @@
 
 ## Checkpoint cPanel production preparation
 - Ditambahkan `docs/CPANEL_DEPLOYMENT.md` dengan detail Node 22, application root, domain, Passenger, PostgreSQL, environment, key generation, build/migrasi, readiness, serta pemeriksaan agar source di bawah `public_html` tidak tersaji langsung.
-- Produksi kini menolak DATABASE_URL non-PostgreSQL/tanpa TLS, DATABASE_URL implisit/default, dan UPLOAD_DIR relatif/di dalam application root. Pool dan migrasi memakai TLS dengan verifikasi sertifikat serta CA opsional melalui `DATABASE_SSL_CA`; penyimpanan unggahan produksi harus di luar application root.
+- Produksi menolak DATABASE_URL non-PostgreSQL/default dan URL tanpa TLS untuk host database remote. PostgreSQL loopback (`localhost`, `127.0.0.1`, `::1`) dapat memakai koneksi plaintext eksplisit (`sslmode=disable`) untuk hosting lokal yang tidak menyediakan TLS; koneksi TLS tetap memverifikasi sertifikat dengan CA opsional melalui `DATABASE_SSL_CA`. `UPLOAD_DIR` produksi harus di luar application root.
 - Validasi lokal: `npm test` 211/211 tanpa skip; guard, JS lint, secret scan, dan diff check lulus. Frontend build serta CSS lint lulus sebelum perubahan konfigurasi final; tidak ada perubahan UI.
 - Deployment belum dilakukan: kredensial/database PostgreSQL dan akses cPanel bukan bagian workspace. Aplikasi tetap sandbox-only dan tidak mengizinkan PayPal live.
 

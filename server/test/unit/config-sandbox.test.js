@@ -40,7 +40,7 @@ test('PayPal endpoint override is limited to local test servers', () => {
   assert.match(development.stderr, /local tests/);
 });
 
-test('production requires an explicit TLS PostgreSQL URL and an absolute upload directory', () => {
+test('production requires PostgreSQL, allows plaintext only over loopback, and requires absolute uploads', () => {
   const base = {
     NODE_ENV: 'production',
     PUBLIC_BASE_URL: 'https://nh.jobenapp.cloud',
@@ -56,6 +56,26 @@ test('production requires an explicit TLS PostgreSQL URL and an absolute upload 
   });
   assert.notEqual(noTls.status, 0);
   assert.match(noTls.stderr, /must enable TLS/);
+
+  const remoteNoTls = importConfig({
+    ...base,
+    DATABASE_URL: 'postgresql://db.example/jobenpay?sslmode=disable',
+  });
+  assert.notEqual(remoteNoTls.status, 0);
+  assert.match(remoteNoTls.stderr, /must enable TLS/);
+
+  const localNoTls = importConfig({
+    ...base,
+    DATABASE_URL: 'postgresql://localhost/jobenpay?sslmode=disable',
+  });
+  assert.equal(localNoTls.status, 0, localNoTls.stderr);
+
+  const localTlsPreference = importConfig({
+    ...base,
+    DATABASE_URL: 'postgresql://127.0.0.1/jobenpay?sslmode=prefer',
+  });
+  assert.notEqual(localTlsPreference.status, 0);
+  assert.match(localTlsPreference.stderr, /must omit sslmode or use sslmode=disable/);
 
   const nonPostgres = importConfig({
     ...base,

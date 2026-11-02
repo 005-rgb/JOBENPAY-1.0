@@ -96,10 +96,17 @@ if (env.NODE_ENV === 'production') {
     throw new Error('DATABASE_URL must use the PostgreSQL protocol in production.');
   }
   const sslMode = databaseUrl.searchParams.get('sslmode')?.toLowerCase();
-  const sslEnabled = databaseUrl.searchParams.get('ssl')?.toLowerCase() === 'true'
+  const sslSetting = databaseUrl.searchParams.get('ssl')?.toLowerCase();
+  const sslEnabled = sslSetting === 'true'
     || ['require', 'verify-ca', 'verify-full'].includes(sslMode);
-  if (!sslEnabled) {
+  const databaseHost = databaseUrl.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  const loopbackDatabase = ['localhost', '127.0.0.1', '::1'].includes(databaseHost);
+  const explicitlyDisabled = sslMode === 'disable' || sslSetting === 'false';
+  if (!sslEnabled && !loopbackDatabase) {
     throw new Error('DATABASE_URL must enable TLS in production (sslmode=require or stronger).');
+  }
+  if (loopbackDatabase && sslMode && !explicitlyDisabled && !sslEnabled) {
+    throw new Error('Loopback PostgreSQL must omit sslmode or use sslmode=disable.');
   }
   if (!env.UPLOAD_DIR || !path.isAbsolute(env.UPLOAD_DIR)) {
     throw new Error('UPLOAD_DIR must be an absolute path outside the public web root in production.');
