@@ -10,7 +10,8 @@ import pool from '../src/db/pool.js';
 test('GET /healthz returns 200', async () => {
   const server = startServer(0);
   await once(server, 'listening');
-  const { port } = server.address();
+  const { port, address } = server.address();
+  assert.ok(['::', '0.0.0.0'].includes(address), `expected wildcard bind address, received ${address}`);
 
   const response = await fetch(`http://127.0.0.1:${port}/healthz`);
   assert.equal(response.status, 200);

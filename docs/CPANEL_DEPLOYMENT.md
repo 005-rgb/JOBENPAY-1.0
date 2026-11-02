@@ -33,6 +33,8 @@ Do not continue or enter production data if any check exposes a file. Prefer an 
 
 In **Setup Node.js App**, select Node 22, set the application root to `public_html/jobenpay`, URL to `nh.jobenapp.cloud`, and startup file to `app.js`. `app.js` is the cPanel/Passenger entrypoint; `app.cjs` remains a compatibility wrapper for the existing `npm start` and Docker commands. Use this Node environment activation path:
 
+The HTTP server does not bind to `localhost` only: `app.listen(port)` uses Node's wildcard address when no host is specified. `PUBLIC_BASE_URL` configures generated public links and must be the HTTPS domain. Passenger/domain routing still has to be enabled in cPanel; changing PostgreSQL `sslmode` affects only the app-to-database connection, not browser access to the site.
+
 ```sh
 source /home/smknwon2/nodevenv/public_html/jobenpay/22/bin/activate
 cd /home/smknwon2/public_html/jobenpay

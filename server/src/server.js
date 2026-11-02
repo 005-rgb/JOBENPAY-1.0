@@ -6,7 +6,8 @@ import { logger } from './lib/logger.js';
 export function startServer(port = env.PORT, { requireSecrets = false } = {}) {
   if (requireSecrets) assertRuntimeSecrets();
   const server = app.listen(port, () => {
-    console.log(`JOBENPAY listening on http://localhost:${port}`);
+    const address = server.address();
+    console.log(`JOBENPAY listening on port ${typeof address === 'object' && address ? address.port : port} (configured URL: ${env.PUBLIC_BASE_URL})`);
   });
 
   if (env.WORKER_ENABLED === 1) {
