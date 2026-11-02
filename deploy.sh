@@ -205,8 +205,9 @@ if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
   import fs from "node:fs";
   const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
   await Promise.all(Object.keys(pkg.dependencies ?? {}).map((name) => import(name)));
+  await import("./server/src/config.js");
 ') >/dev/null 2>&1; then
-  fail "Impor ESM dependensi produksi gagal dari application root. Jalankan Run NPM Install untuk aplikasi Node.js ini di cPanel, pastikan 'node --input-type=module -e ...' berhasil, lalu ulangi deploy."
+  fail "Impor ESM dependensi gagal dari server/src/config.js. Verifikasi dengan 'node --input-type=module -e \"import(\\\"./server/src/config.js\\\")\"'; pastikan Node menggunakan application root dan dependency node_modules dapat diakses dari root itu sebelum deploy ulang."
 fi
 
 COMMIT_AFTER="$(git -C "$APP_DIR" rev-parse --short HEAD)"
