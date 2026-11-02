@@ -203,11 +203,15 @@ assert_release_files
 
 if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
   import fs from "node:fs";
+  import path from "node:path";
+  import { pathToFileURL } from "node:url";
   const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-  await Promise.all(Object.keys(pkg.dependencies ?? {}).map((name) => import(name)));
-  await import("./server/src/config.js");
+  const serverModule = pathToFileURL(path.resolve("server/src/config.js")).href;
+  await Promise.all(Object.keys(pkg.dependencies ?? {}).map((name) => (
+    import(import.meta.resolve(name, serverModule))
+  )));
 ') >/dev/null 2>&1; then
-  fail "Impor ESM dependensi gagal dari server/src/config.js. Verifikasi dengan 'node --input-type=module -e \"import(\\\"./server/src/config.js\\\")\"'; pastikan Node menggunakan application root dan dependency node_modules dapat diakses dari root itu sebelum deploy ulang."
+  fail "Dependensi ESM tidak dapat di-resolve dari lokasi server/src/config.js. Periksa package.json dan node_modules aplikasi, lalu ulangi deploy."
 fi
 
 COMMIT_AFTER="$(git -C "$APP_DIR" rev-parse --short HEAD)"

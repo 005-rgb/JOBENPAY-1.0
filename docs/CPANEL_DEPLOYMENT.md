@@ -109,11 +109,11 @@ source /home/smknwon2/nodevenv/public_html/jobenpay/22/bin/activate
 cd /home/smknwon2/public_html/jobenpay
 node -e 'for (const name of Object.keys(require("./package.json").dependencies)) console.log(name + ": " + require.resolve(name))'
 node --input-type=module -e 'await import("zod"); console.log("ESM dependency resolution OK")'
-node --input-type=module -e 'await import("./server/src/config.js"); console.log("server config import OK")'
+node --input-type=module -e 'import { pathToFileURL } from "node:url"; import path from "node:path"; const from = pathToFileURL(path.resolve("server/src/config.js")).href; console.log(import.meta.resolve("zod", from))'
 ls -ld node_modules
 ```
 
-The config import check tests dependency resolution from the same server module path used by startup; a successful `import("zod")` from an inline command alone is not sufficient. If the config check fails, confirm the activated Node environment and current directory, then use cPanel's **Run NPM Install** for this application and rerun both ESM checks before restarting Passenger. For a release that changes dependencies, sync the code with `bash deploy.sh main`, use **Run NPM Install**, verify the config import, and restart the Node.js application as required by cPanel. Do not delete `node_modules` manually. Keep the directory inaccessible over HTTP; verify `/node_modules/` returns 403 or 404 as described above, and ask hosting support to configure the restriction if needed. Do not replace cPanel-managed `.htaccess` contents.
+The resolver check verifies that `zod` is visible from the server module's location without executing application configuration. Importing `server/src/config.js` directly also validates required runtime environment variables, so it can fail in a shell that does not inherit cPanel's protected values. If dependency resolution fails, confirm the activated Node environment and current directory, then use cPanel's **Run NPM Install** for this application and rerun the resolver check. For a release that changes dependencies, sync with `bash deploy.sh main`, use **Run NPM Install**, verify resolution, then restart the Node.js application as required by cPanel. Do not delete `node_modules` manually. Keep the directory inaccessible over HTTP; verify `/node_modules/` returns 403 or 404 as described above, and ask hosting support to configure the restriction if needed. Do not replace cPanel-managed `.htaccess` contents.
 
 ## 3. Build and publish each release locally
 
@@ -176,7 +176,7 @@ cd /home/smknwon2/public_html/jobenpay
 bash deploy.sh main
 ```
 
-The script verifies Node 22.13+, fetches `origin/main`, warns that local tracked source edits (including staged edits and line-ending changes) will be overwritten, protects untracked server files that collide with the release, verifies the tracked frontend build, ESM production dependencies, and an import of `server/src/config.js` before requesting a Passenger restart using `tmp/restart.txt`. It does not replace or install `node_modules`. Keep `.env` and `.htaccess` untracked; the script refuses a release that tracks either file. Logs are written to `/home/smknwon2/logs/jobenpay-deploy.log`; temporary protections are stored outside the app root with private permissions. If a check fails, the script reports the retained backup path; inspect it and the log before retrying.
+The script verifies Node 22.13+, fetches `origin/main`, warns that local tracked source edits (including staged edits and line-ending changes) will be overwritten, protects untracked server files that collide with the release, verifies the tracked frontend build and ESM production dependency resolution from the server module path before requesting a Passenger restart using `tmp/restart.txt`. It does not execute application configuration or replace/install `node_modules`. Keep `.env` and `.htaccess` untracked; the script refuses a release that tracks either file. Logs are written to `/home/smknwon2/logs/jobenpay-deploy.log`; temporary protections are stored outside the app root with private permissions. If a check fails, the script reports the retained backup path; inspect it and the log before retrying.
 
 The script does **not** install packages, run `npm run build`, apply migrations, seed data, or alter database contents. Frontend build happens locally; its output is pushed to GitHub with the source. cPanel only runs `deploy.sh` for routine releases. If dependencies change, use cPanel's **Run NPM Install** after syncing the release.
 
