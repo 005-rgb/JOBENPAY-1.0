@@ -44,7 +44,8 @@ export async function runMigrations(connectionString = env.DATABASE_URL) {
         await client.query('COMMIT');
       } catch (error) {
         await client.query('ROLLBACK');
-        throw error;
+        const position = error.position ? ` at SQL position ${error.position}` : '';
+        throw new Error(`Migration ${file} failed${position}: ${error.message}`, { cause: error });
       }
     }
   } finally {
