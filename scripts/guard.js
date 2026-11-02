@@ -22,7 +22,6 @@ check(fileExists('.env.example'), '.env.example is required.');
 check(fileExists('app.js'), 'app.js is required as the cPanel startup entrypoint.');
 check(fileExists('app.cjs'), 'app.cjs is required.');
 check(fileExists('deploy.sh'), 'deploy.sh is required for the manual cPanel release process.');
-check(fileExists('scripts/cpanel-install-runtime.sh'), 'cPanel runtime dependency installer is required.');
 check(fileExists('server/src/server.js'), 'server/src/server.js is required.');
 check(fileExists('server/src/config.js'), 'server/src/config.js is required.');
 check(fileExists('.github/workflows/ci.yml'), '.github/workflows/ci.yml is required.');

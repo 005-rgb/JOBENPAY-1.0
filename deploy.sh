@@ -84,7 +84,6 @@ assert_release_files() {
     app.js \
     app.cjs \
     deploy.sh \
-    scripts/cpanel-install-runtime.sh \
     package.json \
     package-lock.json \
     server/src/server.js \
@@ -109,40 +108,6 @@ assert_release_files() {
       }
     }
   ' || fail "Artefak frontend tidak lengkap; build lokal dan push direktori web/dist."
-}
-
-assert_external_node_modules_link() {
-  local app_node_modules="$APP_DIR/node_modules"
-  local public_root="$ACCOUNT_HOME/public_html"
-  local runtime_root="$ACCOUNT_HOME/private/jobenpay/node-runtime"
-  local fingerprint
-  local target
-
-  public_root="$(cd "$public_root" 2>/dev/null && pwd -P)" ||
-    fail "Web root cPanel tidak ditemukan: $ACCOUNT_HOME/public_html."
-  runtime_root="$(cd "$runtime_root" 2>/dev/null && pwd -P)" ||
-    fail "Direktori runtime privat belum ada. Jalankan scripts/cpanel-install-runtime.sh."
-  fingerprint="$("$NODE_BIN" -e '
-    const crypto = require("node:crypto");
-    const fs = require("node:fs");
-    const hash = crypto.createHash("sha256");
-    for (const file of process.argv.slice(1)) hash.update(fs.readFileSync(file));
-    process.stdout.write(hash.digest("hex"));
-  ' "$APP_DIR/package.json" "$APP_DIR/package-lock.json")"
-  [ -L "$app_node_modules" ] ||
-    fail "node_modules harus berupa symlink ke luar public_html. Jalankan bash scripts/cpanel-install-runtime.sh terlebih dahulu."
-  target="$(readlink -f "$app_node_modules" 2>/dev/null || true)"
-  [ -n "$target" ] && [ -d "$target" ] ||
-    fail "Symlink node_modules rusak atau targetnya tidak ada. Jalankan kembali scripts/cpanel-install-runtime.sh."
-  case "$target/" in
-    "$runtime_root/"*) ;;
-    *) fail "Target node_modules harus berada di $runtime_root. Jalankan scripts/cpanel-install-runtime.sh." ;;
-  esac
-  [ "$target" = "$runtime_root/$fingerprint/node_modules" ] ||
-    fail "Runtime dependencies tidak cocok dengan package.json/package-lock.json rilis ini. Jalankan scripts/cpanel-install-runtime.sh."
-  case "$target/" in
-    "$public_root/"*) fail "Target node_modules berada di dalam public_html; deploy dibatalkan." ;;
-  esac
 }
 
 activate_cpanel_node
@@ -177,7 +142,6 @@ fi
 git -C "$APP_DIR" rev-parse --git-dir >/dev/null 2>&1 || fail "Folder aplikasi bukan repository Git."
 git -C "$APP_DIR" remote get-url origin >/dev/null 2>&1 || fail "Remote Git bernama origin belum disiapkan."
 git check-ref-format --branch "$BRANCH" >/dev/null 2>&1 || fail "Nama branch tidak valid."
-assert_external_node_modules_link
 
 if [ "$PHASE" != "--post-reset" ]; then
   if ! git -C "$APP_DIR" diff --quiet ||
@@ -236,7 +200,6 @@ for protected in .env .htaccess; do
 done
 
 assert_release_files
-assert_external_node_modules_link
 
 if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
   import fs from "node:fs";
@@ -245,7 +208,7 @@ if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
   const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
   for (const name of Object.keys(pkg.dependencies ?? {})) require.resolve(name);
 ') >/dev/null 2>&1; then
-  fail "Dependensi produksi belum lengkap. Aktifkan Node.js, jalankan bash scripts/cpanel-install-runtime.sh, lalu ulangi deploy."
+  fail "Dependensi produksi belum tersedia. Gunakan Run NPM Install di cPanel, lalu ulangi deploy."
 fi
 
 COMMIT_AFTER="$(git -C "$APP_DIR" rev-parse --short HEAD)"
