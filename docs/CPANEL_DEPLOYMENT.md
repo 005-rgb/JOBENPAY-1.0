@@ -108,10 +108,11 @@ Use **Run NPM Install** in cPanel's Node.js application setup to provision depen
 source /home/smknwon2/nodevenv/public_html/jobenpay/22/bin/activate
 cd /home/smknwon2/public_html/jobenpay
 node -e 'for (const name of Object.keys(require("./package.json").dependencies)) console.log(name + ": " + require.resolve(name))'
+node --input-type=module -e 'await import("zod"); console.log("ESM dependency resolution OK")'
 ls -ld node_modules
 ```
 
-For a release that changes dependencies, sync the code with `bash deploy.sh main`. Then use cPanel's **Run NPM Install** and restart the Node.js application as required by cPanel. Do not delete `node_modules` manually. Keep the directory inaccessible over HTTP; verify `/node_modules/` returns 403 or 404 as described above, and ask hosting support to configure the restriction if needed. Do not replace cPanel-managed `.htaccess` contents.
+The ESM check is required because the server imports packages with native Node.js `import`, which is not guaranteed to use CommonJS `NODE_PATH` resolution. If it fails, use cPanel's **Run NPM Install** for this Node.js application, then rerun the ESM check before restarting Passenger. For a release that changes dependencies, sync the code with `bash deploy.sh main`, use **Run NPM Install**, verify the ESM check, and restart the Node.js application as required by cPanel. Do not delete `node_modules` manually. Keep the directory inaccessible over HTTP; verify `/node_modules/` returns 403 or 404 as described above, and ask hosting support to configure the restriction if needed. Do not replace cPanel-managed `.htaccess` contents.
 
 ## 3. Build and publish each release locally
 
@@ -174,7 +175,7 @@ cd /home/smknwon2/public_html/jobenpay
 bash deploy.sh main
 ```
 
-The script verifies Node 22.13+, fetches `origin/main`, warns that local tracked source edits (including staged edits and line-ending changes) will be overwritten, protects untracked server files that collide with the release, verifies the tracked frontend build and production dependency resolution using the existing cPanel `node_modules`, and requests a Passenger restart using `tmp/restart.txt`. It does not replace or install `node_modules`. Keep `.env` and `.htaccess` untracked; the script refuses a release that tracks either file. Logs are written to `/home/smknwon2/logs/jobenpay-deploy.log`; temporary protections are stored outside the app root with private permissions. If a check fails, the script reports the retained backup path; inspect it and the log before retrying.
+The script verifies Node 22.13+, fetches `origin/main`, warns that local tracked source edits (including staged edits and line-ending changes) will be overwritten, protects untracked server files that collide with the release, verifies the tracked frontend build and ESM production dependency imports, and requests a Passenger restart using `tmp/restart.txt`. It does not replace or install `node_modules`. Keep `.env` and `.htaccess` untracked; the script refuses a release that tracks either file. Logs are written to `/home/smknwon2/logs/jobenpay-deploy.log`; temporary protections are stored outside the app root with private permissions. If a check fails, the script reports the retained backup path; inspect it and the log before retrying.
 
 The script does **not** install packages, run `npm run build`, apply migrations, seed data, or alter database contents. Frontend build happens locally; its output is pushed to GitHub with the source. cPanel only runs `deploy.sh` for routine releases. If dependencies change, use cPanel's **Run NPM Install** after syncing the release.
 

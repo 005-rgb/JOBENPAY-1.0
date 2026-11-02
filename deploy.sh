@@ -203,12 +203,10 @@ assert_release_files
 
 if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
   import fs from "node:fs";
-  import { createRequire } from "node:module";
-  const require = createRequire(process.cwd() + "/package.json");
   const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-  for (const name of Object.keys(pkg.dependencies ?? {})) require.resolve(name);
+  await Promise.all(Object.keys(pkg.dependencies ?? {}).map((name) => import(name)));
 ') >/dev/null 2>&1; then
-  fail "Dependensi produksi belum tersedia. Gunakan Run NPM Install di cPanel, lalu ulangi deploy."
+  fail "Impor ESM dependensi produksi gagal dari application root. Jalankan Run NPM Install untuk aplikasi Node.js ini di cPanel, pastikan 'node --input-type=module -e ...' berhasil, lalu ulangi deploy."
 fi
 
 COMMIT_AFTER="$(git -C "$APP_DIR" rev-parse --short HEAD)"
