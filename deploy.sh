@@ -81,6 +81,7 @@ activate_cpanel_node() {
 assert_release_files() {
   local release_file
   for release_file in \
+    app.js \
     app.cjs \
     deploy.sh \
     package.json \

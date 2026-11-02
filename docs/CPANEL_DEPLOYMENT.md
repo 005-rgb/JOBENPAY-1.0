@@ -7,7 +7,7 @@ Target cPanel settings:
 - Node environment: `/home/smknwon2/nodevenv/public_html/jobenpay/22`
 - Application root: `/home/smknwon2/public_html/jobenpay`
 - Application URL: `https://nh.jobenapp.cloud`
-- Startup file: `app.cjs`
+- Startup file: `app.js`
 - Node.js: 22.13 or newer in the Node 22 line
 - Git branch: `main`
 
@@ -19,6 +19,7 @@ The requested application root is under `public_html`. Configure the cPanel Node
 
 ```sh
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/package.json
+curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/app.js
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/app.cjs
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/server/src/config.js
 curl -sS -o /dev/null -w '%{http_code}\n' https://nh.jobenapp.cloud/.env
@@ -29,7 +30,7 @@ Do not continue or enter production data if any check exposes a file. Prefer an 
 
 ## 2. Configure cPanel once
 
-In **Setup Node.js App**, select Node 22, set the application root to `public_html/jobenpay`, URL to `nh.jobenapp.cloud`, and startup file to `app.cjs`. Use this Node environment activation path:
+In **Setup Node.js App**, select Node 22, set the application root to `public_html/jobenpay`, URL to `nh.jobenapp.cloud`, and startup file to `app.js`. `app.js` is the cPanel/Passenger entrypoint; `app.cjs` remains a compatibility wrapper for the existing `npm start` and Docker commands. Use this Node environment activation path:
 
 ```sh
 source /home/smknwon2/nodevenv/public_html/jobenpay/22/bin/activate
