@@ -112,53 +112,61 @@ assert_release_files() {
 
 configure_passenger_routing() {
   local htaccess="$APP_DIR/.htaccess"
+  local passenger_begin='# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN'
   local passenger_end='# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END'
+  local guard_begin='# BEGIN JOBENPAY SOURCE ACCESS GUARD'
+  local guard_end='# END JOBENPAY SOURCE ACCESS GUARD'
+  local routing_begin='# BEGIN JOBENPAY LITESPEED ROUTING'
+  local routing_end='# END JOBENPAY LITESPEED ROUTING'
+  local node_bin="$NODE_BIN"
+  local preserved="$BACKUP_DIR/.htaccess.preserved"
+  local generated="$BACKUP_DIR/.htaccess.generated"
 
-  [ -f "$htaccess" ] || fail "File .htaccess cPanel tidak ditemukan. Buat/aplikasikan Node.js App untuk domain ini di cPanel sebelum deploy."
-  grep -Fq "PassengerAppRoot \"$APP_DIR\"" "$htaccess" ||
-    fail ".htaccess PassengerAppRoot tidak menunjuk ke $APP_DIR. Perbaiki Application Root di Setup Node.js App."
-  grep -Eq '^[[:space:]]*PassengerBaseURI[[:space:]]+"/"[[:space:]]*$' "$htaccess" ||
-    fail ".htaccess harus memiliki PassengerBaseURI \"/\" untuk domain root nh.jobenapp.cloud."
-  grep -Eq '^[[:space:]]*PassengerStartupFile[[:space:]]+app\.js[[:space:]]*$' "$htaccess" ||
-    fail ".htaccess harus memiliki PassengerStartupFile app.js."
-  grep -Fq "$passenger_end" "$htaccess" ||
-    fail ".htaccess tidak memiliki penanda akhir konfigurasi Passenger cPanel; perbaiki pemetaan aplikasi di cPanel."
+  [ -f "$htaccess" ] || fail "File .htaccess tidak ditemukan di $APP_DIR. Buat Node.js App untuk domain ini di cPanel sebelum deploy."
+  [ -w "$htaccess" ] || fail "File .htaccess di $APP_DIR tidak dapat ditulis oleh akun ini."
 
-  if ! grep -Eiq '^[[:space:]]*PassengerEnabled[[:space:]]+On([[:space:]]|$)' "$htaccess"; then
-    local updated_htaccess="$BACKUP_DIR/.htaccess.passenger"
-    awk -v marker="$passenger_end" '
-      $0 == marker {
-        print "PassengerEnabled On"
-        inserted = 1
-      }
-      { print }
-      END { if (!inserted) exit 1 }
-    ' "$htaccess" > "$updated_htaccess" ||
-      fail "Tidak dapat menambahkan PassengerEnabled On ke konfigurasi cPanel."
-    chmod --reference="$htaccess" "$updated_htaccess"
-    mv -- "$updated_htaccess" "$htaccess"
-    log WARN "PassengerEnabled On diaktifkan di blok konfigurasi cPanel."
+  if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/node" ]; then
+    node_bin="$VIRTUAL_ENV/bin/node"
+  fi
+  [ -x "$node_bin" ] || fail "Binary Node.js untuk Passenger tidak dapat ditentukan."
+
+  cp -a "$htaccess" "$BACKUP_DIR/.htaccess.previous"
+  if ! grep -Fqx "$passenger_begin" "$htaccess"; then
+    log WARN "Blok Passenger cPanel tidak ditemukan di .htaccess; blok tersebut ditulis ulang otomatis."
   fi
 
-  if ! grep -Fq '# BEGIN JOBENPAY SOURCE ACCESS GUARD' "$htaccess"; then
-    cat >> "$htaccess" <<'EOF'
+  # Blok Passenger cPanel dan kedua blok JOBENPAY selalu ditulis ulang secara utuh: konfigurasi
+  # lama yang salah (mis. sisa tempelan manual) tidak boleh tertinggal di atas aturan keamanan.
+  awk -v pb="$passenger_begin" -v pe="$passenger_end" \
+    -v gb="$guard_begin" -v ge="$guard_end" \
+    -v rb="$routing_begin" -v re="$routing_end" '
+    $0 == pb || $0 == gb || $0 == rb { inside = 1; next }
+    inside && ($0 == pe || $0 == ge || $0 == re) { inside = 0; next }
+    inside { next }
+    /^[[:space:]]*Passenger[A-Za-z]+[[:space:]]/ { next }
+    { print }
+  ' "$htaccess" > "$preserved"
 
-# BEGIN JOBENPAY SOURCE ACCESS GUARD
+  {
+    printf '%s\n\n' "$passenger_begin"
+    printf 'PassengerAppRoot "%s"\n' "$APP_DIR"
+    printf 'PassengerBaseURI "/"\n'
+    printf 'PassengerNodejs "%s"\n' "$node_bin"
+    printf 'PassengerAppType node\n'
+    printf 'PassengerStartupFile app.js\n'
+    printf '%s\n\n' "$passenger_end"
+    printf '%s\n' "$guard_begin"
+    cat <<'EOF'
 <IfModule mod_rewrite.c>
 RewriteEngine On
 RewriteRule ^(server|scripts|shared|docs|node_modules|\.git)(/|$) - [F,L,NC]
 RewriteRule ^(\.env(\..*)?|package(-lock)?\.json|app\.(js|cjs)|deploy\.sh)$ - [F,L,NC]
 RewriteRule ^web/(src|node_modules|package(-lock)?\.json)(/|$) - [F,L,NC]
 </IfModule>
-# END JOBENPAY SOURCE ACCESS GUARD
 EOF
-    log INFO "Aturan penolakan akses source ditambahkan ke .htaccess."
-  fi
-
-  if ! grep -Fq '# BEGIN JOBENPAY LITESPEED ROUTING' "$htaccess"; then
-    cat >> "$htaccess" <<'EOF'
-
-# BEGIN JOBENPAY LITESPEED ROUTING
+    printf '%s\n\n' "$guard_end"
+    printf '%s\n' "$routing_begin"
+    cat <<'EOF'
 <IfModule mod_rewrite.c>
 RewriteEngine On
 RewriteRule ^(api(/|$)|agent(/|$)|mcp$|healthz$|readyz$|webhooks(/|$)) - [L,NC]
@@ -171,10 +179,14 @@ RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 RewriteRule ^ web/dist/index.html [L]
 </IfModule>
-# END JOBENPAY LITESPEED ROUTING
 EOF
-    log INFO "Routing LiteSpeed: SPA ke web/dist, endpoint API/health diteruskan ke Node."
-  fi
+    printf '%s\n\n' "$routing_end"
+    cat "$preserved"
+  } > "$generated"
+
+  chmod --reference="$htaccess" "$generated"
+  mv -- "$generated" "$htaccess"
+  log INFO "Blok Passenger ($node_bin), penolakan akses source, dan routing LiteSpeed ditulis ulang di .htaccess."
 }
 
 verify_public_routes() {
@@ -208,7 +220,7 @@ verify_public_routes() {
     if [ "$attempt" -eq 15 ]; then
       log ERROR "Status /healthz: $(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 "$public_url/healthz" 2>/dev/null || printf 'tidak diketahui'); isi respons: $(head -c 200 "$response_file" 2>/dev/null | tr '\n' ' ' || printf 'kosong')"
       log ERROR "Cadangan privat untuk inspeksi: ${BACKUP_DIR:-tidak tersedia}"
-      fail "Domain $public_url masih tidak menuju aplikasi JOBENPAY (/healthz bukan JSON healthy). Periksa PassengerEnabled, Application URL/root, dan log Passenger; respons placeholder LiteSpeed bukan health check valid."
+      fail "Domain $public_url masih tidak menuju aplikasi JOBENPAY (/healthz bukan JSON healthy). Periksa variabel environment produksi (NODE_ENV, PUBLIC_BASE_URL, DATABASE_URL, UPLOAD_DIR, tiga kunci JOBENPAY_*), lalu log Passenger; respons bawaan LiteSpeed bukan health check valid."
     fi
     sleep 2
   done
