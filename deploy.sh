@@ -206,6 +206,8 @@ verify_public_routes() {
       break
     fi
     if [ "$attempt" -eq 15 ]; then
+      log ERROR "Status /healthz: $(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 "$public_url/healthz" 2>/dev/null || printf 'tidak diketahui'); isi respons: $(head -c 200 "$response_file" 2>/dev/null | tr '\n' ' ' || printf 'kosong')"
+      log ERROR "Cadangan privat untuk inspeksi: ${BACKUP_DIR:-tidak tersedia}"
       fail "Domain $public_url masih tidak menuju aplikasi JOBENPAY (/healthz bukan JSON healthy). Periksa PassengerEnabled, Application URL/root, dan log Passenger; respons placeholder LiteSpeed bukan health check valid."
     fi
     sleep 2
@@ -298,7 +300,8 @@ if [ "$PHASE" != "--post-reset" ]; then
 
   COMMIT_BEFORE="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || printf 'none')"
   log INFO "Memperbarui source dan build lokal ke origin/$BRANCH."
-  git -C "$APP_DIR" reset --hard "origin/$BRANCH" >/dev/null
+  # umask 077 membuat berkas hasil reset bermode 0600 sehingga web server tidak dapat membacanya (403).
+  ( umask 022 && git -C "$APP_DIR" reset --hard "origin/$BRANCH" >/dev/null )
 
   trap - ERR
   exec bash "$APP_DIR/deploy.sh" --post-reset "$BACKUP_DIR" "$BRANCH" "$COMMIT_BEFORE" "$DEFER_RESTART"
@@ -312,6 +315,9 @@ done
 
 configure_passenger_routing
 assert_release_files
+
+# Rilis lama dapat meninggalkan berkas web/dist bermode 0600; pastikan web server dapat membacanya.
+chmod -R go+rX "$APP_DIR/web/dist"
 
 if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
   import fs from "node:fs";
