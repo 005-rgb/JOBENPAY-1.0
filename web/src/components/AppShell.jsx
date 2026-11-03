@@ -35,6 +35,7 @@ import {
   Modal,
   useToast,
 } from './primitives.jsx';
+import { BrandLogo } from './BrandSystem.jsx';
 import styles from './AppShell.module.css';
 
 const navigation = [
@@ -382,7 +383,7 @@ function Sidebar({ pathname, t, onNavigate }) {
   return (
     <aside className={styles.sidebar} data-testid="sidebar">
       <RouterLink aria-label={t('app.name')} className={styles.wordmark} data-testid="wordmark" to="/dashboard" onClick={onNavigate}>
-        <span>{t('app.name')}</span>
+        <BrandLogo showCaption={false} size="sm" />
       </RouterLink>
       <CreateMenu t={t} />
       <SideNavigation
@@ -456,7 +457,7 @@ export default function AppShell({
             <button aria-label="Open navigation" className={styles.mobileMenuButton} onClick={() => setDrawerOpen(true)} type="button">
               <Menu aria-hidden="true" />
             </button>
-            <span className={styles.mobileWordmark}>{t('app.name')}</span>
+            <span className={styles.mobileWordmark}><BrandLogo showCaption={false} size="sm" /></span>
             <div className={styles.headerTitle}>
               <h1 data-testid="page-title">{title}</h1>
               <p>{t('app.organizationRole', { organization: org?.name || t('app.name'), role: role || 'VIEWER' })}</p>
