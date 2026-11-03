@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import cookieParser from 'cookie-parser';
 import express from 'express';
@@ -26,6 +28,9 @@ const STEP_UP_PURPOSES = new Set([
   'TRUST_PAYEE',
   'ROTATE_CREDENTIALS',
 ]);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PUBLIC_DIR = path.resolve(__dirname, '../public');
 
 function readRequestId(req, res, next) {
   req.id = req.get('x-request-id') || crypto.randomUUID();
@@ -129,6 +134,19 @@ export function createApp() {
   app.use(pinoHttp({ logger }));
   app.use(cookieParser());
   app.use(express.json({ limit: '1mb' }));
+  app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
+
+  app.get('/', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
+  });
+
+  app.get('/login', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
+  });
+
+  app.get('/dashboard', (_req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'dashboard.html'));
+  });
 
   app.get('/healthz', (_req, res) => {
     res.status(200).json({ ok: true, service: 'jobenpay', status: 'healthy' });
