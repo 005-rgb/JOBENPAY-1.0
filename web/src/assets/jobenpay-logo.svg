@@ -1,0 +1,58 @@
+<svg width="820" height="280" viewBox="0 0 820 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="jobenpay-wordmark" x1="72" y1="38" x2="722" y2="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#03208B"/>
+      <stop offset="0.48" stop-color="#0B3AB1"/>
+      <stop offset="1" stop-color="#1292FF"/>
+    </linearGradient>
+    <linearGradient id="jobenpay-line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0EA5FF" stop-opacity="0"/>
+      <stop offset="0.24" stop-color="#0EA5FF"/>
+      <stop offset="0.76" stop-color="#0EA5FF"/>
+      <stop offset="1" stop-color="#0EA5FF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="jobenpay-glow" x="0" y="0" width="820" height="280" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.4"/>
+    </filter>
+  </defs>
+
+  <g aria-label="JobenPay logo">
+    <text
+      x="410"
+      y="132"
+      text-anchor="middle"
+      fill="url(#jobenpay-wordmark)"
+      font-family="Arial, Helvetica, sans-serif"
+      font-size="128"
+      font-style="italic"
+      font-weight="700"
+      letter-spacing="-5"
+    >
+      JobenPay
+    </text>
+
+    <g transform="translate(0 12)">
+      <text
+        x="410"
+        y="222"
+        text-anchor="middle"
+        fill="#0B2F9C"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="76"
+        font-style="italic"
+        font-weight="700"
+        letter-spacing="2"
+      >
+        JPay
+      </text>
+
+      <g filter="url(#jobenpay-glow)" opacity="0.45">
+        <path d="M56 206H196" stroke="url(#jobenpay-line)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M624 206H764" stroke="url(#jobenpay-line)" stroke-width="8" stroke-linecap="round"/>
+      </g>
+      <path d="M56 206H196" stroke="url(#jobenpay-line)" stroke-width="6" stroke-linecap="round"/>
+      <path d="M624 206H764" stroke="url(#jobenpay-line)" stroke-width="6" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

@@ -1,6 +1,8 @@
 .loginPage {
   align-items: center;
-  background: var(--jp-surface-sidebar);
+  background:
+    radial-gradient(circle at top, rgba(18, 146, 255, 0.12), transparent 36%),
+    linear-gradient(180deg, #f8fbff 0%, #f5f7fa 58%, #eef4fb 100%);
   display: flex;
   justify-content: center;
   min-height: 100vh;
@@ -8,20 +10,64 @@
 }
 
 .loginCard {
+  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(7, 61, 177, 0.08);
+  box-shadow: 0 30px 90px rgba(4, 38, 114, 0.12);
   display: flex;
   flex-direction: column;
   gap: var(--jp-space-4);
   max-width: var(--jp-login-card-w);
+  overflow: hidden;
+  position: relative;
   width: 100%;
+}
+
+.loginCard::before {
+  background: linear-gradient(120deg, rgba(18, 146, 255, 0), rgba(18, 146, 255, 0.1), rgba(18, 146, 255, 0));
+  content: "";
+  inset: 0 auto auto -30%;
+  height: 220px;
+  pointer-events: none;
+  position: absolute;
+  transform: rotate(-12deg);
+  width: 70%;
+}
+
+.loginBrand {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-2);
+  text-align: center;
 }
 
 .loginWordmark {
   align-self: center;
-  color: var(--jp-text);
-  font-size: var(--jp-wordmark-font-size);
-  font-weight: var(--jp-font-weight-bold);
-  letter-spacing: var(--jp-wordmark-letter-spacing);
   text-decoration: none;
+}
+
+.loginWordmarkImage {
+  width: min(100%, 300px);
+}
+
+.loginEyebrow,
+.loginBrandText {
+  margin: 0;
+}
+
+.loginEyebrow {
+  color: var(--jp-blue-dark);
+  font-size: 12px;
+  font-weight: var(--jp-font-weight-bold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.loginBrandText {
+  color: var(--jp-text-muted);
+  line-height: 1.6;
+  max-width: 320px;
 }
 
 .loginCard h1 {
@@ -99,6 +145,113 @@
   font-size: var(--jp-font-size-page-title);
   line-height: var(--jp-font-line-page-title);
   margin-top: var(--jp-space-1);
+}
+
+.brandHero {
+  background:
+    linear-gradient(135deg, rgba(3, 32, 139, 0.045), rgba(18, 146, 255, 0.02)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 247, 250, 0.94));
+  border: 1px solid rgba(7, 61, 177, 0.09);
+  overflow: hidden;
+  position: relative;
+}
+
+.brandHero::after {
+  animation: heroSweep 4.8s linear infinite;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0), rgba(18, 146, 255, 0.13), rgba(255, 255, 255, 0));
+  content: "";
+  inset: 0 auto 0 -32%;
+  pointer-events: none;
+  position: absolute;
+  width: 32%;
+}
+
+.brandHeroTop,
+.brandHeroIdentity,
+.brandHeroStats {
+  align-items: center;
+  display: flex;
+}
+
+.brandHeroTop {
+  gap: var(--jp-space-4);
+  justify-content: space-between;
+}
+
+.brandHeroIdentity {
+  gap: var(--jp-space-4);
+  min-width: 0;
+}
+
+.brandHeroMark {
+  align-items: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(235, 244, 255, 0.94));
+  border: 1px solid rgba(7, 61, 177, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(4, 38, 114, 0.08);
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: 12px;
+}
+
+.brandHeroCopy {
+  display: grid;
+  gap: var(--jp-space-2);
+  min-width: 0;
+}
+
+.brandHeroLogo {
+  width: min(100%, 256px);
+}
+
+.brandHeroCopy p {
+  color: var(--jp-text-muted);
+  line-height: 1.7;
+  margin: 0;
+  max-width: 520px;
+}
+
+.brandHeroBadge {
+  background: rgba(3, 48, 135, 0.08);
+  border: 1px solid rgba(3, 48, 135, 0.1);
+  border-radius: var(--jp-radius-pill);
+  color: var(--jp-blue-dark);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: var(--jp-font-weight-bold);
+  letter-spacing: 0.06em;
+  padding: 10px 14px;
+  text-transform: uppercase;
+}
+
+.brandHeroStats {
+  gap: var(--jp-space-3);
+  margin-top: var(--jp-space-6);
+}
+
+.brandHeroStats > div {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(7, 61, 177, 0.06);
+  border-radius: 18px;
+  display: grid;
+  flex: 1 1 0;
+  gap: var(--jp-space-1);
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+.brandHeroStats span {
+  color: var(--jp-text-muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.brandHeroStats strong {
+  color: var(--jp-blue-dark);
+  font-size: 18px;
 }
 
 .budgetAction > span {
@@ -481,4 +634,51 @@
   flex-wrap: wrap;
   gap: var(--jp-space-3);
   justify-content: flex-start;
+}
+
+@keyframes heroSweep {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(420%);
+  }
+}
+
+@media (--jp-tablet-down) {
+  .brandHeroTop,
+  .brandHeroIdentity,
+  .brandHeroStats {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .brandHeroBadge {
+    align-self: flex-start;
+  }
+}
+
+@media (--jp-mobile-down) {
+  .loginPage {
+    padding: var(--jp-space-3);
+  }
+
+  .loginWordmarkImage {
+    width: min(100%, 240px);
+  }
+
+  .brandHeroMark {
+    align-self: flex-start;
+  }
+
+  .brandHeroStats {
+    margin-top: var(--jp-space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brandHero::after {
+    animation: none;
+  }
 }

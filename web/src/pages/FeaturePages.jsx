@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { BrandLogo, BrandSplash } from '../components/BrandKit.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
 import {
   Banner,
@@ -31,7 +32,6 @@ import {
   FloatingInput,
   FloatingSelect,
   Modal,
-  Skeleton,
   StatusPill,
 } from '../components/primitives.jsx';
 import styles from './FeaturePages.module.css';
@@ -52,14 +52,7 @@ function usePageQuery(queryKey, queryFn, { active = false } = {}) {
 }
 
 function LoadingState() {
-  const { t } = useTranslation();
-  return (
-    <div aria-label={t('components.loading')} className={styles.skeletonGrid}>
-      <Skeleton />
-      <Skeleton />
-      <Skeleton />
-    </div>
-  );
+  return <BrandSplash compact message="Loading dashboard data" />;
 }
 
 function PageError({ error, onRetry }) {
@@ -102,7 +95,13 @@ export function LoginPage() {
   return (
     <main className={styles.loginPage}>
       <Card className={styles.loginCard} padding="section">
-        <Link aria-label={t('app.name')} className={styles.loginWordmark} to="/dashboard">{t('app.name')}</Link>
+        <div className={styles.loginBrand}>
+          <Link aria-label={t('app.name')} className={styles.loginWordmark} to="/dashboard">
+            <BrandLogo alt={t('app.name')} className={styles.loginWordmarkImage} size="lg" variant="full" />
+          </Link>
+          <p className={styles.loginEyebrow}>Secure payout operations</p>
+          <p className={styles.loginBrandText}>Clean approval flows, precise controls, and a consistent finance workspace.</p>
+        </div>
         <h1>{t('app.loginTitle')}</h1>
         <form className={styles.formStack} onSubmit={submit}>
           <FloatingInput autoComplete="username" label={t('app.email')} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
@@ -221,6 +220,35 @@ export function DashboardPage() {
           {t('app.manageMandates')} <ChevronDown aria-hidden="true" />
         </Button>
       </section>
+
+      <Card className={styles.brandHero} padding="section">
+        <div className={styles.brandHeroTop}>
+          <div className={styles.brandHeroIdentity}>
+            <span className={styles.brandHeroMark}>
+              <BrandLogo alt="" size="md" variant="mark" />
+            </span>
+            <div className={styles.brandHeroCopy}>
+              <BrandLogo alt="JOBENPAY logo" className={styles.brandHeroLogo} size="md" variant="full" />
+              <p>Elegant control center for approvals, payees, mandates, and secure payout execution.</p>
+            </div>
+          </div>
+          <span className={styles.brandHeroBadge}>Brand system active</span>
+        </div>
+        <div className={styles.brandHeroStats}>
+          <div>
+            <span>Visual language</span>
+            <strong>Unified</strong>
+          </div>
+          <div>
+            <span>Experience</span>
+            <strong>Responsive</strong>
+          </div>
+          <div>
+            <span>Motion</span>
+            <strong>Refined</strong>
+          </div>
+        </div>
+      </Card>
       {['OWNER', 'ADMIN', 'JUDGE'].includes(auth.role) && data.aiDailyUsage?.warning ? (
         <Banner title="AI daily budget warning">
           AI usage is at {data.aiDailyUsage.usedPct}% of the daily budget ({data.aiDailyUsage.usedUsd.toFixed(2)} of {data.aiDailyUsage.budgetUsd.toFixed(2)} USD).
