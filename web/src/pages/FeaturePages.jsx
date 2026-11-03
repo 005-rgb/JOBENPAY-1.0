@@ -34,8 +34,8 @@ import {
   Modal,
   StatusPill,
 } from '../components/primitives.jsx';
-import logoUrl from '../assets/jobenpay-logo.png';
-import brandMarkUrl from '../assets/jobenpay-mark.png';
+import logoUrl from '../assets/jobenpay-logo.svg';
+import brandMarkUrl from '../assets/jobenpay-mark.svg';
 import styles from './FeaturePages.module.css';
 
 function usePageQuery(queryKey, queryFn, { active = false } = {}) {

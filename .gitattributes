@@ -1,3 +1,15 @@
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.webp binary
+*.gif binary
+web/dist/**/*.png binary
+web/dist/**/*.ico binary
+web/dist/**/*.webp binary
 web/index.html text eol=lf
-web/dist/** text eol=lf
+web/dist/**/*.js text eol=lf
+web/dist/**/*.css text eol=lf
+web/dist/**/*.html text eol=lf
+web/dist/**/*.svg text eol=lf
 web/dist/** whitespace=cr-at-eol,-blank-at-eol

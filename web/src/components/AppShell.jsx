@@ -29,7 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '../api/client.js';
-import wordmarkUrl from '../assets/jobenpay-logo.png';
+import wordmarkUrl from '../assets/jobenpay-logo.svg';
 import {
   Banner,
   Button,

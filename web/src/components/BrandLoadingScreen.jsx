@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
-import brandMarkUrl from '../assets/jobenpay-mark.png';
-import wordmarkUrl from '../assets/jobenpay-logo.png';
+import brandMarkUrl from '../assets/jobenpay-mark.svg';
+import wordmarkUrl from '../assets/jobenpay-logo.svg';
 import styles from './BrandLoadingScreen.module.css';
 
 export default function BrandLoadingScreen({
