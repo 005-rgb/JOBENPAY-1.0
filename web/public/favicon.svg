@@ -1,0 +1,18 @@
+<svg width="64" height="64" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="favicon-stroke" x1="18" y1="16" x2="80" y2="78" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#03208B"/>
+      <stop offset="0.54" stop-color="#0B3AB1"/>
+      <stop offset="1" stop-color="#1292FF"/>
+    </linearGradient>
+    <linearGradient id="favicon-fill" x1="25" y1="22" x2="70" y2="71" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#03208B"/>
+      <stop offset="1" stop-color="#1292FF"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M48 8C25.909 8 8 25.909 8 48C8 70.091 25.909 88 48 88C63.804 88 77.467 78.834 83.94 65.54" stroke="url(#favicon-stroke)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M72 13C76.994 15.142 81.281 18.666 84.318 23.158" stroke="url(#favicon-stroke)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M29 26H52C62.493 26 71 34.507 71 45C71 55.493 62.493 64 52 64H43V76H29V26ZM43 39V51H52C55.314 51 58 48.314 58 45C58 41.686 55.314 39 52 39H43Z" fill="url(#favicon-fill)"/>
+  <path d="M55 57H67C75.284 57 82 63.716 82 72C82 80.284 75.284 87 67 87H55V74H66C67.105 74 68 73.105 68 72C68 70.895 67.105 70 66 70H55V57Z" fill="url(#favicon-fill)"/>
+</svg>

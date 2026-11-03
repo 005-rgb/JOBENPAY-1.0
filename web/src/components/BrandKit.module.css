@@ -1,0 +1,168 @@
+.logo {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  user-select: none;
+}
+
+.full {
+  width: 100%;
+}
+
+.mark {
+  width: auto;
+}
+
+.sm.full {
+  max-width: 176px;
+}
+
+.md.full {
+  max-width: 264px;
+}
+
+.lg.full {
+  max-width: 336px;
+}
+
+.sm.mark {
+  width: 38px;
+}
+
+.md.mark {
+  width: 52px;
+}
+
+.lg.mark {
+  width: 72px;
+}
+
+.splash {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+  isolation: isolate;
+  justify-content: center;
+  min-height: min(56vh, 460px);
+  overflow: hidden;
+  padding: var(--jp-space-8) var(--jp-space-4);
+  position: relative;
+  text-align: center;
+}
+
+.splashCompact {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 247, 250, 0.92));
+  border: var(--jp-border-width) solid rgba(7, 61, 177, 0.08);
+  border-radius: calc(var(--jp-radius-card) * 2);
+  min-height: 260px;
+}
+
+.splashHalo {
+  background:
+    radial-gradient(circle at center, rgba(18, 146, 255, 0.18), rgba(18, 146, 255, 0) 64%),
+    radial-gradient(circle at center, rgba(3, 32, 139, 0.18), rgba(3, 32, 139, 0) 72%);
+  border-radius: 50%;
+  height: 220px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 220px;
+  z-index: -2;
+}
+
+.splashOrb {
+  align-items: center;
+  animation: splashFloat 2.8s ease-in-out infinite;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(7, 61, 177, 0.1);
+  border-radius: 50%;
+  box-shadow: 0 22px 60px rgba(4, 38, 114, 0.12);
+  display: inline-flex;
+  height: 88px;
+  justify-content: center;
+  position: relative;
+  width: 88px;
+  z-index: 1;
+}
+
+.splashOrb::before,
+.splashOrb::after {
+  border: 1px solid rgba(18, 146, 255, 0.28);
+  border-radius: 50%;
+  content: "";
+  inset: -10px;
+  position: absolute;
+}
+
+.splashOrb::after {
+  animation: splashPulse 1.8s ease-out infinite;
+}
+
+.splashMark {
+  filter: drop-shadow(0 10px 22px rgba(4, 38, 114, 0.22));
+}
+
+.splashWordmark {
+  margin-top: var(--jp-space-2);
+}
+
+.splash p {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+  line-height: var(--jp-font-line-caption);
+  margin: 0;
+  max-width: 280px;
+}
+
+@keyframes splashPulse {
+  0% {
+    opacity: 0.88;
+    transform: scale(0.92);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes splashFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@media (--jp-mobile-down) {
+  .splash {
+    min-height: 44vh;
+    padding-inline: var(--jp-space-3);
+  }
+
+  .splashCompact {
+    min-height: 220px;
+  }
+
+  .splashOrb {
+    height: 74px;
+    width: 74px;
+  }
+
+  .md.full,
+  .lg.full {
+    max-width: 224px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splashOrb,
+  .splashOrb::after {
+    animation: none;
+  }
+}

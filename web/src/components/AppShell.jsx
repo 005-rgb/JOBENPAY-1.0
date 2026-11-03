@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '../api/client.js';
+import { BrandLogo } from './BrandKit.jsx';
 import {
   Banner,
   Button,
@@ -382,7 +383,7 @@ function Sidebar({ pathname, t, onNavigate }) {
   return (
     <aside className={styles.sidebar} data-testid="sidebar">
       <RouterLink aria-label={t('app.name')} className={styles.wordmark} data-testid="wordmark" to="/dashboard" onClick={onNavigate}>
-        <span>{t('app.name')}</span>
+        <BrandLogo alt={t('app.name')} className={styles.wordmarkLogo} size="md" variant="full" />
       </RouterLink>
       <CreateMenu t={t} />
       <SideNavigation
@@ -456,7 +457,10 @@ export default function AppShell({
             <button aria-label="Open navigation" className={styles.mobileMenuButton} onClick={() => setDrawerOpen(true)} type="button">
               <Menu aria-hidden="true" />
             </button>
-            <span className={styles.mobileWordmark}>{t('app.name')}</span>
+            <RouterLink aria-label={t('app.name')} className={styles.mobileWordmark} to="/dashboard">
+              <BrandLogo alt="" className={styles.mobileWordmarkMark} size="sm" variant="mark" />
+              <BrandLogo alt={t('app.name')} className={styles.mobileWordmarkLogo} size="sm" variant="full" />
+            </RouterLink>
             <div className={styles.headerTitle}>
               <h1 data-testid="page-title">{title}</h1>
               <p>{t('app.organizationRole', { organization: org?.name || t('app.name'), role: role || 'VIEWER' })}</p>
