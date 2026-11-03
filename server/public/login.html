@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JOBENPAY Login</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main class="login-page">
+      <section class="login-card panel" aria-labelledby="login-title">
+        <div class="brand-lockup brand-lockup--login">
+          <img src="/assets/jobenpay-logo.svg" alt="JobenPay" />
+        </div>
+        <p class="eyebrow">Sandbox Governance</p>
+        <h1 class="title" id="login-title">Sign in to your workspace</h1>
+        <p class="subtitle">
+          Precision controls for AI-driven payout governance, presented in a cleaner
+          and more professional entry point.
+        </p>
+
+        <form class="form-stack" id="login-form" novalidate>
+          <label class="field-label">
+            Email address
+            <input class="input" id="email" name="email" type="email" autocomplete="username" required />
+          </label>
+
+          <label class="field-label">
+            Password
+            <input class="input" id="password" name="password" type="password" autocomplete="current-password" required />
+          </label>
+
+          <button class="button button--primary" id="submit-button" type="submit">Log In</button>
+        </form>
+
+        <p class="status-copy" id="form-status" aria-live="polite"></p>
+        <p class="hint">Use your JOBENPAY account credentials. Session state stays inside the secure backend cookie.</p>
+      </section>
+    </main>
+
+    <script type="module" src="/login.js"></script>
+  </body>
+</html>

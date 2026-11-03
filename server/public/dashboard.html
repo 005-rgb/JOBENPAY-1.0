@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JOBENPAY Dashboard</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main class="dashboard-page">
+      <div class="page-shell">
+        <header class="dashboard-topbar">
+          <a class="brand-lockup brand-lockup--dashboard" href="/dashboard" aria-label="JobenPay dashboard">
+            <img src="/assets/jobenpay-logo.svg" alt="JobenPay" />
+          </a>
+
+          <div class="topbar-actions">
+            <div class="identity-chip" id="identity-chip">Loading session...</div>
+            <button class="button button--secondary" id="logout-button" type="button">Log Out</button>
+          </div>
+        </header>
+
+        <section class="dashboard-hero">
+          <article class="hero-panel panel">
+            <p class="eyebrow" style="text-align: left; margin-bottom: 10px;">Operational Overview</p>
+            <h1 class="hero-title">Control, review, and approve payout activity with confidence.</h1>
+            <p class="hero-copy">
+              This dashboard keeps the brand presentation sharp while surfacing the live
+              session, organization, and governance state from the backend.
+            </p>
+
+            <div class="metrics-grid">
+              <section class="metric-card">
+                <p class="metric-label">Organization</p>
+                <p class="metric-value" id="metric-org">-</p>
+              </section>
+              <section class="metric-card">
+                <p class="metric-label">Role</p>
+                <p class="metric-value" id="metric-role">-</p>
+              </section>
+              <section class="metric-card">
+                <p class="metric-label">AI Mode</p>
+                <p class="metric-value" id="metric-ai-mode">-</p>
+              </section>
+              <section class="metric-card">
+                <p class="metric-label">Governance Status</p>
+                <p class="metric-value" id="metric-frozen">-</p>
+              </section>
+            </div>
+          </article>
+
+          <aside class="side-panel panel" aria-labelledby="session-title">
+            <div>
+              <p class="eyebrow" style="text-align: left; margin-bottom: 10px;">Session Detail</p>
+              <h2 class="title" id="session-title" style="text-align: left; font-size: 1.45rem;">Current Access</h2>
+            </div>
+
+            <section class="detail-row">
+              <p class="detail-label">Display Name</p>
+              <p class="detail-value" id="detail-name">-</p>
+            </section>
+
+            <section class="detail-row">
+              <p class="detail-label">Email</p>
+              <p class="detail-value" id="detail-email">-</p>
+            </section>
+
+            <section class="detail-row">
+              <p class="detail-label">Organization ID</p>
+              <p class="detail-value" id="detail-org-id">-</p>
+            </section>
+
+            <section class="detail-row">
+              <p class="detail-label">Judge Access</p>
+              <p class="detail-value" id="detail-judge">-</p>
+            </section>
+          </aside>
+        </section>
+      </div>
+    </main>
+
+    <script type="module" src="/dashboard.js"></script>
+  </body>
+</html>
