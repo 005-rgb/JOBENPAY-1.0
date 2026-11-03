@@ -1,0 +1,19 @@
+<svg width="256" height="256" viewBox="0 0 220 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fav-deep" x1="30" x2="196" y1="12" y2="145" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A2F9D" />
+      <stop offset="1" stop-color="#1565FF" />
+    </linearGradient>
+    <linearGradient id="fav-cyan" x1="30" x2="172" y1="146" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#21B5FF" />
+      <stop offset="1" stop-color="#49D2FF" />
+    </linearGradient>
+    <linearGradient id="fav-overlay" x1="111" x2="209" y1="53" y2="111" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07144F" />
+      <stop offset="1" stop-color="#0897FF" />
+    </linearGradient>
+  </defs>
+  <path d="M72 18C76 7 86 0 98 0h81c23 0 41 18 41 41v32c0 22-18 40-40 40h-42c-11 0-20-9-20-20V67c0-11 9-20 20-20h34c11 0 21 4 28 11V41c0-11-9-20-20-20h-69c-9 0-17 6-19 15l-25 97c-4 16-18 27-34 27H16c-11 0-18-10-15-21l25-97c4-16 18-27 34-27h12Z" fill="url(#fav-deep)" />
+  <path d="M107 26c3-13 15-22 28-22h28c11 0 19 10 16 20l-20 78c-4 16-18 27-34 27H15C6 129 0 123 0 115V92c0-10 8-18 18-18h39c11 0 20 9 20 20v14c0 7-2 13-6 18h35c7 0 14-5 16-12l17-66c1-5 5-9 10-12h-25c-8 0-14 5-16 13l-6 23H94l13-46Z" fill="url(#fav-cyan)" />
+  <path d="M126 47h44c24 0 44 19 44 43 0 8-2 16-6 23-7 2-14 3-21 3h-49c-11 0-20-9-20-20V67c0-11 9-20 20-20h-12Z" fill="url(#fav-overlay)" opacity=".32" />
+</svg>

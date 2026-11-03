@@ -1,0 +1,401 @@
+.mark {
+  display: block;
+  filter: drop-shadow(0 10px 24px rgba(10, 47, 157, 0.18));
+  height: auto;
+  width: 100%;
+}
+
+.logo {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--jp-space-3);
+  min-width: 0;
+}
+
+.logoStacked {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.logoSm {
+  gap: var(--jp-space-2);
+}
+
+.logoMd {
+  gap: var(--jp-space-3);
+}
+
+.logoLg {
+  gap: var(--jp-space-4);
+}
+
+.logoMark {
+  flex: 0 0 auto;
+}
+
+.logoSm .logoMark {
+  width: 54px;
+}
+
+.logoMd .logoMark {
+  width: 72px;
+}
+
+.logoLg .logoMark {
+  width: 96px;
+}
+
+.logoText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.wordmark {
+  background: var(--jp-brand-wordmark-gradient);
+  -webkit-background-clip: text;
+  color: transparent;
+  display: inline-block;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  white-space: nowrap;
+}
+
+.logoSm .wordmark {
+  font-size: 28px;
+}
+
+.logoMd .wordmark {
+  font-size: 40px;
+}
+
+.logoLg .wordmark {
+  font-size: clamp(42px, 6vw, 66px);
+}
+
+.captionRow {
+  align-items: center;
+  color: var(--jp-brand-deep);
+  display: inline-flex;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.captionRule {
+  background: linear-gradient(90deg, transparent, rgba(13, 118, 255, 0.75), transparent);
+  display: inline-block;
+  height: 2px;
+  width: clamp(26px, 8vw, 72px);
+}
+
+.caption {
+  font-size: clamp(15px, 2.5vw, 24px);
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.tagline {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.splash {
+  align-items: center;
+  background:
+    radial-gradient(circle at top, rgba(73, 210, 255, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 249, 255, 0.98));
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: clamp(24px, 4vw, 40px);
+  position: relative;
+}
+
+.splashCompact {
+  border-radius: var(--jp-radius-card);
+  min-height: min(70vh, 520px);
+}
+
+.splashGlow {
+  animation: pulseGlow 3.6s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(21, 101, 255, 0.24), transparent 64%);
+  border-radius: 50%;
+  height: min(62vw, 520px);
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  width: min(62vw, 520px);
+}
+
+.splashCore {
+  align-items: center;
+  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(10, 47, 157, 0.1);
+  border-radius: 28px;
+  box-shadow: var(--jp-brand-surface-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+  max-width: 720px;
+  padding: clamp(28px, 5vw, 44px);
+  position: relative;
+  text-align: center;
+  width: min(100%, 720px);
+  z-index: 1;
+}
+
+.loadingTrack {
+  background: rgba(10, 47, 157, 0.08);
+  border-radius: var(--jp-radius-pill);
+  height: 8px;
+  overflow: hidden;
+  width: min(100%, 280px);
+}
+
+.loadingBar {
+  animation: loadingSweep 1.4s ease-in-out infinite;
+  background: var(--jp-brand-wordmark-gradient);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  width: 42%;
+}
+
+.splashCopy {
+  display: grid;
+  gap: var(--jp-space-2);
+}
+
+.splashCopy strong {
+  color: var(--jp-brand-deep);
+  font-size: clamp(18px, 3vw, 24px);
+  letter-spacing: -0.02em;
+}
+
+.splashCopy p {
+  color: var(--jp-text-muted);
+  margin: 0;
+  max-width: 54ch;
+}
+
+.brandCard {
+  align-items: center;
+  background:
+    radial-gradient(circle at top right, rgba(73, 210, 255, 0.18), transparent 36%),
+    linear-gradient(135deg, rgba(6, 23, 82, 0.02), rgba(21, 101, 255, 0.08));
+  border: 1px solid rgba(10, 47, 157, 0.1);
+  border-radius: 28px;
+  box-shadow: var(--jp-brand-card-shadow);
+  display: grid;
+  gap: clamp(20px, 4vw, 36px);
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+  overflow: hidden;
+  padding: clamp(24px, 4vw, 36px);
+  position: relative;
+}
+
+.brandCardCopy {
+  display: grid;
+  gap: var(--jp-space-4);
+  position: relative;
+  z-index: 1;
+}
+
+.eyebrow {
+  color: var(--jp-brand-deep);
+  font-size: var(--jp-font-size-caption);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.brandCardCopy p {
+  color: var(--jp-text-muted);
+  margin: 0;
+  max-width: 58ch;
+}
+
+.brandMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jp-space-2);
+}
+
+.brandMeta span {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(10, 47, 157, 0.08);
+  border-radius: var(--jp-radius-pill);
+  color: var(--jp-brand-deep);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 8px 12px;
+  text-transform: uppercase;
+}
+
+.brandStage {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 100%;
+  position: relative;
+}
+
+.orbitRing,
+.orbitRingSecondary {
+  animation: spinSlow 18s linear infinite;
+  border: 1px solid rgba(13, 118, 255, 0.18);
+  border-radius: 50%;
+  position: absolute;
+}
+
+.orbitRing {
+  height: min(30vw, 260px);
+  width: min(30vw, 260px);
+}
+
+.orbitRingSecondary {
+  animation-duration: 14s;
+  border-style: dashed;
+  height: min(24vw, 212px);
+  width: min(24vw, 212px);
+}
+
+.brandBadge {
+  align-items: center;
+  animation: floatBadge 3.2s ease-in-out infinite;
+  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(10, 47, 157, 0.1);
+  border-radius: 24px;
+  box-shadow: var(--jp-brand-surface-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-3);
+  max-width: 240px;
+  padding: 22px;
+  position: relative;
+  text-align: center;
+  z-index: 1;
+}
+
+.stageMark {
+  width: 120px;
+}
+
+.brandBadge span {
+  color: var(--jp-brand-deep);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+@keyframes loadingSweep {
+  0% {
+    transform: translateX(-130%);
+  }
+
+  50% {
+    transform: translateX(85%);
+  }
+
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes floatBadge {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (--jp-tablet-down) {
+  .brandCard {
+    grid-template-columns: 1fr;
+  }
+
+  .brandStage {
+    min-height: 220px;
+  }
+}
+
+@media (--jp-mobile-down) {
+  .logoSm .wordmark {
+    font-size: 24px;
+  }
+
+  .logoMd .wordmark {
+    font-size: 32px;
+  }
+
+  .logoLg .wordmark {
+    font-size: 40px;
+  }
+
+  .logoLg .logoMark {
+    width: 80px;
+  }
+
+  .caption {
+    font-size: 14px;
+  }
+
+  .tagline {
+    letter-spacing: 0.06em;
+  }
+
+  .brandCard {
+    border-radius: 22px;
+    padding: 20px;
+  }
+
+  .brandBadge {
+    max-width: 220px;
+  }
+
+  .stageMark {
+    width: 96px;
+  }
+}
