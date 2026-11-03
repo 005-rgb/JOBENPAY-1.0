@@ -5,7 +5,8 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import AppShell, { FixtureMain } from './components/AppShell.jsx';
 import { AuthProvider, useAuth } from './auth/AuthProvider.jsx';
 import { RequireAuth, RequireRole } from './auth/RequireAuth.jsx';
-import { Skeleton, ToastProvider } from './components/primitives.jsx';
+import BrandLoadingScreen from './components/BrandLoadingScreen.jsx';
+import { ToastProvider } from './components/primitives.jsx';
 import { useTranslation } from 'react-i18next';
 
 const ApprovalDetailPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.ApprovalDetailPage })));
@@ -43,6 +44,7 @@ const queryClient = new QueryClient({
 
 function AuthenticatedApp() {
   const auth = useAuth();
+  const { t } = useTranslation();
   return (
     <AppShell
       aiMode={auth.data?.aiMode || 'live'}
@@ -53,7 +55,7 @@ function AuthenticatedApp() {
       role={auth.role}
       user={auth.user}
     >
-      <Suspense fallback={<main aria-busy="true"><Skeleton className="pageSkeleton" /></main>}>
+      <Suspense fallback={<BrandLoadingScreen message={t('app.loadingWorkspaceHint')} />}>
         <Routes>
           <Route element={<DashboardPage />} path="/" />
           <Route element={<DashboardPage />} path="/dashboard" />
@@ -112,7 +114,7 @@ function AppRoutes() {
           <Route element={<ParityPage variant="s2" />} path="/__parity/s2" />
         </>
       ) : null}
-      <Route element={<Suspense fallback={<main aria-busy="true"><Skeleton className="pageSkeleton" /></main>}><LoginPage /></Suspense>} path="/login" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><LoginPage /></Suspense>} path="/login" />
       <Route
         element={(
           <RequireAuth>

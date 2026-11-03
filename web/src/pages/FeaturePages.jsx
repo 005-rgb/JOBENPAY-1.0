@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import BrandLoadingScreen from '../components/BrandLoadingScreen.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
 import {
   Banner,
@@ -31,9 +32,10 @@ import {
   FloatingInput,
   FloatingSelect,
   Modal,
-  Skeleton,
   StatusPill,
 } from '../components/primitives.jsx';
+import logoUrl from '../assets/jobenpay-logo.png';
+import brandMarkUrl from '../assets/jobenpay-mark.png';
 import styles from './FeaturePages.module.css';
 
 function usePageQuery(queryKey, queryFn, { active = false } = {}) {
@@ -52,14 +54,7 @@ function usePageQuery(queryKey, queryFn, { active = false } = {}) {
 }
 
 function LoadingState() {
-  const { t } = useTranslation();
-  return (
-    <div aria-label={t('components.loading')} className={styles.skeletonGrid}>
-      <Skeleton />
-      <Skeleton />
-      <Skeleton />
-    </div>
-  );
+  return <BrandLoadingScreen />;
 }
 
 function PageError({ error, onRetry }) {
@@ -102,7 +97,9 @@ export function LoginPage() {
   return (
     <main className={styles.loginPage}>
       <Card className={styles.loginCard} padding="section">
-        <Link aria-label={t('app.name')} className={styles.loginWordmark} to="/dashboard">{t('app.name')}</Link>
+        <Link aria-label={t('app.name')} className={styles.loginWordmark} to="/dashboard">
+          <img alt={t('app.name')} className={styles.loginLogo} src={logoUrl} />
+        </Link>
         <h1>{t('app.loginTitle')}</h1>
         <form className={styles.formStack} onSubmit={submit}>
           <FloatingInput autoComplete="username" label={t('app.email')} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
@@ -155,6 +152,109 @@ function QueueMetricCard({ label, value }) {
     <Card className={styles.metricCard} padding="section">
       <span className={styles.metricLabel}>{label}</span>
       <strong className={styles.metricValue}>{value}</strong>
+    </Card>
+  );
+}
+
+function BrandCard({ auth, data, setupCards, t }) {
+  const completedSetupCount = setupCards.filter((card) => card.done).length;
+  const orgName = auth.org?.name || t('app.name');
+  const roleName = auth.role || 'VIEWER';
+
+  return (
+    <Card className={styles.brandCard} padding="section">
+      <div className={styles.brandCardGrid}>
+        <div className={styles.fintechCardWrapper}>
+          <div className={styles.fintechCard}>
+            <div className={styles.cardHeader}>
+              <div className={styles.cardChipBlock}>
+                <div className={styles.emvChip} aria-hidden="true" />
+                <svg className={styles.contactlessWave} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <path d="M8.5 16.5a5 5 0 0 1 0-7M12 18.5a8.5 8.5 0 0 0 0-13M15.5 20.5a12 12 0 0 0 0-17" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <img src={logoUrl} alt="JobenPay" className={styles.cardBrandLogo} />
+            </div>
+
+            <div className={styles.cardWatermark} aria-hidden="true">
+              <img src={brandMarkUrl} alt="" className={styles.cardWatermarkImg} />
+            </div>
+
+            <div className={styles.cardNumber}>
+              <span>••••</span>
+              <span>••••</span>
+              <span>••••</span>
+              <strong>8842</strong>
+            </div>
+
+            <div className={styles.cardFooter}>
+              <div className={styles.cardInfo}>
+                <span className={styles.cardLabel}>{t('app.brandCardRole')}</span>
+                <span className={styles.cardHolderName}>{orgName}</span>
+              </div>
+              <div className={styles.cardInfo}>
+                <span className={styles.cardLabel}>VALID THRU</span>
+                <span className={styles.cardExpiry}>12/29</span>
+              </div>
+              <div className={styles.cardTierBadge}>
+                <span>PLATINUM</span>
+              </div>
+            </div>
+
+            <div className={styles.cardSheen} aria-hidden="true" />
+          </div>
+        </div>
+
+        <div className={styles.brandCardContent}>
+          <div className={styles.brandCopy}>
+            <div className={styles.brandHeaderRow}>
+              <div className={styles.brandMarkMiniWrap} aria-hidden="true">
+                <span className={styles.brandGlowMini} />
+                <img alt="" className={styles.brandMarkMini} src={brandMarkUrl} />
+              </div>
+              <div>
+                <p className={styles.brandEyebrow}>{t('app.brandCardEyebrow')}</p>
+                <h2>{t('app.brandCardTitle')}</h2>
+              </div>
+            </div>
+            <p className={styles.brandDescription}>{t('app.brandCardDescription')}</p>
+            <div className={styles.brandSignals}>
+              <span className={styles.signalBadge}>
+                <span className={styles.signalDot} />
+                {t('app.brandCardSandbox')}
+              </span>
+              <span className={styles.signalBadge}>
+                <span className={styles.signalDot} />
+                {t('app.brandCardGoverned')}
+              </span>
+              <span className={styles.signalBadge}>
+                <span className={styles.signalDot} />
+                {t('app.brandCardAudit')}
+              </span>
+            </div>
+          </div>
+
+          <div className={styles.brandStats}>
+            <div className={styles.brandStat}>
+              <span>{t('app.brandCardBudget')}</span>
+              <strong>{formatMinor(data.remainingBudgetMinor, data.currency)}</strong>
+              <small>{data.budgetUsedPct}% {t('app.budgetUsed')}</small>
+            </div>
+            <div className={styles.brandStat}>
+              <span>{t('app.brandCardReadiness')}</span>
+              <strong>{t('app.brandCardReadinessValue', { count: completedSetupCount, total: setupCards.length })}</strong>
+              <small className={completedSetupCount === setupCards.length ? styles.readyStatus : styles.progressStatus}>
+                {completedSetupCount === setupCards.length ? t('app.brandCardReady') : t('app.brandCardInProgress')}
+              </small>
+            </div>
+            <div className={styles.brandStat}>
+              <span>{t('app.brandCardRole')}</span>
+              <strong>{orgName}</strong>
+              <small className={styles.roleTag}>{roleName}</small>
+            </div>
+          </div>
+        </div>
+      </div>
     </Card>
   );
 }
@@ -221,6 +321,7 @@ export function DashboardPage() {
           {t('app.manageMandates')} <ChevronDown aria-hidden="true" />
         </Button>
       </section>
+      <BrandCard auth={auth} data={data} setupCards={setupCards} t={t} />
       {['OWNER', 'ADMIN', 'JUDGE'].includes(auth.role) && data.aiDailyUsage?.warning ? (
         <Banner title="AI daily budget warning">
           AI usage is at {data.aiDailyUsage.usedPct}% of the daily budget ({data.aiDailyUsage.usedUsd.toFixed(2)} of {data.aiDailyUsage.budgetUsd.toFixed(2)} USD).

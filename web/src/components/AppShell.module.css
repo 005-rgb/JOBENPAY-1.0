@@ -20,22 +20,21 @@
 
 .wordmark {
   align-items: center;
-  color: var(--jp-text);
   display: flex;
-  font-size: var(--jp-wordmark-font-size);
-  font-weight: var(--jp-font-weight-bold);
   height: var(--jp-wordmark-h);
   justify-content: center;
   left: var(--jp-sidebar-pad-x);
-  letter-spacing: var(--jp-wordmark-letter-spacing);
   position: absolute;
   text-decoration: none;
   top: var(--jp-wordmark-top);
   width: var(--jp-sidebar-content-w);
 }
 
-.wordmark span {
-  transform: scaleX(var(--jp-wordmark-scale-x));
+.wordmarkImage {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  width: 100%;
 }
 
 .createButton {
@@ -285,6 +284,12 @@
 .mobileMenuButton,
 .mobileWordmark {
   display: none;
+}
+
+.mobileWordmarkImage {
+  display: block;
+  height: auto;
+  width: 118px;
 }
 
 .mainContent {
@@ -918,10 +923,8 @@
   }
 
   .mobileWordmark {
-    color: var(--jp-text);
-    display: inline;
-    font-size: var(--jp-wordmark-mobile-size);
-    font-weight: var(--jp-font-weight-bold);
+    display: inline-flex;
+    margin-right: var(--jp-space-2);
   }
 
   .setupCards {

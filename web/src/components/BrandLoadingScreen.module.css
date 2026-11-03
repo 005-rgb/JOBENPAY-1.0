@@ -1,0 +1,224 @@
+.loadingShell {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.fullScreen {
+  background:
+    radial-gradient(circle at top, rgba(31, 120, 255, 0.16), transparent 42%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+  min-height: 100vh;
+  padding: var(--jp-space-6);
+}
+
+.inlineShell {
+  min-height: min(60vh, 480px);
+}
+
+.loadingPanel {
+  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(17, 75, 199, 0.12);
+  border-radius: 28px;
+  box-shadow: 0 22px 64px rgba(10, 43, 158, 0.12);
+  display: grid;
+  gap: var(--jp-space-4);
+  justify-items: center;
+  max-width: 640px;
+  overflow: hidden;
+  padding: clamp(28px, 4vw, 40px);
+  position: relative;
+  text-align: center;
+  width: min(100%, 640px);
+}
+
+.loadingPanel::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: translateX(-120%);
+  animation: shimmer 2.8s ease-in-out infinite;
+}
+
+.markStage {
+  display: grid;
+  place-items: center;
+  height: 120px;
+  position: relative;
+  width: 120px;
+}
+
+.markHalo,
+.markRing,
+.mark {
+  grid-area: 1 / 1;
+}
+
+.markHalo {
+  background: radial-gradient(circle, rgba(31, 145, 255, 0.28), rgba(31, 145, 255, 0.02) 70%);
+  border-radius: 50%;
+  height: 116px;
+  width: 116px;
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+.markRing {
+  border: 1px solid rgba(17, 75, 199, 0.18);
+  border-radius: 50%;
+  height: 96px;
+  width: 96px;
+  animation: rotate 12s linear infinite;
+}
+
+.mark {
+  animation: float 2.8s ease-in-out infinite;
+  filter: drop-shadow(0 16px 24px rgba(10, 43, 158, 0.18));
+  height: 82px;
+  object-fit: contain;
+  width: 82px;
+}
+
+.wordmark {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-width: min(100%, 220px);
+  object-fit: contain;
+  width: 100%;
+}
+
+.copy {
+  display: grid;
+  gap: var(--jp-space-2);
+  max-width: 480px;
+  position: relative;
+  z-index: 1;
+}
+
+.eyebrow {
+  color: #0a2b9e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  margin: 0;
+}
+
+.copy h1,
+.copy p {
+  margin: 0;
+}
+
+.copy h1 {
+  color: #0d1d46;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.1;
+}
+
+.copy p {
+  color: var(--jp-text-muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.signalRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jp-space-2);
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.signalRow span {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(17, 75, 199, 0.12);
+  border-radius: 999px;
+  color: #0f47c3;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+.progressTrack {
+  background: rgba(10, 43, 158, 0.08);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+  position: relative;
+  width: min(100%, 320px);
+  z-index: 1;
+}
+
+.progressBar {
+  background: linear-gradient(90deg, #0a2b9e, #149dff, #67d2ff);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  width: 42%;
+  animation: loadingBar 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes loadingBar {
+  0% {
+    transform: translateX(-80%);
+  }
+
+  50% {
+    transform: translateX(75%);
+  }
+
+  100% {
+    transform: translateX(210%);
+  }
+}
+
+@media (--jp-mobile-down) {
+  .fullScreen {
+    padding: var(--jp-space-4);
+  }
+
+  .loadingPanel {
+    border-radius: 24px;
+    padding: 24px 20px;
+  }
+
+  .markStage {
+    height: 104px;
+    width: 104px;
+  }
+
+  .mark {
+    height: 72px;
+    width: 72px;
+  }
+
+  .copy p {
+    font-size: 14px;
+  }
+}

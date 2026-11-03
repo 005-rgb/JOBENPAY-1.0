@@ -17,11 +17,26 @@
 
 .loginWordmark {
   align-self: center;
-  color: var(--jp-text);
-  font-size: var(--jp-wordmark-font-size);
-  font-weight: var(--jp-font-weight-bold);
-  letter-spacing: var(--jp-wordmark-letter-spacing);
+  display: inline-flex;
+  justify-content: center;
+  margin: 0 auto var(--jp-space-2) auto;
   text-decoration: none;
+  width: min(100%, 220px);
+}
+
+.loginLogo {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-height: 52px;
+  max-width: 100%;
+  object-fit: contain;
+  transition: transform 0.2s ease;
+  width: auto;
+}
+
+.loginLogo:hover {
+  transform: scale(1.02);
 }
 
 .loginCard h1 {
@@ -68,6 +83,403 @@
   flex-direction: column;
   gap: var(--jp-space-6);
   min-width: 0;
+}
+
+.brandCard {
+  background:
+    radial-gradient(circle at top right, rgba(31, 156, 255, 0.16), transparent 38%),
+    linear-gradient(135deg, rgba(10, 43, 158, 0.03), rgba(20, 157, 255, 0.06)),
+    var(--jp-surface);
+  border: 1px solid rgba(17, 75, 199, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 20px 48px rgba(10, 43, 158, 0.08);
+  overflow: hidden;
+  position: relative;
+}
+
+.brandCard::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-125%);
+  animation: brandShimmer 5s ease-in-out infinite;
+}
+
+.brandCardGrid {
+  align-items: center;
+  display: grid;
+  gap: var(--jp-space-8);
+  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 991px) {
+  .brandCardGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--jp-space-6);
+  }
+}
+
+.fintechCardWrapper {
+  display: flex;
+  justify-content: center;
+  perspective: 1000px;
+}
+
+.fintechCard {
+  aspect-ratio: 1.586 / 1;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(0, 164, 228, 0.45), transparent 55%),
+    radial-gradient(circle at 15% 85%, rgba(0, 48, 135, 0.6), transparent 50%),
+    linear-gradient(135deg, #001233 0%, #002b66 42%, #004b99 82%, #0070ba 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 16px;
+  box-shadow:
+    0 16px 36px -4px rgba(0, 32, 96, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  box-sizing: border-box;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 22px 24px;
+  position: relative;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  width: min(100%, 340px);
+}
+
+.fintechCard:hover {
+  box-shadow:
+    0 22px 48px -4px rgba(0, 32, 96, 0.45),
+    0 8px 16px rgba(0, 0, 0, 0.16),
+    inset 0 1px 1px rgba(255, 255, 255, 0.45);
+  transform: translateY(-4px) rotateX(2deg) rotateY(-2deg);
+}
+
+.cardHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  z-index: 2;
+}
+
+.cardChipBlock {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.emvChip {
+  background: linear-gradient(135deg, #fce096 0%, #dfb15b 50%, #c49339 100%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 5px;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.2);
+  height: 26px;
+  position: relative;
+  width: 34px;
+}
+
+.emvChip::before {
+  border: 1px solid rgba(90, 60, 10, 0.35);
+  border-radius: 2px;
+  content: "";
+  inset: 4px 7px;
+  position: absolute;
+}
+
+.contactlessWave {
+  color: rgba(255, 255, 255, 0.85);
+  height: 20px;
+  width: 20px;
+}
+
+.cardBrandLogo {
+  filter: brightness(0) invert(1);
+  height: 24px;
+  object-fit: contain;
+  width: auto;
+}
+
+.cardWatermark {
+  bottom: -20px;
+  opacity: 0.16;
+  pointer-events: none;
+  position: absolute;
+  right: -20px;
+  z-index: 1;
+}
+
+.cardWatermarkImg {
+  filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.4));
+  height: 180px;
+  object-fit: contain;
+  transform: rotate(-8deg);
+  width: 180px;
+}
+
+.cardNumber {
+  align-items: center;
+  display: flex;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 17px;
+  font-weight: 600;
+  gap: 14px;
+  letter-spacing: 0.12em;
+  margin: 12px 0;
+  position: relative;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+}
+
+.cardNumber strong {
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.cardFooter {
+  align-items: flex-end;
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  z-index: 2;
+}
+
+.cardInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardLabel {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cardHolderName {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cardExpiry {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.cardTierBadge {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.cardTierBadge span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.cardSheen {
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  content: "";
+  inset: -100%;
+  pointer-events: none;
+  position: absolute;
+  transform: rotate(35deg) translateY(-80%);
+  animation: cardSheenSweep 6s ease-in-out infinite;
+  z-index: 3;
+}
+
+@keyframes cardSheenSweep {
+  0% { transform: rotate(35deg) translateY(-120%); }
+  35%, 100% { transform: rotate(35deg) translateY(120%); }
+}
+
+.brandCardContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+  justify-content: center;
+  min-width: 0;
+}
+
+.brandCopy {
+  display: grid;
+  gap: var(--jp-space-3);
+}
+
+.brandHeaderRow {
+  align-items: center;
+  display: flex;
+  gap: var(--jp-space-4);
+}
+
+.brandMarkMiniWrap {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  position: relative;
+}
+
+.brandGlowMini,
+.brandMarkMini {
+  grid-area: 1 / 1;
+}
+
+.brandGlowMini {
+  animation: brandPulse 3.2s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(31, 145, 255, 0.3), rgba(31, 145, 255, 0.02) 70%);
+  border-radius: 50%;
+  height: 64px;
+  width: 64px;
+}
+
+.brandMarkMini {
+  animation: brandFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 8px 16px rgba(10, 43, 158, 0.2));
+  height: 48px;
+  object-fit: contain;
+  width: 48px;
+}
+
+.brandEyebrow {
+  color: #0a2b9e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.brandCopy h2 {
+  color: #09183d;
+  font-size: clamp(22px, 2.5vw, 30px);
+  line-height: 1.15;
+  margin: 0;
+  max-width: 22ch;
+}
+
+.brandDescription {
+  color: var(--jp-text-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 60ch;
+}
+
+.brandSignals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jp-space-2);
+}
+
+.signalBadge {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(17, 75, 199, 0.15);
+  border-radius: 999px;
+  color: #0f47c3;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  padding: 6px 12px;
+}
+
+.signalDot {
+  background: #118c4f;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(17, 140, 79, 0.5);
+  height: 7px;
+  width: 7px;
+}
+
+.brandStats {
+  display: grid;
+  gap: var(--jp-space-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: var(--jp-space-2);
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 640px) {
+  .brandStats {
+    grid-template-columns: 1fr;
+  }
+}
+
+.brandStat {
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(17, 75, 199, 0.1);
+  border-radius: 16px;
+  display: grid;
+  gap: var(--jp-space-1);
+  min-width: 0;
+  padding: 16px;
+}
+
+.brandStat span,
+.brandStat small {
+  color: var(--jp-text-muted);
+}
+
+.brandStat span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.brandStat strong {
+  color: #0d1d46;
+  font-size: clamp(17px, 1.8vw, 22px);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.readyStatus {
+  color: var(--jp-success) !important;
+  font-weight: 600;
+}
+
+.progressStatus {
+  color: var(--jp-blue) !important;
+  font-weight: 500;
+}
+
+.roleTag {
+  background: rgba(10, 43, 158, 0.08);
+  border-radius: 4px;
+  color: #0a2b9e !important;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  width: fit-content;
 }
 
 .budgetHeader,
@@ -481,4 +893,75 @@
   flex-wrap: wrap;
   gap: var(--jp-space-3);
   justify-content: flex-start;
+}
+
+@keyframes brandPulse {
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes brandFloat {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes brandShimmer {
+  100% {
+    transform: translateX(125%);
+  }
+}
+
+@media (--jp-tablet-down) {
+  .brandCardMain {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .brandStats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (--jp-mobile-down) {
+  .budgetHeader,
+  .sectionHeading,
+  .performanceHeading,
+  .pageToolbar,
+  .cardHeading,
+  .inlineActions,
+  .setupCardTop,
+  .pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .brandCard {
+    padding: 20px;
+  }
+
+  .brandGlow {
+    height: 112px;
+    width: 112px;
+  }
+
+  .brandMark {
+    height: 80px;
+    width: 80px;
+  }
+
+  .quickItems,
+  .setupCards,
+  .metricsGrid,
+  .detailsList {
+    grid-template-columns: 1fr;
+  }
+
+  .tableActions,
+  .keyRow,
+  .historyList li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
