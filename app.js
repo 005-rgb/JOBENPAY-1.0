@@ -1,3 +1,7 @@
+if (!process.env.UV_THREADPOOL_SIZE) {
+  process.env.UV_THREADPOOL_SIZE = '2';
+}
+
 import fs from 'node:fs';
 import path from 'node:path';
 

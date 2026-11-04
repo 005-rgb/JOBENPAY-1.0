@@ -174,6 +174,10 @@ configure_passenger_routing() {
     printf 'PassengerNodejs "%s"\n' "$node_bin"
     printf 'PassengerAppType node\n'
     printf 'PassengerStartupFile app.cjs\n'
+    printf 'PassengerMinInstances 1\n'
+    printf 'PassengerMaxInstancesPerApp 1\n'
+    printf 'PassengerPoolIdleTime 300\n'
+    printf 'PassengerMaxRequests 1000\n'
     printf '%s\n\n' "$passenger_end"
     printf '%s\n' "$guard_begin"
     cat <<'EOF'
@@ -390,7 +394,7 @@ if [ -n "$missing_deps" ]; then
   ensure_cpanel_node_modules
   if command -v npm >/dev/null 2>&1; then
     log INFO "Menjalankan npm install --omit=dev --no-audit --no-fund untuk memasang dependensi yang kurang..."
-    npm --prefix "$APP_DIR" install --omit=dev --no-audit --no-fund || fail "Gagal menginstal dependensi: $missing_deps. Silakan jalankan 'npm install --omit=dev' secara manual."
+    npm --prefix "$APP_DIR" install --omit=dev --no-audit --no-fund --jobs=1 --maxsockets=2 || fail "Gagal menginstal dependensi: $missing_deps. Silakan jalankan 'npm install --omit=dev' secara manual."
     ensure_cpanel_node_modules
   else
     fail "Dependensi ESM ($missing_deps) belum terpasang di node_modules. Jalankan 'npm install --omit=dev' pada server."
