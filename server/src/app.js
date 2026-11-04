@@ -16,7 +16,10 @@ import { env } from './config.js';
 import { query } from './db/pool.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
-import { decrypt, encrypt, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
+import { decrypt, encrypt, hashPassword, hmacSha256, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
+import { isCommonPassword } from './auth/common-passwords.js';
+import { enqueueEmail, claimAndSendEmail } from './email/outbox.js';
+import { createUnverifiedUser, verifyUserEmail } from './repositories/users.js';
 import { appendAudit } from './repositories/audit.js';
 import { listAuditEvents } from './repositories/auditListing.js';
 import { listLedgerEntries } from './repositories/ledger.js';
@@ -71,6 +74,7 @@ import { createSession, deleteSession, findSessionByCookie } from './repositorie
 import { createUser, findUserByEmail, findUserById, recordLoginFailure, resetLoginFailure } from './repositories/users.js';
 import { enqueue, queueStats } from './jobs/queue.js';
 import { agentAuth } from './auth/agentAuth.js';
+import { registerAuthRoutes } from './auth/routes.js';
 import { effectiveRole } from './auth/permissions.js';
 import { clearPaypalTokenCache, paypalFor } from './paypal/client.js';
 import { appendEntry, exportLedger, LEDGER_TYPES, verifyChain } from './services/ledger.js';
@@ -248,6 +252,14 @@ async function insertAgentApiKey(orgId, agentId, db) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
+
+function requireJsonBody(req, res, next) {
+  const contentType = req.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return next(buildError('UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json.', 415));
+  }
+  next();
+}
 
 function readRequestId(req, res, next) {
   req.id = req.get('x-request-id') || crypto.randomUUID();
@@ -1710,6 +1722,14 @@ export function createApp() {
         return res.status(403).json({ ok: false, code: 'FORBIDDEN', message: 'Account locked.' });
       }
 
+      if (!user.email_verified_at) {
+        return res.status(403).json({
+          ok: false,
+          code: 'EMAIL_NOT_VERIFIED',
+          message: 'Email not verified.',
+        });
+      }
+
       await resetLoginFailure(GLOBAL_ORG_ID, user.id);
       const activeMembership = await findFirstMembership(GLOBAL_ORG_ID, user.id);
       const currentOrgId = activeMembership?.org_id || GLOBAL_ORG_ID;
@@ -1981,33 +2001,7 @@ export function createApp() {
     }
   });
 
-  api.post('/auth/register', async (req, res, next) => {
-    try {
-      if (Number(env.REGISTRATION_ENABLED) !== 1) {
-        throw buildError('REGISTRATION_DISABLED', 'Registration is disabled.', 403);
-      }
-
-      const email = String(req.body?.email || '').trim().toLowerCase();
-      const password = String(req.body?.password || '');
-      const displayName = String(req.body?.displayName || '').trim() || email;
-      const passwordHash = await import('./lib/crypto.js').then((m) => m.hashPassword(password));
-      const existing = await findUserByEmail(GLOBAL_ORG_ID, email);
-      if (existing) {
-        return res.status(409).json({ ok: false, code: 'DUPLICATE_SUSPECTED', message: 'User already exists.' });
-      }
-
-      const created = await createUser(GLOBAL_ORG_ID, {
-        email,
-        passwordHash,
-        displayName,
-        role: 'VIEWER',
-      });
-
-      return res.status(201).json({ ok: true, user: { id: created.id, email: created.email } });
-    } catch (error) {
-      next(error);
-    }
-  });
+  registerAuthRoutes(api);
 
   api.get('/org', requireSession, async (req, res, next) => {
     try {

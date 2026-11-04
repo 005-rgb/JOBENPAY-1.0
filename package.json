@@ -29,6 +29,7 @@
     "validate:static": "node scripts/validate/static.js",
     "validate:schema": "node scripts/validate/schema.js",
     "validate:ledger": "node scripts/validate/ledger-crosscheck.js",
+    "real:smtp-test": "node --env-file-if-exists=.env scripts/real/smtp-test.js",
     "validate": "npm run validate:static && npm run validate:schema"
   },
   "dependencies": {
@@ -36,6 +37,7 @@
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
     "helmet": "^8.0.0",
+    "nodemailer": "^10.3.1",
     "pg": "^8.13.0",
     "pino": "^9.5.0",
     "pino-http": "^10.0.0",

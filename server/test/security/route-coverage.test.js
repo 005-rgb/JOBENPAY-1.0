@@ -23,6 +23,8 @@ test('route table protects session mutations and parameterized reads', () => {
   const sessionlessMutations = new Set([
     '/auth/login',
     '/auth/register',
+    '/auth/verify-email',
+    '/auth/resend-verification',
     '/agent/v1/payout-requests',
     '/agent/v1/documents',
     '/agent/v1/refund-requests',

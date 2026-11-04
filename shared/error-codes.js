@@ -34,5 +34,8 @@ export const ERROR_CODES = {
   IDEMPOTENCY_CONFLICT: { httpStatus: 409, message: 'Idempotency conflict.' },
   STEP_UP_REQUIRED: { httpStatus: 401, message: 'Step-up authentication required.' },
   REGISTRATION_DISABLED: { httpStatus: 403, message: 'Registration is disabled.' },
+  EMAIL_NOT_VERIFIED: { httpStatus: 403, message: 'Email not verified.' },
+  TOKEN_INVALID_OR_EXPIRED: { httpStatus: 400, message: 'Invalid or expired token.' },
+  UNSUPPORTED_MEDIA_TYPE: { httpStatus: 415, message: 'Content-Type must be application/json.' },
   INTERNAL: { httpStatus: 500, message: 'Internal server error.' },
 };

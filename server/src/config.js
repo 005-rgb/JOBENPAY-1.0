@@ -46,6 +46,13 @@ const envSchema = z.object({
   AI_PRICE_OUT_PER_MTOK: z.coerce.number().finite().nonnegative().default(0),
   UPLOAD_DIR: z.string().trim().min(1).optional(),
   REGISTRATION_ENABLED: z.coerce.number().int().min(0).max(1).default(0),
+  SIGNUP_DAILY_LIMIT: z.coerce.number().int().positive().default(50),
+  SMTP_HOST: z.string().trim().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().trim().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().trim().optional(),
+  SMTP_TLS_SERVERNAME: z.string().trim().optional(),
   WORKER_ENABLED: z.coerce.number().int().min(0).max(1).default(0),
   JOBENPAY_ENC_KEY: optionalBase64Key(32),
   JOBENPAY_LEDGER_SIGNING_KEY: ledgerPrivateKey,
@@ -81,6 +88,20 @@ if (env.NODE_ENV === 'production' && !process.env.PUBLIC_BASE_URL) {
 }
 if (env.NODE_ENV === 'production' && !env.PUBLIC_BASE_URL.startsWith('https://')) {
   throw new Error('PUBLIC_BASE_URL must use HTTPS in production.');
+}
+if (env.NODE_ENV === 'production' && env.REGISTRATION_ENABLED === 1) {
+  const missingSmtp = [
+    ['SMTP_HOST', env.SMTP_HOST],
+    ['SMTP_PORT', env.SMTP_PORT],
+    ['SMTP_USER', env.SMTP_USER],
+    ['SMTP_PASS', env.SMTP_PASS],
+    ['SMTP_FROM', env.SMTP_FROM],
+    ['PUBLIC_BASE_URL', process.env.PUBLIC_BASE_URL],
+  ].filter(([, val]) => !val).map(([name]) => name);
+
+  if (missingSmtp.length > 0) {
+    throw new Error(`When REGISTRATION_ENABLED=1 in production, ${missingSmtp.join(', ')} are required.`);
+  }
 }
 if (env.NODE_ENV === 'production') {
   if (!process.env.DATABASE_URL) {

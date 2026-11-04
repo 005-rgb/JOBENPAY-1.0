@@ -40,6 +40,7 @@ export function FloatingInput({
   id,
   error,
   hint,
+  action,
   className = '',
   ...props
 }) {
@@ -59,6 +60,7 @@ export function FloatingInput({
           {...props}
         />
         <label htmlFor={inputId}>{label}</label>
+        {action ? <div className={styles.fieldAction}>{action}</div> : null}
       </div>
       {hint ? <span className={styles.hint} id={hintId}>{hint}</span> : null}
       {error ? <span className={styles.errorMessage} id={errorId}><AlertCircle aria-hidden="true" />{error}</span> : null}

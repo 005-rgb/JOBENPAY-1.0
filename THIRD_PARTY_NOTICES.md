@@ -88,6 +88,7 @@ Only dependencies with licenses in the repository allowlist are included.
 - `minimatch` 3.1.5 — ISC
 - `ms` 2.1.3 — MIT
 - `negotiator` 1.1.0 — MIT
+- `nodemailer` 10.3.1 — MIT-0
 - `object-inspect` 1.13.4 — MIT
 - `on-exit-leak-free` 2.1.2 — MIT
 - `on-finished` 2.4.2 — MIT

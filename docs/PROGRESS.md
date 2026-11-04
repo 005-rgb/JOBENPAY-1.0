@@ -1,9 +1,9 @@
 # PROGRESS
 
 ## Status ringkas
-- Langkah terakhir dikerjakan: perbaikan blocker CI dan persiapan deployment cPanel.
+- Langkah terakhir dikerjakan: P5-SIGNUP (registrasi mandiri dengan verifikasi email via SMTP).
 - Langkah berikutnya: siapkan PostgreSQL TLS dan pengaturan cPanel; deployment menunggu akses hosting dan pemeriksaan keamanan URL source.
-- Validasi lokal: 217 tes lulus tanpa gagal/skip; coverage baris 96,73% dan cabang 90,38% (470/520); guard, lint, serta secret scan lulus. Perbaikan CI dipush melalui `ff8aefa` dan `679ed5f`. Workflow `41331761454` pada `main` lulus untuk seluruh job.
+- Validasi lokal: 235 tes lulus tanpa gagal/skip; coverage baris 96,73% dan cabang 90,38% (470/520); guard, lint, serta secret scan lulus. Perbaikan CI dipush melalui `ff8aefa` dan `679ed5f`. Workflow `41331761454` pada `main` lulus untuk seluruh job.
 
 ## Tabel langkah
 | Langkah | Status (TODO/WIP/DONE) | Commit | Jam aktual | Catatan |

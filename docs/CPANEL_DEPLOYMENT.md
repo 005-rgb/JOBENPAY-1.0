@@ -55,7 +55,14 @@ The detected version must be 22.13 or newer and below 23. Configure these values
 | `BACKUP_DIR` | `/home/smknwon2/private/jobenpay/backups` |
 | `AI_PROVIDER` | `replay` (no external AI key) |
 | `WORKER_ENABLED` | `1` |
-| `REGISTRATION_ENABLED` | `0` |
+| `REGISTRATION_ENABLED` | `0` (or `1` to enable self-service signup) |
+| `SIGNUP_DAILY_LIMIT` | `50` (daily global signup throttle) |
+| `SMTP_HOST` | SMTP server host (e.g. `mail.jobenapp.cloud`) (required if `REGISTRATION_ENABLED=1`) |
+| `SMTP_PORT` | `465` (implicit TLS) or `587` (STARTTLS) |
+| `SMTP_USER` | SMTP username |
+| `SMTP_PASS` | SMTP password (keep protected in cPanel env, never commit) |
+| `SMTP_FROM` | Sender address, e.g. `JOBENPAY <noreply@jobenapp.cloud>` |
+| `SMTP_TLS_SERVERNAME` | (Optional) Server name indication if different from `SMTP_HOST` |
 | `AI_DAILY_BUDGET_USD` | `5` or a smaller owner-approved limit |
 | `SEED_OWNER_PASSWORD`, `SEED_JUDGE_PASSWORD`, `SEED_APPROVER_PASSWORD`, `SEED_VIEWER_PASSWORD` | Unique passwords of at least 12 characters, only if initializing a new demo database |
 
@@ -203,6 +210,21 @@ Use the cPanel script runner if it inherits the protected application environmen
 For a new synthetic demo database only, run `npm run seed` once with all four `SEED_*_PASSWORD` variables set. The seed prints a demo agent API key once; capture it securely or revoke/rotate it immediately. Never seed on routine releases.
 
 Cron jobs do not inherit Passenger's environment. If the cPanel cron interface cannot set protected variables, store only the required exports in `/home/smknwon2/private/jobenpay/cron.env`, owned by the account with mode `600`; never place it under `public_html` or commit it.
+
+
+### Email deliverability and SMTP verification
+
+When `REGISTRATION_ENABLED=1` is set, the application delivers verification and service notification emails over SMTP via `email_outbox` and the `send_email` job queue handler. Ensure that:
+
+1. DNS records for your domain include proper **SPF**, **DKIM**, and **DMARC** records to prevent verification emails from being classified as spam.
+2. Scheduled cron job executes `node server/scripts/tick.js` every minute to drain pending outbox emails with retry and exponential backoff.
+3. Test the SMTP connection and credentials before enabling registration:
+
+```sh
+npm run real:smtp-test -- --to your-email@example.com
+```
+
+This script tests authentication and TLS handshake without logging sensitive credentials and classifies the result (`OK`, `EAUTH`, `ECONNECTION`, `ETIMEDOUT`, `CERT_MISMATCH`, or `OTHER`).
 
 ## 5. Verify the release
 

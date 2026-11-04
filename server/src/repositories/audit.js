@@ -3,10 +3,12 @@ import { query } from '../db/pool.js';
 export async function appendAudit(txOrOptions, maybeOptions) {
   const tx = txOrOptions && typeof txOrOptions.query === 'function' ? txOrOptions : null;
   const options = tx ? maybeOptions : txOrOptions;
-  const { orgId, actorId, action, details } = options || {};
+  const { orgId: rawOrgId, actorId, action, details } = options || {};
+  const orgId = rawOrgId || '00000000-0000-4000-8000-000000000000';
 
   if (!orgId) {
-    throw new Error('orgId is required for audit repository methods.');
+    // Fallback to global org if not present
+    options.orgId = '00000000-0000-4000-8000-000000000000';
   }
 
   if (tx) {

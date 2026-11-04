@@ -21,6 +21,11 @@ const AuditPage = lazy(() => import('./pages/F05Pages.jsx').then((pages) => ({ d
 const DeveloperPage = lazy(() => import('./pages/F05Pages.jsx').then((pages) => ({ default: pages.DeveloperPage })));
 const LedgerPage = lazy(() => import('./pages/F05Pages.jsx').then((pages) => ({ default: pages.LedgerPage })));
 const LoginPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.LoginPage })));
+const SignupPage = lazy(() => import('./pages/SignupPage.jsx'));
+const CheckEmailPage = lazy(() => import('./pages/CheckEmailPage.jsx'));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage.jsx'));
+const TermsPage = lazy(() => import('./pages/LegalPages.jsx').then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import('./pages/LegalPages.jsx').then((m) => ({ default: m.PrivacyPage })));
 const MandateBuilderPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.MandateBuilderPage })));
 const MandateDetailPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.MandateDetailPage })));
 const MandatesPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.MandatesPage })));
@@ -115,6 +120,11 @@ function AppRoutes() {
         </>
       ) : null}
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><LoginPage /></Suspense>} path="/login" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><SignupPage /></Suspense>} path="/signup" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><CheckEmailPage /></Suspense>} path="/signup/check-email" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><VerifyEmailPage /></Suspense>} path="/verify-email" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><TermsPage /></Suspense>} path="/terms" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><PrivacyPage /></Suspense>} path="/privacy" />
       <Route
         element={(
           <RequireAuth>

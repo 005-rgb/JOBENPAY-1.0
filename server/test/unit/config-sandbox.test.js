@@ -100,3 +100,42 @@ test('production requires PostgreSQL, allows plaintext only over loopback, and r
   assert.notEqual(insideAppRoot.status, 0);
   assert.match(insideAppRoot.stderr, /UPLOAD_DIR must be outside the application root/);
 });
+
+test('production with REGISTRATION_ENABLED=1 requires HTTPS PUBLIC_BASE_URL and complete SMTP settings', () => {
+  const prodBase = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgresql://localhost/jobenpay?sslmode=disable',
+    UPLOAD_DIR: 'C:\\private\\jobenpay\\uploads',
+    PUBLIC_BASE_URL: 'http://insecure.test',
+    REGISTRATION_ENABLED: '1',
+  };
+
+  const insecureUrl = importConfig(prodBase);
+  assert.notEqual(insecureUrl.status, 0);
+  assert.match(insecureUrl.stderr, /PUBLIC_BASE_URL must use HTTPS in production/);
+
+  const missingSmtp = importConfig(
+    {
+      ...prodBase,
+      PUBLIC_BASE_URL: 'https://secure.jobenapp.cloud',
+    },
+    ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'],
+  );
+  assert.notEqual(missingSmtp.status, 0);
+  assert.match(missingSmtp.stderr, /When REGISTRATION_ENABLED=1 in production/);
+  assert.match(missingSmtp.stderr, /SMTP_HOST/);
+
+  const secretPass = 'SuperSecretSmtpPass!999';
+  const validProd = importConfig({
+    ...prodBase,
+    PUBLIC_BASE_URL: 'https://secure.jobenapp.cloud',
+    SMTP_HOST: 'smtp.example.test',
+    SMTP_PORT: '587',
+    SMTP_USER: 'smtpuser',
+    SMTP_PASS: secretPass,
+    SMTP_FROM: 'noreply@jobenapp.cloud',
+  });
+  assert.equal(validProd.status, 0, validProd.stderr);
+  assert.ok(!validProd.stdout.includes(secretPass));
+  assert.ok(!validProd.stderr.includes(secretPass));
+});

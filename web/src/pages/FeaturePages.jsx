@@ -77,19 +77,53 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [unverified, setUnverified] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendNotice, setResendNotice] = useState('');
+  const [registrationEnabled, setRegistrationEnabled] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    apiClient.get('/auth/config')
+      .then((cfg) => {
+        if (active) setRegistrationEnabled(Boolean(cfg?.registrationEnabled));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const submit = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError('');
+    setUnverified(false);
+    setResendNotice('');
     try {
       await auth.login({ email, password });
       const returnTo = location.state?.from?.pathname || '/dashboard';
       navigate(returnTo, { replace: true });
     } catch (loginError) {
-      setError(loginError.code === 'UNAUTHENTICATED' ? t('app.loginError') : loginError.message);
+      if (loginError.code === 'EMAIL_NOT_VERIFIED' || loginError.message === 'Email not verified.') {
+        setUnverified(true);
+      } else {
+        setError(loginError.code === 'UNAUTHENTICATED' ? t('app.loginError') : loginError.message);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!email || resending) return;
+    setResending(true);
+    setResendNotice('');
+    try {
+      await apiClient.post('/auth/resend-verification', { email });
+      setResendNotice(t('app.resendSuccess'));
+    } catch {
+      setResendNotice(t('app.resendSuccess'));
+    } finally {
+      setResending(false);
     }
   };
 
@@ -101,10 +135,34 @@ export function LoginPage() {
           <img alt={t('app.name')} className={styles.loginLogo} src={logoUrl} />
         </Link>
         <h1>{t('app.loginTitle')}</h1>
+
+        {unverified ? (
+          <Banner kind="warning" title={t('app.emailNotVerified')}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--jp-space-2)' }}>
+              <span>{t('app.emailNotVerified')}</span>
+              {resendNotice ? (
+                <span style={{ fontWeight: 'bold' }}>{resendNotice}</span>
+              ) : (
+                <Button
+                  loading={resending}
+                  onClick={handleResend}
+                  size="sm"
+                  variant="secondary"
+                >
+                  {t('app.resendVerification')}
+                </Button>
+              )}
+            </div>
+          </Banner>
+        ) : null}
+
         <form className={styles.formStack} onSubmit={submit}>
           <FloatingInput autoComplete="username" label={t('app.email')} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
           <FloatingInput autoComplete="current-password" error={error} label={t('app.password')} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} />
           <Button className={styles.fullWidth} loading={loading} size="lg" type="submit">{t('app.login')}</Button>
+          {registrationEnabled ? (
+            <Link className={styles.loginLink} to="/signup">{t('app.createAccount')}</Link>
+          ) : null}
         </form>
         {import.meta.env.VITE_SHOW_DEMO_HINT === '1' ? <p className={styles.demoHint}>{t('app.demoAccountsHint')}</p> : null}
         <p className={styles.paypalDisclaimer}>{t('app.paypalDisclaimer')}</p>

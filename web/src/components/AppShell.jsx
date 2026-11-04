@@ -370,7 +370,7 @@ function Footer({ t, className = '' }) {
       <div className={styles.footerDivider} data-testid="footer-divider" />
       <div className={styles.footerCopyright} data-testid="footer-copyright">
         <span>{t('app.copyright')}</span><span aria-hidden="true" className={styles.footerVerticalDivider} /><nav aria-label={t('app.legalNavigation')}>
-          <a href="#privacy">{t('app.privacy')}</a><a href="#legal">{t('app.legal')}</a><a href="#policy">{t('app.policyUpdates')}</a>
+          <RouterLink to="/privacy">{t('app.privacy')}</RouterLink><RouterLink to="/terms">{t('app.legal')}</RouterLink><a href="#policy">{t('app.policyUpdates')}</a>
         </nav>
       </div>
       <p className={styles.footerLegal} data-testid="footer-legal">{t('app.legalNotice')}</p>

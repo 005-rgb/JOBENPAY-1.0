@@ -79,6 +79,43 @@ export async function resetLoginFailure(orgId, userId) {
   );
 }
 
+export async function createUnverifiedUser(txOrPool, {
+  email,
+  passwordHash,
+  displayName,
+  termsAcceptedAt = new Date(),
+  termsVersion = '1.0',
+  pendingOrgName,
+}) {
+  const db = txOrPool && typeof txOrPool.query === 'function' ? txOrPool : { query };
+  const result = await db.query(
+    `INSERT INTO users (email, password_hash, display_name, terms_accepted_at, terms_version, pending_org_name, email_verified_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NULL)
+     RETURNING *`,
+    [
+      String(email).trim().toLowerCase(),
+      passwordHash,
+      displayName || null,
+      termsAcceptedAt,
+      termsVersion,
+      pendingOrgName || null,
+    ],
+  );
+  return result.rows[0];
+}
+
+export async function verifyUserEmail(txOrPool, userId) {
+  const db = txOrPool && typeof txOrPool.query === 'function' ? txOrPool : { query };
+  const result = await db.query(
+    `UPDATE users
+     SET email_verified_at = now()
+     WHERE id = $1
+     RETURNING *`,
+    [userId],
+  );
+  return result.rows[0] ?? null;
+}
+
 export function hashToken(value) {
   return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
 }

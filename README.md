@@ -34,6 +34,8 @@ npm ci && npm run setup && npm start
 
 `npm run setup` installs the web dependencies, builds the UI, applies database migrations, and seeds synthetic demo data. The default `AI_PROVIDER=replay` needs no AI key. To use a live AI provider, configure its API key, model, and non-zero input/output prices in `.env`. To use PayPal, connect your own PayPal Sandbox credentials in the application settings; do not use live credentials.
 
+To enable self-service signup, set `REGISTRATION_ENABLED=1`, `PUBLIC_BASE_URL` to your HTTPS app URL, and configure your `SMTP_*` credentials (see `.env.example`). Registrations are throttled by `SIGNUP_DAILY_LIMIT` (default 50/day), per-IP (5/hr), and per-email (3/hr).
+
 In another terminal, run the dry-run judge smoke test:
 
 ```sh
@@ -88,7 +90,7 @@ These scenarios use synthetic data. The simulator dry-run does not submit a payo
 
 ## 9. What's next
 
-The current submission targets Tier A. Possible Tier B work from the product roadmap includes registration and account recovery, TOTP, refund/dispute workflows, email notifications, CSV export, Indonesian localization, an AG Grid ledger theme, an expanded AI evaluation corpus, and additional MCP tools.
+The current submission targets Tier A. Possible Tier B work from the product roadmap includes account recovery, TOTP, refund/dispute workflows, email notifications, CSV export, Indonesian localization, an AG Grid ledger theme, an expanded AI evaluation corpus, and additional MCP tools.
 
 Tier C roadmap items include reminders, a complete email outbox, four-eyes approval, organization deletion, fuller ADMIN/OPERATOR UI permissions, and WebAuthn. These are roadmap items, not claims about delivered functionality.
 

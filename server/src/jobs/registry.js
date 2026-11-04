@@ -6,6 +6,7 @@ import { expireApprovals } from './expireApprovals.js';
 import { executeRequest } from './handlers/executeRequest.js';
 import { reconcileRequest } from './handlers/reconcileRequest.js';
 import { resetDemoDataJob } from './resetDemoData.js';
+import { sendEmailJob } from './handlers/sendEmail.js';
 
 export const JOB_TYPES = Object.freeze([
   'extract_document',
@@ -41,6 +42,7 @@ handlers.set('expire_approvals', expireApprovals);
 handlers.set('execute_request', executeRequest);
 handlers.set('reconcile_request', reconcileRequest);
 handlers.set('reset_demo_data', resetDemoDataJob);
+handlers.set('send_email', sendEmailJob);
 
 export function registerHandler(type, handler) {
   if (!JOB_TYPES.includes(type)) {

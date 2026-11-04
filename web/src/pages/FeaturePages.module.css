@@ -1,3 +1,42 @@
+.honeypot {
+  position: absolute;
+  left: -9999px;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+
+.legalPage {
+  background: var(--jp-surface-sidebar);
+  min-height: 100vh;
+  padding: var(--jp-space-6);
+  display: flex;
+  justify-content: center;
+}
+
+.legalCard {
+  max-width: var(--jp-content-max-w);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-4);
+}
+
+.legalMeta {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+  font-style: italic;
+}
+
+.authNotice {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-body);
+  line-height: var(--jp-font-line-body);
+  text-align: center;
+  margin: 0;
+}
+
 .loginPage {
   align-items: center;
   background: var(--jp-surface-sidebar);
