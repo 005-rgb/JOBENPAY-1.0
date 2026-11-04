@@ -195,7 +195,7 @@ verify_public_routes() {
   local attempt status private_path
 
   if [ -z "$public_url" ] && [ -f "$APP_DIR/.env" ]; then
-    public_url="$(grep -E '^PUBLIC_BASE_URL=' "$APP_DIR/.env" | head -n1 | cut -d= -f2- | tr -d '"'''\r ' || true)"
+    public_url="$(grep -E '^PUBLIC_BASE_URL=' "$APP_DIR/.env" | head -n1 | cut -d= -f2- | tr -d '\r "' | tr -d "'" || true)"
   fi
   if [ -z "$public_url" ] && [ -f "$APP_DIR/.htaccess" ]; then
     public_url="$(awk '$1 == "SetEnv" && $2 == "PUBLIC_BASE_URL" { print $3; exit }' "$APP_DIR/.htaccess")"

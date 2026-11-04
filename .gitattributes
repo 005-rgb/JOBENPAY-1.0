@@ -13,3 +13,4 @@ web/dist/**/*.css text eol=lf
 web/dist/**/*.html text eol=lf
 web/dist/**/*.svg text eol=lf
 web/dist/** whitespace=cr-at-eol,-blank-at-eol
+*.sh text eol=lf
