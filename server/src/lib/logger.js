@@ -8,6 +8,9 @@ const redactPaths = [
   'secret',
   'api_key',
   'apiKey',
+  'smtp',
+  'smtp_pass',
+  'SMTP_PASS',
   'password',
   'token',
   'access_token',
@@ -30,7 +33,7 @@ function redactEncryptedFields(value) {
   return Object.fromEntries(
     Object.entries(value)
       .filter(([key]) => !/_enc$/i.test(key)
-        && !/(?:password|secret|token|api[_-]?key|authorization|cookie)/i.test(key))
+        && !/(?:password|secret|token|api[_-]?key|authorization|cookie|smtp)/i.test(key))
       .map(([key, entry]) => [key, redactEncryptedFields(entry)]),
   );
 }

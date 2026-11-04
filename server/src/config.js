@@ -37,6 +37,13 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/jobenpay'),
   TEST_DATABASE_URL: z.string().optional(),
   PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
+  SMTP_HOST: z.string().trim().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().trim().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  SMTP_FROM: z.string().trim().min(1).optional(),
+  SMTP_TLS_SERVERNAME: z.string().trim().min(1).optional(),
+  SIGNUP_DAILY_LIMIT: z.coerce.number().int().positive().default(50),
   AI_PROVIDER: z.enum(['anthropic', 'openai', 'replay']).default('replay'),
   AI_MODEL: z.string().optional(),
   AI_API_KEY: z.string().optional(),
@@ -81,6 +88,19 @@ if (env.NODE_ENV === 'production' && !process.env.PUBLIC_BASE_URL) {
 }
 if (env.NODE_ENV === 'production' && !env.PUBLIC_BASE_URL.startsWith('https://')) {
   throw new Error('PUBLIC_BASE_URL must use HTTPS in production.');
+}
+if (env.NODE_ENV === 'production' && env.REGISTRATION_ENABLED === 1) {
+  const missing = [
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'SMTP_FROM',
+    'PUBLIC_BASE_URL',
+  ].filter((name) => !process.env[name] || !String(process.env[name]).trim());
+  if (missing.length > 0) {
+    throw new Error(`Registration requires email configuration in production. Missing: ${missing.join(', ')}.`);
+  }
 }
 if (env.NODE_ENV === 'production') {
   if (!process.env.DATABASE_URL) {
