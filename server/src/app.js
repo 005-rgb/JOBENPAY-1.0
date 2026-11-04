@@ -426,6 +426,7 @@ export function createApp() {
     imgSrc.push('https://lh3.googleusercontent.com');
   }
 
+  app.set('trust proxy', true);
   app.disable('x-powered-by');
   app.use(helmet({
     contentSecurityPolicy: {
