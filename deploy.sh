@@ -431,11 +431,19 @@ else
     runtime_err="$(cat "$BACKUP_DIR/runtime-check.log" 2>/dev/null || true)"
     log WARN "Konfigurasi runtime mendeteksi kendala: $runtime_err"
   fi
+  log INFO "Menjalankan migrasi skema database..."
+  if (cd "$APP_DIR" && "$NODE_BIN" server/scripts/migrate.js >"$BACKUP_DIR/migration.log" 2>&1); then
+    log INFO "Migrasi skema database berhasil diterapkan."
+  else
+    migration_err="$(cat "$BACKUP_DIR/migration.log" 2>/dev/null || true)"
+    fail "Migrasi skema database gagal: $migration_err. Periksa DATABASE_URL di .env."
+  fi
+
   touch "$APP_DIR/tmp/restart.txt"
   log INFO "Rilis $COMMIT_AFTER ($BRANCH; sebelumnya $PREVIOUS_COMMIT) siap; restart Passenger diminta."
   verify_public_routes
 fi
-log INFO "Tidak ada build, instalasi paket, migrasi database, atau seed yang dijalankan oleh deploy.sh."
+log INFO "Deploy selesai. Seluruh aset, dependensi, migrasi, dan konfigurasi telah disinkronkan."
 
 rm -rf -- "$BACKUP_DIR"
 trap - ERR
