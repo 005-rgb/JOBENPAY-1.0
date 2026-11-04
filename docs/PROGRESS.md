@@ -150,3 +150,14 @@
 - `DATABASE_URL` dan `TEST_DATABASE_URL` tidak tersedia. `npm run migrate` gagal autentikasi PostgreSQL; 10 tes integrasi dilewati.
 - `npm run guard` gagal karena `.github/workflows/ci.yml` tidak ada. Jangan mengklaim CI hijau.
 - Perubahan checkpoint: validator `ST-*`/`SC-*`, npm aliases, validasi format kunci/boot, dan pemindahan breakpoint CSS ke tokens; seluruhnya belum dapat di-commit pada workspace ini.
+
+## Checkpoint S13-REAL-A (2026-11-04)
+- **Implementasi S13-REAL-A**:
+  1. Penanda hidup pemroses (heartbeat `_tick_heartbeat`) pada `server/src/jobs/tick.js` dan helper `getProcessorHealth()`.
+  2. Endpoint read-only `GET /api/v1/admin/real-preflight` (OWNER/JUDGE) dengan 12 pemeriksaan kesiapan (PF-01 s/d PF-12: environment, koneksi PayPal & webhook, pemroses hidup, antrean, status org, agen aktif & API key, mandat aktif USD & jadwal, payee allowlist terpercaya, validasi invoice, integritas ledger chain, verifikasi dekripsi kredensial PayPal, konektivitas OAuth PayPal Sandbox).
+  3. UI tombol "Run real-payout preflight" dan tabel status periksa di `/settings/paypal`.
+  4. Endpoint bukti ter-redaksi `GET /api/v1/admin/evidence/:requestId` dengan redaksi otomatis (email disamarkan `a***@d***.tld`, field sensitif diganti `[REDACTED]`, rahasia dan header/token dihapus), metadata, dan analisis latency/timing.
+  5. Tombol "Download evidence (JSON)" di `/requests/:id` untuk peran OWNER dan JUDGE pada status COMPLETED/EXECUTED/RECONCILED/FAILED.
+  6. Skrip CLI `scripts/real/preflight.js` dan `scripts/real/export-evidence.js` yang terhubung ke skrip npm `npm run real:preflight` dan `npm run real:evidence`.
+  7. Panduan lengkap dwibahasa (Inggris & Indonesia) di `docs/REAL_PAYOUT_RUNBOOK.md`.
+  8. Seluruh pengujian otomatis unit & integrasi lulus: 268/268 lulus tanpa kegagalan (`npm test`, `npm run lint`, `npm run guard`, `npm --prefix web run build`).

@@ -797,7 +797,35 @@ export function RequestDetailPage() {
       </div>
       <Card className={styles.actionCard}>
         <h2>Actions</h2>
-        {canCancel ? <Button loading={cancel.isPending} onClick={() => cancel.mutate()} variant="secondary">Cancel request</Button> : <p>No actions are available for this request.</p>}
+        {canCancel ? <Button loading={cancel.isPending} onClick={() => cancel.mutate()} variant="secondary">Cancel request</Button> : null}
+        {['OWNER', 'JUDGE'].includes(auth.role) && ['COMPLETED', 'EXECUTED', 'RECONCILED', 'FAILED'].includes(request.status) ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={async () => {
+              try {
+                const data = await apiClient.get(`/admin/evidence/${request.id}`);
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `evidence-${request.id}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                notify({ message: 'Evidence downloaded.' });
+              } catch (err) {
+                notify({ message: `Download failed: ${err.message}`, variant: 'error' });
+              }
+            }}
+          >
+            Download evidence (JSON)
+          </Button>
+        ) : null}
+        {!canCancel && !(['OWNER', 'JUDGE'].includes(auth.role) && ['COMPLETED', 'FAILED'].includes(request.status)) ? (
+          <p>No actions are available for this request.</p>
+        ) : null}
         {cancel.error ? <p className={styles.formError} role="alert">{cancel.error.message}</p> : null}
         {request.reason_codes?.length ? <section><h3>Why this decision?</h3><p>{request.explanation || request.reason_codes.join(', ')}</p>{request.reason_codes.map((code) => <small className={styles.reasonCode} key={code}>{code}</small>)}</section> : null}
       </Card>

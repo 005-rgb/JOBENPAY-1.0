@@ -832,6 +832,22 @@ export function PaypalSettingsPage() {
   const [pendingCredentials, setPendingCredentials] = useState(null);
   const [feedback, setFeedback] = useState('');
   const formRef = useRef(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflightResult, setPreflightResult] = useState(null);
+  const [preflightError, setPreflightError] = useState('');
+
+  const runPreflight = async () => {
+    setPreflightLoading(true);
+    setPreflightError('');
+    try {
+      const data = await apiClient.get('/admin/real-preflight');
+      setPreflightResult(data);
+    } catch (err) {
+      setPreflightError(err.message);
+    } finally {
+      setPreflightLoading(false);
+    }
+  };
   const owner = auth.role === 'OWNER';
   const query = usePageQuery(['paypal', 'connection'], () => apiClient.get('/paypal/connection'));
   const connection = query.data;

@@ -1,17 +1,6 @@
 import { z } from 'zod';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import fs from 'node:fs';
-
-if (typeof process.loadEnvFile === 'function') {
-  const baseDir = import.meta.dirname ? path.resolve(import.meta.dirname, '../../') : process.cwd();
-  const envPath = path.resolve(baseDir, '.env');
-  if (fs.existsSync(envPath)) {
-    try {
-      process.loadEnvFile(envPath);
-    } catch {}
-  }
-}
 import { PAYPAL_API_BASE } from './paypal/constants.js';
 
 const nodeMajor = Number(process.versions.node.split('.')[0]);

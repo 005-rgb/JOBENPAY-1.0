@@ -100,6 +100,8 @@ import { resetDemoBudget } from './services/simulator.js';
 import { resetDemoOrganization } from './services/demoReset.js';
 import { cancelRequest, decideApproval } from './services/approvals.js';
 import { onFreeze } from './services/freeze.js';
+import { runRealPreflight } from './services/realPreflight.js';
+import { exportEvidence } from './services/realEvidence.js';
 import { AGENT_MCP_TOOLS, createMcpRequestHandler, mcpOriginGuard } from './agent/mcp.js';
 import { logger } from './lib/logger.js';
 
@@ -949,6 +951,32 @@ export function createApp() {
       return res.status(200).json(await queueStats(orgId));
     } catch (error) {
       return next(error);
+    }
+  });
+
+  api.get('/admin/real-preflight', requireSession, requireRole('OWNER', 'JUDGE'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const result = await runRealPreflight(orgId);
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  api.get('/admin/evidence/:requestId', requireSession, requireRole('OWNER', 'JUDGE'), async (req, res, next) => {
+    try {
+      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const { requestId } = req.params;
+      const evidence = await exportEvidence(orgId, requestId);
+      if (!evidence) {
+        throw buildError('NOT_FOUND', 'Payment request evidence not found.', 404);
+      }
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="evidence-${requestId}.json"`);
+      return res.status(200).send(JSON.stringify(evidence, null, 2));
+    } catch (error) {
+      return next(error instanceof AppError ? error : buildError('INTERNAL', error.message, 500));
     }
   });
 

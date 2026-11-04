@@ -30,6 +30,8 @@
     "validate:schema": "node scripts/validate/schema.js",
     "validate:ledger": "node scripts/validate/ledger-crosscheck.js",
     "real:smtp-test": "node --env-file-if-exists=.env scripts/real/smtp-test.js",
+    "real:preflight": "node --env-file-if-exists=.env scripts/real/preflight.js",
+    "real:evidence": "node --env-file-if-exists=.env scripts/real/export-evidence.js",
     "validate": "npm run validate:static && npm run validate:schema"
   },
   "dependencies": {

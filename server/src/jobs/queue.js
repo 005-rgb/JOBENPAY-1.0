@@ -161,7 +161,7 @@ export async function queueStats(orgId = null, dbOrPool = pool) {
     dbOrPool.query(`
       SELECT status, count(*)::integer AS count
       FROM jobs
-      WHERE type <> '_worker_heartbeat'
+      WHERE type NOT IN ('_worker_heartbeat', '_tick_heartbeat')
         AND ($1::uuid IS NULL OR org_id = $1)
       GROUP BY status
     `, [orgId]),
@@ -190,4 +190,5 @@ export async function queueStats(orgId = null, dbOrPool = pool) {
   };
 }
 
+export { getProcessorHealth } from './tick.js';
 export { DEFAULT_MAX_ATTEMPTS };
