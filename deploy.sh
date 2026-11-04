@@ -78,6 +78,26 @@ activate_cpanel_node() {
   fi
 }
 
+ensure_cpanel_node_modules() {
+  local nodeenv_dir="${CPANEL_NODEENV_DIR:-${VIRTUAL_ENV:-}}"
+  if [ -z "$nodeenv_dir" ]; then
+    nodeenv_dir="$ACCOUNT_HOME/nodevenv/public_html/jobenpay/22"
+  fi
+  local nodeenv_modules="$nodeenv_dir/lib/node_modules"
+
+  if [ -d "$APP_DIR/node_modules" ] && [ ! -L "$APP_DIR/node_modules" ]; then
+    log INFO "Mengonversi folder fisik node_modules menjadi symlink CloudLinux virtualenv..."
+    mkdir -p "$nodeenv_modules"
+    cp -an "$APP_DIR/node_modules/." "$nodeenv_modules/" 2>/dev/null || true
+    rm -rf "$APP_DIR/node_modules"
+    ln -s "$nodeenv_modules" "$APP_DIR/node_modules"
+    log INFO "Symlink node_modules berhasil dihubungkan ke $nodeenv_modules."
+  elif [ ! -e "$APP_DIR/node_modules" ] && [ -d "$nodeenv_modules" ]; then
+    log INFO "Membuat symlink node_modules ke $nodeenv_modules..."
+    ln -s "$nodeenv_modules" "$APP_DIR/node_modules"
+  fi
+}
+
 assert_release_files() {
   local release_file
   for release_file in \
@@ -340,6 +360,7 @@ for protected in .env .htaccess; do
 done
 
 configure_passenger_routing
+ensure_cpanel_node_modules
 assert_release_files
 
 # Rilis lama dapat meninggalkan berkas web/dist bermode 0600; pastikan web server dapat membacanya.
@@ -366,6 +387,7 @@ missing_deps="$(cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
 
 if [ -n "$missing_deps" ]; then
   log WARN "Dependensi produksi belum terpasang di node_modules: $missing_deps"
+  ensure_cpanel_node_modules
   if command -v npm >/dev/null 2>&1; then
     log INFO "Menjalankan npm install --omit=dev --no-audit --no-fund untuk memasang dependensi yang kurang..."
     npm --prefix "$APP_DIR" install --omit=dev --no-audit --no-fund || fail "Gagal menginstal dependensi: $missing_deps. Silakan jalankan 'npm install --omit=dev' secara manual."
