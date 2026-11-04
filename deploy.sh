@@ -279,6 +279,8 @@ fi
 git -C "$APP_DIR" rev-parse --git-dir >/dev/null 2>&1 || fail "Folder aplikasi bukan repository Git."
 git -C "$APP_DIR" remote get-url origin >/dev/null 2>&1 || fail "Remote Git bernama origin belum disiapkan."
 git check-ref-format --branch "$BRANCH" >/dev/null 2>&1 || fail "Nama branch tidak valid."
+git -C "$APP_DIR" config pack.threads 1 2>/dev/null || true
+git -C "$APP_DIR" config core.preloadindex false 2>/dev/null || true
 
 if [ "$PHASE" != "--post-reset" ]; then
   if ! git -C "$APP_DIR" diff --quiet ||
@@ -287,7 +289,7 @@ if [ "$PHASE" != "--post-reset" ]; then
   fi
 
   log INFO "Mengambil branch $BRANCH dari GitHub."
-  git -C "$APP_DIR" fetch --quiet origin "$BRANCH"
+  git -C "$APP_DIR" -c pack.threads=1 fetch --quiet origin "$BRANCH"
   git -C "$APP_DIR" show-ref --verify --quiet "refs/remotes/origin/$BRANCH" ||
     fail "Branch origin/$BRANCH tidak ditemukan."
 
