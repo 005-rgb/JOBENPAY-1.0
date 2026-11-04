@@ -109,6 +109,25 @@ function ParityPage({ variant }) {
   );
 }
 
+function RootPage() {
+  const auth = useAuth();
+  const { t } = useTranslation();
+
+  if (auth.isPending) {
+    return <BrandLoadingScreen fullScreen label={t('app.loadingWorkspace')} />;
+  }
+
+  if (!auth.user) {
+    return (
+      <Suspense fallback={<BrandLoadingScreen fullScreen />}>
+        <LoginPage />
+      </Suspense>
+    );
+  }
+
+  return <AuthenticatedApp />;
+}
+
 function AppRoutes() {
   const parityEnabled = import.meta.env.DEV || import.meta.env.VITE_PARITY === '1';
   return (
@@ -119,6 +138,7 @@ function AppRoutes() {
           <Route element={<ParityPage variant="s2" />} path="/__parity/s2" />
         </>
       ) : null}
+      <Route element={<RootPage />} path="/" />
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><LoginPage /></Suspense>} path="/login" />
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><SignupPage /></Suspense>} path="/signup" />
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><CheckEmailPage /></Suspense>} path="/signup/check-email" />
