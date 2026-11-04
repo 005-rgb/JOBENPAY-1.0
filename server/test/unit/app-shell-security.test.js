@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { env } from '../../src/config.js';
 import { closeTestApp, startTestApp } from '../helpers/testApp.js';
 
 test('web responses include the specified content security policy', async () => {
@@ -8,9 +9,12 @@ test('web responses include the specified content security policy', async () => 
   try {
     const response = await fetch(`${url}/healthz`);
     assert.equal(response.status, 200);
+    const expectedCsp = env.GOOGLE_CLIENT_ID
+      ? "default-src 'self';script-src 'self' https://accounts.google.com/gsi/client;style-src 'self' https://accounts.google.com/gsi/style;style-src-attr 'unsafe-inline';img-src 'self' data: https://lh3.googleusercontent.com;connect-src 'self' https://accounts.google.com/gsi/;frame-ancestors 'none';frame-src 'self' https://accounts.google.com/gsi/;base-uri 'self';form-action 'self'"
+      : "default-src 'self';script-src 'self';style-src 'self';style-src-attr 'unsafe-inline';img-src 'self' data:;connect-src 'self';frame-ancestors 'none';base-uri 'self';form-action 'self'";
     assert.equal(
       response.headers.get('content-security-policy'),
-      "default-src 'self';script-src 'self';style-src 'self';style-src-attr 'unsafe-inline';img-src 'self' data:;connect-src 'self';frame-ancestors 'none';base-uri 'self';form-action 'self'",
+      expectedCsp,
     );
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
     assert.equal(response.headers.get('referrer-policy'), 'same-origin');

@@ -412,18 +412,33 @@ export function createApp() {
     },
   });
 
+  const scriptSrc = ["'self'"];
+  const frameSrc = ["'self'"];
+  const connectSrc = ["'self'"];
+  const styleSrc = ["'self'"];
+  const imgSrc = ["'self'", 'data:'];
+
+  if (env.GOOGLE_CLIENT_ID) {
+    scriptSrc.push('https://accounts.google.com/gsi/client');
+    frameSrc.push('https://accounts.google.com/gsi/');
+    connectSrc.push('https://accounts.google.com/gsi/');
+    styleSrc.push('https://accounts.google.com/gsi/style');
+    imgSrc.push('https://lh3.googleusercontent.com');
+  }
+
   app.disable('x-powered-by');
   app.use(helmet({
     contentSecurityPolicy: {
       useDefaults: false,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'"],
+        scriptSrc,
+        styleSrc,
         styleSrcAttr: ["'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:'],
-        connectSrc: ["'self'"],
+        imgSrc,
+        connectSrc,
         frameAncestors: ["'none'"],
+        ...(env.GOOGLE_CLIENT_ID ? { frameSrc } : {}),
         baseUri: ["'self'"],
         formAction: ["'self'"],
       },

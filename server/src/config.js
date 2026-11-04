@@ -53,6 +53,8 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().trim().optional(),
   SMTP_TLS_SERVERNAME: z.string().trim().optional(),
+  GOOGLE_CLIENT_ID: z.string().trim().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().trim().optional(),
   WORKER_ENABLED: z.coerce.number().int().min(0).max(1).default(0),
   JOBENPAY_ENC_KEY: optionalBase64Key(32),
   JOBENPAY_LEDGER_SIGNING_KEY: ledgerPrivateKey,

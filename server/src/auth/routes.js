@@ -8,9 +8,14 @@ import { AppError } from '../lib/errors.js';
 import { hashPassword, hmacSha256, sha256Hex } from '../lib/crypto.js';
 import { rateLimit } from '../repositories/rateLimit.js';
 import { findUserByEmail, createUnverifiedUser, verifyUserEmail } from '../repositories/users.js';
+import { resetLoginFailure } from '../repositories/users.js';
+import { findFirstMembership } from '../repositories/memberships.js';
+import { createSession } from '../repositories/sessions.js';
+import { enforceRateLimit } from '../repositories/rateLimit.js';
 import { appendAudit } from '../repositories/audit.js';
 import { enqueueEmail, claimAndSendEmail } from '../email/outbox.js';
 import { isCommonPassword } from './common-passwords.js';
+import { verifyGoogleIdToken } from './google.js';
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000000';
 
@@ -28,11 +33,21 @@ export function requireJsonBody(req, res, next) {
   next();
 }
 
+export function cookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.NODE_ENV !== 'development',
+    path: '/',
+  };
+}
+
 export function registerAuthRoutes(api) {
-  // Public config endpoint: returns registration status
+  // Public config endpoint: returns registration status and Google client ID if configured
   api.get('/auth/config', (_req, res) => {
     return res.status(200).json({
       registrationEnabled: Number(env.REGISTRATION_ENABLED) === 1,
+      googleClientId: env.GOOGLE_CLIENT_ID || null,
     });
   });
 
@@ -359,6 +374,214 @@ export function registerAuthRoutes(api) {
 
       // Always return 202 generic
       return res.status(202).json({ status: 'verification_sent' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /api/v1/auth/google
+  api.post('/auth/google', requireJsonBody, async (req, res, next) => {
+    try {
+      const forwarded = req.get('x-forwarded-for');
+      const ip = (forwarded ? forwarded.split(',')[0].trim() : '') || req.ip || req.socket?.remoteAddress || 'unknown';
+      const ipKey = `google:${ip}`;
+      await enforceRateLimit(ipKey, 10, 60);
+
+      const googleSchema = z.object({
+        credential: z.string().min(10, 'Google credential is required.'),
+        orgName: z.string().trim().min(2).max(80).regex(/^[\p{L}\p{N}\s.,'&()/-]+$/u, 'Organization name contains invalid characters.').optional(),
+      });
+
+      const parsed = googleSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw buildError('VALIDATION_FAILED', 'Invalid Google authentication payload.', 400);
+      }
+
+      const { credential, orgName } = parsed.data;
+      const googleUser = await verifyGoogleIdToken(credential);
+      const email = googleUser.email.trim().toLowerCase();
+
+      const existing = await findUserByEmail(GLOBAL_ORG_ID, email);
+
+      if (existing) {
+        // User exists -> Check account lockout
+        if (existing.locked_until && new Date(existing.locked_until) > new Date()) {
+          return res.status(403).json({ ok: false, code: 'FORBIDDEN', message: 'Account locked.' });
+        }
+
+        // Ensure email is marked verified since verified by Google
+        if (!existing.email_verified_at) {
+          await pool.query('UPDATE users SET email_verified_at = now() WHERE id = $1', [existing.id]);
+        }
+
+        let membership = await findFirstMembership(GLOBAL_ORG_ID, existing.id);
+        let currentOrgId = membership?.org_id;
+
+        // If user registered earlier without verifying (hence no org created yet), create it now:
+        if (!currentOrgId) {
+          await withTx(async (client) => {
+            const chosenOrgName = orgName || existing.pending_org_name || (googleUser.name ? `${googleUser.name}'s Team` : 'My Organization');
+            const slugBase = chosenOrgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'team';
+            const slug = `${slugBase}-${crypto.randomBytes(3).toString('hex')}`;
+
+            const orgInsert = await client.query(
+              `INSERT INTO organizations (name, slug)
+               VALUES ($1, $2)
+               RETURNING id, name, slug`,
+              [chosenOrgName, slug],
+            );
+            const newOrg = orgInsert.rows[0];
+
+            await client.query(
+              `INSERT INTO memberships (org_id, user_id, role, is_judge)
+               VALUES ($1, $2, 'OWNER', false)`,
+              [newOrg.id, existing.id],
+            );
+
+            currentOrgId = newOrg.id;
+
+            await appendAudit({
+              orgId: currentOrgId,
+              actorId: existing.id,
+              action: 'ORG_CREATED',
+              details: { orgId: newOrg.id, name: newOrg.name, slug: newOrg.slug },
+            });
+          });
+        }
+
+        // Reset login failures
+        await resetLoginFailure(GLOBAL_ORG_ID, existing.id);
+
+        const csrfSecret = crypto.randomBytes(32).toString('hex');
+        const sessionInfo = await createSession(GLOBAL_ORG_ID, {
+          userId: existing.id,
+          currentOrgId: currentOrgId || GLOBAL_ORG_ID,
+          csrfSecret,
+          expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000),
+        });
+
+        res.cookie('jp_sid', sessionInfo.token, cookieOptions());
+
+        await appendAudit({
+          orgId: currentOrgId || GLOBAL_ORG_ID,
+          actorId: existing.id,
+          action: 'LOGIN_GOOGLE',
+          details: { email, googleSub: googleUser.sub },
+        });
+
+        return res.status(200).json({
+          ok: true,
+          user: {
+            id: existing.id,
+            email: existing.email,
+            displayName: existing.display_name || googleUser.name,
+          },
+          csrfToken: csrfSecret,
+          isNewUser: false,
+        });
+      }
+
+      // User does NOT exist -> Sign up with Google
+      if (Number(env.REGISTRATION_ENABLED) !== 1) {
+        throw buildError('REGISTRATION_DISABLED', 'Registration is disabled.', 403);
+      }
+
+      const globalExceeded = await rateLimit('signup:global', env.SIGNUP_DAILY_LIMIT, 86400);
+      if (globalExceeded) {
+        throw buildError('SERVICE_UNAVAILABLE', 'Signups are temporarily unavailable', 503);
+      }
+
+      const dummyPass = crypto.randomBytes(32).toString('hex');
+      const passwordHash = await hashPassword(dummyPass);
+      const displayName = googleUser.name || email.split('@')[0];
+
+      let createdUser = null;
+      let createdOrg = null;
+      let sessionToken = null;
+      let csrfSecret = null;
+
+      await withTx(async (client) => {
+        const userInsert = await client.query(
+          `INSERT INTO users (email, password_hash, display_name, email_verified_at, terms_accepted_at, terms_version)
+           VALUES ($1, $2, $3, now(), now(), '1.0')
+           RETURNING id, email, display_name`,
+          [email, passwordHash, displayName],
+        );
+        createdUser = userInsert.rows[0];
+
+        const chosenOrgName = orgName || `${displayName}'s Team`;
+        const slugBase = chosenOrgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'team';
+        const slug = `${slugBase}-${crypto.randomBytes(3).toString('hex')}`;
+
+        const orgInsert = await client.query(
+          `INSERT INTO organizations (name, slug)
+           VALUES ($1, $2)
+           RETURNING id, name, slug`,
+          [chosenOrgName, slug],
+        );
+        createdOrg = orgInsert.rows[0];
+
+        await client.query(
+          `INSERT INTO memberships (org_id, user_id, role, is_judge)
+           VALUES ($1, $2, 'OWNER', false)`,
+          [createdOrg.id, createdUser.id],
+        );
+
+        await appendAudit({
+          orgId: createdOrg.id,
+          actorId: createdUser.id,
+          action: 'SIGNUP_GOOGLE',
+          details: { email, googleSub: googleUser.sub },
+        });
+
+        await appendAudit({
+          orgId: createdOrg.id,
+          actorId: createdUser.id,
+          action: 'ORG_CREATED',
+          details: { orgId: createdOrg.id, name: createdOrg.name, slug: createdOrg.slug },
+        });
+
+        try {
+          const outbox = await enqueueEmail(client, {
+            orgId: createdOrg.id,
+            to: email,
+            template: 'welcome',
+            data: { orgName: createdOrg.name },
+          });
+          claimAndSendEmail(outbox.id).catch(() => {});
+        } catch {
+          // Non-blocking
+        }
+
+        csrfSecret = crypto.randomBytes(32).toString('hex');
+        const sessionInfo = await createSession(GLOBAL_ORG_ID, {
+          userId: createdUser.id,
+          currentOrgId: createdOrg.id,
+          csrfSecret,
+          expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000),
+        });
+        sessionToken = sessionInfo.token;
+      });
+
+      res.cookie('jp_sid', sessionToken, cookieOptions());
+
+      await appendAudit({
+        orgId: createdOrg.id,
+        actorId: createdUser.id,
+        action: 'LOGIN_SUCCESS',
+        details: { email, method: 'google' },
+      });
+
+      return res.status(200).json({
+        ok: true,
+        user: {
+          id: createdUser.id,
+          email: createdUser.email,
+          displayName: createdUser.display_name,
+        },
+        csrfToken: csrfSecret,
+        isNewUser: true,
+      });
     } catch (error) {
       next(error);
     }

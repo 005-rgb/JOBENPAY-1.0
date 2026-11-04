@@ -17,6 +17,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { GoogleAuthButton } from '../components/GoogleAuthButton.jsx';
 import { useTranslation } from 'react-i18next';
 
 import { apiClient } from '../api/client.js';
@@ -81,16 +82,35 @@ export function LoginPage() {
   const [resending, setResending] = useState(false);
   const [resendNotice, setResendNotice] = useState('');
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState('');
 
   useEffect(() => {
     let active = true;
     apiClient.get('/auth/config')
       .then((cfg) => {
-        if (active) setRegistrationEnabled(Boolean(cfg?.registrationEnabled));
+        if (active) {
+          setRegistrationEnabled(Boolean(cfg?.registrationEnabled));
+          setGoogleClientId(cfg?.googleClientId || '');
+        }
       })
       .catch(() => {});
     return () => { active = false; };
   }, []);
+
+  const handleGoogleSuccess = async (credential) => {
+    setLoading(true);
+    setError('');
+    setUnverified(false);
+    try {
+      await auth.googleLogin({ credential });
+      const returnTo = location.state?.from?.pathname || '/dashboard';
+      navigate(returnTo, { replace: true });
+    } catch (err) {
+      setError(err?.message || t('app.googleAuthFailed'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -156,6 +176,19 @@ export function LoginPage() {
           </Banner>
         ) : null}
 
+        {googleClientId ? (
+          <div className={styles.formStack}>
+            <GoogleAuthButton
+              clientId={googleClientId}
+              onError={(err) => setError(err.message)}
+              onSuccess={handleGoogleSuccess}
+              text="signin_with"
+            />
+            <div className={styles.authDivider}>
+              <span>{t('app.or')}</span>
+            </div>
+          </div>
+        ) : null}
         <form className={styles.formStack} onSubmit={submit}>
           <FloatingInput autoComplete="username" label={t('app.email')} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
           <FloatingInput autoComplete="current-password" error={error} label={t('app.password')} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} />

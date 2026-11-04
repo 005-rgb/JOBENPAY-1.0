@@ -34,7 +34,7 @@ npm ci && npm run setup && npm start
 
 `npm run setup` installs the web dependencies, builds the UI, applies database migrations, and seeds synthetic demo data. The default `AI_PROVIDER=replay` needs no AI key. To use a live AI provider, configure its API key, model, and non-zero input/output prices in `.env`. To use PayPal, connect your own PayPal Sandbox credentials in the application settings; do not use live credentials.
 
-To enable self-service signup, set `REGISTRATION_ENABLED=1`, `PUBLIC_BASE_URL` to your HTTPS app URL, and configure your `SMTP_*` credentials (see `.env.example`). Registrations are throttled by `SIGNUP_DAILY_LIMIT` (default 50/day), per-IP (5/hr), and per-email (3/hr).
+To enable self-service signup, set `REGISTRATION_ENABLED=1`, `PUBLIC_BASE_URL` to your HTTPS app URL, and configure your `SMTP_*` credentials (see `.env.example`). Registrations are throttled by `SIGNUP_DAILY_LIMIT` (default 50/day), per-IP (5/hr), and per-email (3/hr). To enable Sign in / Sign up with Google, configure `GOOGLE_CLIENT_ID` with your Google OAuth 2.0 Web Client ID; Google Identity Services will be displayed on the login and signup screens.
 
 In another terminal, run the dry-run judge smoke test:
 

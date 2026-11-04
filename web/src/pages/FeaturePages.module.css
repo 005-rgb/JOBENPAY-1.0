@@ -115,6 +115,38 @@
 .loginLink {
   align-self: center;
 }
+.authDivider {
+  align-items: center;
+  color: var(--jp-text-muted);
+  display: flex;
+  font-size: var(--jp-font-size-caption);
+  line-height: var(--jp-font-line-caption);
+  margin: var(--jp-space-2) 0;
+  text-align: center;
+}
+
+.authDivider::before,
+.authDivider::after {
+  border-bottom: 1px solid var(--jp-border);
+  content: '';
+  flex: 1;
+}
+
+.authDivider span {
+  font-weight: var(--jp-font-weight-medium);
+  letter-spacing: 0.05em;
+  padding: 0 var(--jp-space-3);
+  text-transform: uppercase;
+}
+
+.googleButtonContainer {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+  width: 100%;
+}
+
 
 .dashboard,
 .pageStack {

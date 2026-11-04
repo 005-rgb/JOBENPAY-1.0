@@ -36,6 +36,17 @@ export function AuthProvider({ children }) {
       queryClient.setQueryData(['auth', 'me'], await apiClient.get('/auth/me'));
       return result;
     },
+    async googleLogin(payload) {
+      const result = await apiClient.post('/auth/google', payload);
+      if (!result.ok) {
+        const error = new Error(result.message || 'Google authentication failed.');
+        error.code = result.code || 'UNAUTHENTICATED';
+        throw error;
+      }
+      setCsrfToken(result.csrfToken);
+      queryClient.setQueryData(['auth', 'me'], await apiClient.get('/auth/me'));
+      return result;
+    },
     async logout() {
       await apiClient.post('/auth/logout');
       setCsrfToken('');

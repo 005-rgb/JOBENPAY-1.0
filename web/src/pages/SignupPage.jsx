@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import BrandLoadingScreen from '../components/BrandLoadingScreen.jsx';
+import { GoogleAuthButton } from '../components/GoogleAuthButton.jsx';
 import {
   Banner,
   Button,
@@ -33,6 +34,7 @@ export function SignupPage() {
   const [bannerError, setBannerError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [registrationEnabled, setRegistrationEnabled] = useState(null);
+  const [googleClientId, setGoogleClientId] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -40,6 +42,7 @@ export function SignupPage() {
       .then((data) => {
         if (active) {
           setRegistrationEnabled(Boolean(data?.registrationEnabled));
+          setGoogleClientId(data?.googleClientId || '');
         }
       })
       .catch(() => {
@@ -49,6 +52,23 @@ export function SignupPage() {
       });
     return () => { active = false; };
   }, []);
+
+  const handleGoogleSuccess = async (credential) => {
+    setLoading(true);
+    setBannerError('');
+    setFieldErrors({});
+    try {
+      await auth.googleLogin({
+        credential,
+        orgName: orgName.trim() || undefined,
+      });
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      setBannerError(err?.message || t('app.googleAuthFailed'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (auth.user) {
     return <Navigate to="/dashboard" replace />;
@@ -135,6 +155,19 @@ export function SignupPage() {
           </div>
         ) : (
           <form className={styles.formStack} onSubmit={submit}>
+            {googleClientId ? (
+              <>
+                <GoogleAuthButton
+                  clientId={googleClientId}
+                  onError={(err) => setBannerError(err.message)}
+                  onSuccess={handleGoogleSuccess}
+                  text="signup_with"
+                />
+                <div className={styles.authDivider}>
+                  <span>{t('app.or')}</span>
+                </div>
+              </>
+            ) : null}
             {bannerError ? (
               <Banner kind="error" title={bannerError}>
                 {bannerError}
