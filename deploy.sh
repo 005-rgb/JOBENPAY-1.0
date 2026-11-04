@@ -345,6 +345,36 @@ assert_release_files
 # Rilis lama dapat meninggalkan berkas web/dist bermode 0600; pastikan web server dapat membacanya.
 chmod -R go+rX "$APP_DIR/web/dist"
 
+missing_deps="$(cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
+  import fs from "node:fs";
+  import path from "node:path";
+  import { pathToFileURL } from "node:url";
+  const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+  const serverModule = pathToFileURL(path.resolve("server/src/config.js")).href;
+  const missing = [];
+  for (const name of Object.keys(pkg.dependencies ?? {})) {
+    try {
+      await import(import.meta.resolve(name, serverModule));
+    } catch {
+      missing.push(name);
+    }
+  }
+  if (missing.length > 0) {
+    process.stdout.write(missing.join(" "));
+  }
+' 2>/dev/null || true)"
+
+if [ -n "$missing_deps" ]; then
+  log WARN "Dependensi produksi belum terpasang di node_modules: $missing_deps"
+  if command -v npm >/dev/null 2>&1; then
+    log INFO "Menjalankan npm install --omit=dev --no-audit --no-fund untuk memasang dependensi yang kurang..."
+    npm --prefix "$APP_DIR" install --omit=dev --no-audit --no-fund || fail "Gagal menginstal dependensi: $missing_deps. Silakan jalankan 'npm install --omit=dev' secara manual."
+  else
+    fail "Dependensi ESM ($missing_deps) belum terpasang di node_modules. Jalankan 'npm install --omit=dev' pada server."
+  fi
+fi
+
+resolve_error_file="$BACKUP_DIR/esm-resolve-error.log"
 if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
   import fs from "node:fs";
   import path from "node:path";
@@ -354,8 +384,9 @@ if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
   await Promise.all(Object.keys(pkg.dependencies ?? {}).map((name) => (
     import(import.meta.resolve(name, serverModule))
   )));
-') >/dev/null 2>&1; then
-  fail "Dependensi ESM tidak dapat di-resolve dari lokasi server/src/config.js. Periksa package.json dan node_modules aplikasi, lalu ulangi deploy."
+' >"$resolve_error_file" 2>&1); then
+  err_detail="$(cat "$resolve_error_file" 2>/dev/null || true)"
+  fail "Dependensi ESM tidak dapat di-resolve dari lokasi server/src/config.js. Detail: $err_detail"
 fi
 
 COMMIT_AFTER="$(git -C "$APP_DIR" rev-parse --short HEAD)"
