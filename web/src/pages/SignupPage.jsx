@@ -139,7 +139,7 @@ export function SignupPage() {
   return (
     <main className={styles.loginPage}>
       <Card className={styles.loginCard} padding="section">
-        <Link aria-label={t('app.name')} className={styles.loginWordmark} to="/dashboard">
+        <Link aria-label={t('app.name')} className={styles.loginWordmark} to="/">
           <img alt={t('app.name')} className={styles.loginLogo} src={logoUrl} />
         </Link>
         <h1>{t('app.signupTitle')}</h1>
