@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const envPath = path.resolve('.env');
+const appDir = import.meta.dirname || path.resolve('.');
+const envPath = path.resolve(appDir, '.env');
 if (fs.existsSync(envPath) && typeof process.loadEnvFile === 'function') {
   try {
     process.loadEnvFile(envPath);
@@ -17,5 +18,16 @@ if (fs.existsSync(envPath) && typeof process.loadEnvFile === 'function') {
   startServer();
 })().catch((error) => {
   console.error('Failed to start JOBENPAY server:', error);
+  try {
+    const tmpDir = path.resolve(appDir, 'tmp');
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    fs.writeFileSync(
+      path.resolve(tmpDir, 'startup-error.log'),
+      `[${new Date().toISOString()}] ${error.stack || error.message || String(error)}\n`,
+      'utf8'
+    );
+  } catch {}
   process.exit(1);
 });

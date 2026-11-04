@@ -4,7 +4,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 if (typeof process.loadEnvFile === 'function') {
-  const envPath = path.resolve(process.cwd(), '.env');
+  const baseDir = import.meta.dirname ? path.resolve(import.meta.dirname, '../../') : process.cwd();
+  const envPath = path.resolve(baseDir, '.env');
   if (fs.existsSync(envPath)) {
     try {
       process.loadEnvFile(envPath);

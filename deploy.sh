@@ -173,7 +173,7 @@ configure_passenger_routing() {
     printf 'PassengerBaseURI "/"\n'
     printf 'PassengerNodejs "%s"\n' "$node_bin"
     printf 'PassengerAppType node\n'
-    printf 'PassengerStartupFile app.js\n'
+    printf 'PassengerStartupFile app.cjs\n'
     printf '%s\n\n' "$passenger_end"
     printf '%s\n' "$guard_begin"
     cat <<'EOF'
@@ -391,6 +391,7 @@ if [ -n "$missing_deps" ]; then
   if command -v npm >/dev/null 2>&1; then
     log INFO "Menjalankan npm install --omit=dev --no-audit --no-fund untuk memasang dependensi yang kurang..."
     npm --prefix "$APP_DIR" install --omit=dev --no-audit --no-fund || fail "Gagal menginstal dependensi: $missing_deps. Silakan jalankan 'npm install --omit=dev' secara manual."
+    ensure_cpanel_node_modules
   else
     fail "Dependensi ESM ($missing_deps) belum terpasang di node_modules. Jalankan 'npm install --omit=dev' pada server."
   fi
@@ -416,6 +417,20 @@ if [ "$DEFER_RESTART" = "--defer-restart" ]; then
   log INFO "Rilis $COMMIT_AFTER ($BRANCH; sebelumnya $PREVIOUS_COMMIT) tersinkron; restart ditunda sesuai permintaan."
 else
   mkdir -p "$APP_DIR/tmp"
+  log INFO "Memeriksa konfigurasi runtime dan secrets..."
+  if ! (cd "$APP_DIR" && "$NODE_BIN" --input-type=module -e '
+    import fs from "node:fs";
+    import path from "node:path";
+    const envPath = path.resolve(".env");
+    if (fs.existsSync(envPath) && typeof process.loadEnvFile === "function") {
+      process.loadEnvFile(envPath);
+    }
+    const { assertRuntimeSecrets } = await import("./server/src/config.js");
+    assertRuntimeSecrets();
+  ') >"$BACKUP_DIR/runtime-check.log" 2>&1; then
+    runtime_err="$(cat "$BACKUP_DIR/runtime-check.log" 2>/dev/null || true)"
+    log WARN "Konfigurasi runtime mendeteksi kendala: $runtime_err"
+  fi
   touch "$APP_DIR/tmp/restart.txt"
   log INFO "Rilis $COMMIT_AFTER ($BRANCH; sebelumnya $PREVIOUS_COMMIT) siap; restart Passenger diminta."
   verify_public_routes
