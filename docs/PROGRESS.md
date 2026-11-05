@@ -1,8 +1,8 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: LANDING (Homepage publik aktif di `/` [`nh.jobenapp.cloud`] dengan tombol Login di pojok kanan atas menuju `/login`, struktur hero, 5 langkah, 3 kontrol, 4 fakta, try 3 menit, honest limits strip, dan footer terintegrasi token).
-- **Langkah saat ini**: Selesai; siap untuk pengujian end-to-end / deployment cPanel.
+- **Langkah terakhir dikerjakan**: MOBILE-RESPONSIVE (Mode mobile responsif penuh di semua halaman: AppShell drawer & close button, Dashboard grid 2x2, kartu data tabel dengan horizontal touch scroll, filter/search full-width, Landing typography fluid clamp, serta Google OAuth & mitigasi batas memori CloudLinux cPanel).
+- **Langkah saat ini**: Siap untuk verifikasi akun PayPal Sandbox nyata / pengerjaan modul Tier B selanjutnya.
 - **Validasi lokal terkini**:
   - `npm test`: 280/280 tes lulus tanpa gagal/skip (279 tes suite + 1 pemeriksaan akhir integritas ledger 7 organisasi valid dan deteksi 6/6 tamper classes).
   - `npm run coverage`: line 96,73%, branch 90,19% (469/520 >= 90%), function 100%, statements 96,73%.
@@ -43,6 +43,9 @@
 | F05 | DONE | F05 | 2026-11-01 | UI ledger, audit listing, simulator, tamper & restore teruji |
 | HARDEN-1 | DONE | HARDEN-1 | 2026-11-05 | Pengujian otomatis lintas tenant 404/403 seluruh rute Express, D16 & D18 teruji |
 | LANDING | DONE | LANDING | 2026-11-05 | Homepage publik aktif di `/` (`nh.jobenapp.cloud`), tombol login di pojok kanan atas ke `/login`, hero, 5 langkah, 3 kontrol, 4 fakta, try 3 menit, honest limits strip, dan footer terintegrasi token |
+| P5-AUTH | DONE | P5-AUTH | 2026-11-05 | Google OAuth 2.0 auth token login, email verification outbox worker terenkripsi, retry backoff, dan pembersihan akun kedaluwarsa |
+| CPANEL-OPT | DONE | CPANEL-OPT | 2026-11-05 | Optimasi alokasi memori V8 (`--max-old-space-size=256`), threadpool=2, eliminasi crash `Aborted (core dumped)` di cPanel |
+| MOBILE-RESPONSIVE | DONE | d94f68f | 2026-11-06 | Layout mobile responsif di seluruh halaman (AppShell, Dashboard 2x2, kartu data tabel, filter bar, hero typography), 0 regresi desktop |
 
 ## Resume
 Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Rute beranda publik (`/` untuk domain `nh.jobenapp.cloud`) kini aktif melayani Landing Page dengan navigasi tombol Login di pojok kanan atas menuju `/login`, rute proteksi `/dashboard` untuk sesi aktif, tata letak token murni, dan kepatuhan penuh terhadap guard sistem.
