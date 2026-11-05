@@ -1,20 +1,34 @@
+if (!process.env.UV_THREADPOOL_SIZE) {
+  process.env.UV_THREADPOOL_SIZE = '2';
+}
+
+import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseArgs } from 'node:util';
 
-import pool from '../../server/src/db/pool.js';
-import { withTx } from '../../server/src/db/tx.js';
-import { env } from '../../server/src/config.js';
-import { encrypt } from '../../server/src/lib/crypto.js';
-import { preparePayeeIdentifier } from '../../server/src/lib/payeeIdentifiers.js';
-import { createPayee } from '../../server/src/repositories/payees.js';
-import { createMandate, activateMandate } from '../../server/src/services/mandates.js';
-import { savePaypalConnection, updatePaypalConnectionStatus } from '../../server/src/repositories/paypalConnections.js';
-import { paypalFor } from '../../server/src/paypal/client.js';
-import { runRealPreflight } from '../../server/src/services/realPreflight.js';
+const appDir = path.resolve('.');
+const envPath = path.resolve(appDir, '.env');
+if (fs.existsSync(envPath) && typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile(envPath);
+  } catch {}
+}
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000000';
 
 async function main() {
+  const { default: pool } = await import('../../server/src/db/pool.js');
+  const { withTx } = await import('../../server/src/db/tx.js');
+  const { env } = await import('../../server/src/config.js');
+  const { encrypt } = await import('../../server/src/lib/crypto.js');
+  const { preparePayeeIdentifier } = await import('../../server/src/lib/payeeIdentifiers.js');
+  const { createPayee } = await import('../../server/src/repositories/payees.js');
+  const { createMandate, activateMandate } = await import('../../server/src/services/mandates.js');
+  const { savePaypalConnection, updatePaypalConnectionStatus } = await import('../../server/src/repositories/paypalConnections.js');
+  const { paypalFor } = await import('../../server/src/paypal/client.js');
+  const { runRealPreflight } = await import('../../server/src/services/realPreflight.js');
+
   const options = {
     org: { type: 'string' },
     'client-id': { type: 'string' },

@@ -1,10 +1,25 @@
+if (!process.env.UV_THREADPOOL_SIZE) {
+  process.env.UV_THREADPOOL_SIZE = '2';
+}
+
+import fs from 'node:fs';
+import path from 'node:path';
 import { parseArgs } from 'node:util';
-import pool from '../../server/src/db/pool.js';
-import { runRealPreflight } from '../../server/src/services/realPreflight.js';
+
+const appDir = path.resolve('.');
+const envPath = path.resolve(appDir, '.env');
+if (fs.existsSync(envPath) && typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile(envPath);
+  } catch {}
+}
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000000';
 
 async function main() {
+  const { default: pool } = await import('../../server/src/db/pool.js');
+  const { runRealPreflight } = await import('../../server/src/services/realPreflight.js');
+
   const options = {
     org: { type: 'string' },
     json: { type: 'boolean', default: false },
