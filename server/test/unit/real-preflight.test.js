@@ -146,6 +146,7 @@ function baseOptions(overrides = {}) {
     paypalFor: () => ({
       testConnection: async () => true,
     }),
+    verifyChain: async () => ({ valid: true, checkedEntries: 0 }),
     db: makeMockDb(),
     ...overrides,
   };
@@ -413,9 +414,17 @@ test('PF-09: requireInvoice scenarios', async () => {
 });
 
 test('PF-10: verifyChain ledger integrity', async () => {
-  // Empty ledger is valid
+  // Valid ledger
   const passRes = await runRealPreflight(testOrgId, baseOptions());
   assert.equal(passRes.checks.find((c) => c.id === 'PF-10').status, 'PASS');
+
+  // Broken ledger chain
+  const failRes = await runRealPreflight(testOrgId, baseOptions({
+    verifyChain: async () => ({ valid: false, checkedEntries: 2, firstBrokenSeq: 2, reason: 'hash mismatch' }),
+  }));
+  const pf10Fail = failRes.checks.find((c) => c.id === 'PF-10');
+  assert.equal(pf10Fail.status, 'FAIL');
+  assert.match(pf10Fail.detail, /hash mismatch/);
 });
 
 test('PF-11: stored credentials decrypt key match / mismatch', async () => {

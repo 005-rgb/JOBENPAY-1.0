@@ -174,6 +174,13 @@ const english = {
     saveConnection: 'Save connection',
     connectionSaved: 'Connection settings saved.',
     connectionTested: 'Connection test completed.',
+    preflightTitle: 'Real-Payout Preflight Checks',
+    preflightDesc: 'Verify all 12 operational readiness checks (PF-01 to PF-12) before executing payouts against PayPal Sandbox.',
+    runPreflight: 'Run real-payout preflight',
+    runningPreflight: 'Running checks...',
+    status: 'Status',
+    checkId: 'Check',
+    detail: 'Detail',
     readOnlyRole: 'Only an organization owner can change these settings.',
     lastTested: 'Last tested',
     noConnection: 'No Sandbox connection has been configured.',
@@ -292,7 +299,19 @@ const english = {
 
 const resources = {
   en: { translation: english },
-  id: { translation: {} },
+  id: {
+    translation: {
+      app: {
+        preflightTitle: 'Pemeriksaan Kesiapan Real-Payout',
+        preflightDesc: 'Verifikasi seluruh 12 pemeriksaan operasional (PF-01 hingga PF-12) sebelum mengeksekusi payout ke PayPal Sandbox.',
+        runPreflight: 'Jalankan preflight real-payout',
+        runningPreflight: 'Menjalankan pemeriksaan...',
+        status: 'Status',
+        checkId: 'Pemeriksaan',
+        detail: 'Detail',
+      },
+    },
+  },
 };
 
 i18n.use(initReactI18next).init({

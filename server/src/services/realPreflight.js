@@ -6,7 +6,7 @@ import { env as configEnv } from '../config.js';
 import { decrypt } from '../lib/crypto.js';
 import { paypalFor as defaultPaypalFor } from '../paypal/client.js';
 import { getProcessorHealth } from '../jobs/tick.js';
-import { verifyChain } from './ledger.js';
+import { verifyChain as defaultVerifyChain } from './ledger.js';
 import { getBudget } from './budget.js';
 import { ruleA9Schedule } from './decision/rulesA.js';
 
@@ -20,6 +20,7 @@ export async function runRealPreflight(orgId, options = {}) {
   const now = options.now ?? new Date();
   const paypalFor = options.paypalFor ?? defaultPaypalFor;
   const encryptionKey = options.encryptionKey ?? configEnv.JOBENPAY_ENC_KEY ?? configEnv.ENCRYPTION_KEY;
+  const verifyChain = options.verifyChain ?? defaultVerifyChain;
 
   const checks = [];
 

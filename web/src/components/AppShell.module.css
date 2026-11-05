@@ -15,7 +15,7 @@
   flex-direction: column;
   left: 0;
   overflow-y: auto;
-  padding: var(--jp-space-2) var(--jp-sidebar-pad-x) var(--jp-space-6);
+  padding: 0 var(--jp-sidebar-pad-x) var(--jp-space-6);
   position: fixed;
   top: 0;
   width: var(--jp-sidebar-w);
@@ -26,7 +26,8 @@
   align-items: center;
   display: flex;
   justify-content: center;
-  padding: var(--jp-space-1) 0;
+  margin-top: 0;
+  padding: 0;
   text-decoration: none;
   width: 100%;
 }

@@ -954,13 +954,23 @@ export function createApp() {
     }
   });
 
-  api.get('/admin/real-preflight', requireSession, requireRole('OWNER', 'JUDGE'), async (req, res, next) => {
+  api.get('/admin/real-preflight', requireSession, requireRole('OWNER', 'JUDGE'), async (req, res) => {
     try {
-      const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
+      const orgId = req.membership?.org_id || req.session?.current_org_id || GLOBAL_ORG_ID;
       const result = await runRealPreflight(orgId);
       return res.status(200).json(result);
     } catch (error) {
-      return next(error);
+      return res.status(200).json({
+        ready: false,
+        error: error.message,
+        checks: [
+          {
+            id: 'SYS-ERR',
+            status: 'FAIL',
+            detail: `Preflight execution error: ${error.message}`,
+          },
+        ],
+      });
     }
   });
 
