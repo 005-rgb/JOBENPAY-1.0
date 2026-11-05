@@ -693,13 +693,19 @@ export function createApp() {
 
   api.get('/ledger/export', requireSession, requireRole('OWNER', 'ADMIN', 'APPROVER', 'VIEWER', 'JUDGE'), async (req, res, next) => {
     try {
-      if (req.query.format !== 'json') {
-        throw buildError('VALIDATION_FAILED', 'Only JSON ledger export is supported.', 400);
+      const format = req.query.format === 'csv' ? 'csv' : (req.query.format === 'json' ? 'json' : null);
+      if (!format) {
+        throw buildError('VALIDATION_FAILED', 'Only JSON and CSV ledger export formats are supported.', 400);
       }
-      res.setHeader('content-type', 'application/json; charset=utf-8');
-      res.setHeader('content-disposition', 'attachment; filename="ledger.json"');
+      if (format === 'csv') {
+        res.setHeader('content-type', 'text/csv; charset=utf-8');
+        res.setHeader('content-disposition', 'attachment; filename="ledger.csv"');
+      } else {
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+        res.setHeader('content-disposition', 'attachment; filename="ledger.json"');
+      }
       res.setHeader('x-content-type-options', 'nosniff');
-      for await (const chunk of exportLedger(req.session.current_org_id || GLOBAL_ORG_ID, { format: 'json' })) {
+      for await (const chunk of exportLedger(req.session.current_org_id || GLOBAL_ORG_ID, { format })) {
         if (!res.write(chunk)) await new Promise((resolve) => res.once('drain', resolve));
       }
       return res.end();

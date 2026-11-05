@@ -297,10 +297,63 @@ export async function verifyChain(orgId) {
   return { valid: true, checkedEntries, firstBrokenSeq: null, reason: 'valid' };
 }
 
+export function escapeCsvCell(value) {
+  if (value === null || value === undefined) return '';
+  let str = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  // Mitigate CSV Formula Injection: if str starts with =, +, -, @, \t, \r, prepend a single quote
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+  // Wrap in quotes if cell contains commas, newlines, or quotes
+  if (/[",\r\n]/.test(str)) {
+    return `"${str.replaceAll('"', '""')}"`;
+  }
+  return str;
+}
+
 export async function* exportLedger(orgId, { format = 'json' } = {}) {
   requireOrgId(orgId);
-  if (format !== 'json') {
-    throw new Error('Only JSON ledger export is supported in this tier.');
+  if (format !== 'json' && format !== 'csv') {
+    throw new Error(`Unsupported ledger export format: ${format}. Supported formats are json and csv.`);
+  }
+
+  if (format === 'csv') {
+    yield 'seq,created_at,type,subject_type,subject_id,entry_hash,prev_hash,kid,signature,payload\r\n';
+    let offset = 0;
+    while (true) {
+      const rows = await query(
+        `SELECT org_id, seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, created_at
+         FROM ledger_entries
+         WHERE org_id = $1
+         ORDER BY seq ASC
+         LIMIT $2 OFFSET $3`,
+        [orgId, BATCH_SIZE, offset],
+      );
+
+      if (rows.rowCount === 0) {
+        break;
+      }
+
+      for (const row of rows.rows) {
+        const line = [
+          row.seq,
+          new Date(row.created_at).toISOString(),
+          escapeCsvCell(row.type),
+          escapeCsvCell(row.subject_type),
+          escapeCsvCell(row.subject_id),
+          row.entry_hash,
+          row.prev_hash,
+          escapeCsvCell(row.kid),
+          escapeCsvCell(row.signature),
+          escapeCsvCell(row.payload),
+        ].join(',') + '\r\n';
+
+        yield line;
+      }
+
+      offset += rows.rows.length;
+    }
+    return;
   }
 
   let offset = 0;
@@ -362,5 +415,6 @@ export default {
   appendEntry,
   verifyChain,
   exportLedger,
+  escapeCsvCell,
   listOrgIds,
 };

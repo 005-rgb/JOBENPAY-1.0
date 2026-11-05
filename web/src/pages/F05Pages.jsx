@@ -182,17 +182,17 @@ export function LedgerPage() {
   const tableData = brokenEntry && !entries.some((entry) => entry.seq === brokenEntry.seq)
     ? [...entries, brokenEntry].sort((a, b) => b.seq - a.seq)
     : entries;
-  const download = async () => {
+  const download = async (format = 'json') => {
     try {
-      const response = await fetch('/api/v1/ledger/export?format=json', { credentials: 'same-origin' });
-      if (!response.ok) throw new Error('Ledger export could not be downloaded.');
+      const response = await fetch(`/api/v1/ledger/export?format=${format}`, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`Ledger ${format.toUpperCase()} export could not be downloaded.`);
       const url = URL.createObjectURL(await response.blob());
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = 'ledger.json';
+      anchor.download = `ledger.${format}`;
       anchor.click();
       URL.revokeObjectURL(url);
-      notify({ message: 'Ledger JSON exported.' });
+      notify({ message: `Ledger ${format.toUpperCase()} exported.` });
     } catch (error) {
       notify({ kind: 'error', message: error.message });
     }
@@ -205,7 +205,8 @@ export function LedgerPage() {
         <h2>Ledger</h2>
         <div className={styles.actions}>
           <Button loading={verify.isPending} onClick={() => verify.mutate()} variant="secondary"><ShieldCheck aria-hidden="true" /> Verify ledger</Button>
-          <Button onClick={download} variant="secondary"><Download aria-hidden="true" /> Export JSON</Button>
+          <Button onClick={() => download('json')} variant="secondary"><Download aria-hidden="true" /> Export JSON</Button>
+          <Button onClick={() => download('csv')} variant="secondary"><Download aria-hidden="true" /> Export CSV</Button>
         </div>
       </div>
       {verification ? (

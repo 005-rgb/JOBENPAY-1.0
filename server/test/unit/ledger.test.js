@@ -7,6 +7,7 @@ import {
   assertSafePayload,
   verifyChain,
   exportLedger,
+  escapeCsvCell,
 } from '../../src/services/ledger.js';
 
 test('ledger constants and payload guard are defined', () => {
@@ -45,7 +46,7 @@ test('verifyChain rejects a missing orgId', async () => {
   await assert.rejects(verifyChain(undefined), /orgId/i);
 });
 
-test('exportLedger requires an orgId', async () => {
+test('exportLedger requires an orgId and rejects unsupported formats', async () => {
   const iterator = exportLedger(undefined, { format: 'json' });
   await assert.rejects(async () => {
     for await (const entry of iterator) {
@@ -53,8 +54,32 @@ test('exportLedger requires an orgId', async () => {
     }
   }, /orgId/i);
   await assert.rejects(async () => {
-    for await (const entry of exportLedger('11111111-1111-4111-8111-111111111111', { format: 'csv' })) {
+    for await (const entry of exportLedger('11111111-1111-4111-8111-111111111111', { format: 'xml' })) {
       void entry;
     }
-  }, /Only JSON/);
+  }, /Unsupported ledger export format/);
+});
+
+test('escapeCsvCell mitigates formula injection and escapes special characters', () => {
+  assert.equal(escapeCsvCell(null), '');
+  assert.equal(escapeCsvCell(undefined), '');
+  assert.equal(escapeCsvCell('REQUEST_RECEIVED'), 'REQUEST_RECEIVED');
+  assert.equal(escapeCsvCell(123), '123');
+
+  // OWASP CSV Formula Injection characters (=, +, -, @, \t, \r)
+  assert.equal(escapeCsvCell('=cmd|/C calc'), "'=cmd|/C calc");
+  assert.equal(escapeCsvCell('+123'), "'+123");
+  assert.equal(escapeCsvCell('-50.00'), "'-50.00");
+  assert.equal(escapeCsvCell('@SUM(A1:B1)'), "'@SUM(A1:B1)");
+  assert.equal(escapeCsvCell('\tmalicious'), "'\tmalicious");
+
+  // Commas, quotes, newlines wrapped in quotes with internal quotes doubled
+  assert.equal(escapeCsvCell('hello, world'), '"hello, world"');
+  assert.equal(escapeCsvCell('hello "world"'), '"hello ""world"""');
+  assert.equal(escapeCsvCell('line1\nline2'), '"line1\nline2"');
+
+  // Object payload serialized and sanitized
+  const payloadStr = escapeCsvCell({ amount: 100, note: '=test' });
+  assert.ok(payloadStr.startsWith('"'));
+  assert.ok(payloadStr.includes('""amount"":100'));
 });

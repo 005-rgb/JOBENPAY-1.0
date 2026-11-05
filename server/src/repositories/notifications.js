@@ -1,4 +1,6 @@
 import pool from '../db/pool.js';
+import { enqueueEmail } from '../email/outbox.js';
+import { logger } from '../lib/logger.js';
 
 export async function listNotifications(orgId, userId, db = pool) {
   if (!orgId) {
@@ -33,6 +35,39 @@ export async function notifyOrgRoles(tx, orgId, roles, kind, payload) {
       [orgId, kind, { ...payload, recipientUserId }],
     );
   }
+
+  if (kind === 'REQUEST_PENDING_APPROVAL' && recipients.rowCount > 0) {
+    const userIds = recipients.rows.map((r) => r.user_id);
+    const emailsResult = await tx.query(
+      'SELECT id, email FROM users WHERE id = ANY($1::uuid[])',
+      [userIds],
+    );
+    const emailMap = new Map((emailsResult?.rows || []).map((u) => [u.id, u.email]));
+    for (const { user_id: recipientUserId } of recipients.rows) {
+      const email = emailMap.get(recipientUserId);
+      if (email) {
+        try {
+          await enqueueEmail(tx, {
+            orgId,
+            to: email,
+            template: 'approvalNeeded',
+            data: {
+              requestId: payload.requestId,
+              amount: payload.amount || '0.00',
+              currency: payload.currency || 'USD',
+              payeeName: payload.payeeName || 'Payee',
+              mandateName: payload.mandateName || 'Payment Mandate',
+              reviewUrl: payload.reviewUrl || `/requests/${payload.requestId}`,
+              expiresAt: payload.approvalExpiresAt || null,
+            },
+          });
+        } catch (err) {
+          logger.warn({ err: err?.message, orgId, recipientUserId }, 'Could not enqueue approval email');
+        }
+      }
+    }
+  }
+
   return recipients.rowCount;
 }
 

@@ -1,14 +1,14 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: MOBILE-RESPONSIVE (Mode mobile responsif penuh di semua halaman: AppShell drawer & close button, Dashboard grid 2x2, kartu data tabel dengan horizontal touch scroll, filter/search full-width, Landing typography fluid clamp, serta Google OAuth & mitigasi batas memori CloudLinux cPanel).
-- **Langkah saat ini**: Siap untuk verifikasi akun PayPal Sandbox nyata / pengerjaan modul Tier B selanjutnya.
+- **Langkah terakhir dikerjakan**: TIER-B-AUDIT-NOTIF (Ekspor CSV Ledger FR-902/FR-1206 dengan mitigasi formula injection OWASP + Notifikasi Email Approval FR-704 terenkripsi AES-256-GCM via outbox worker).
+- **Langkah saat ini**: Siap verifikasi operasional di cPanel staging/production & siap untuk pengerjaan modul berikutnya.
 - **Validasi lokal terkini**:
   - `npm test`: 280/280 tes lulus tanpa gagal/skip (279 tes suite + 1 pemeriksaan akhir integritas ledger 7 organisasi valid dan deteksi 6/6 tamper classes).
   - `npm run coverage`: line 96,73%, branch 90,19% (469/520 >= 90%), function 100%, statements 96,73%.
   - `npm run lint` & `npm run guard`: LULUS.
   - `npm run migrate` (2x berturut-turut): LULUS.
-  - `npm --prefix web run build`: LULUS (bundle entry JS 391,88 kB).
+  - `npm --prefix web run build`: LULUS (bundle entry JS 395,21 kB).
   - `npm --prefix web run lint:css`: LULUS.
 - **Blueprint PRD**: `JOBENPAY_PRD_Technical_Blueprint_v1_2.md` digunakan sebagai dokumen sumber acuan utama (menggantikan `docs/PRD.md` yang hanya memuat judul).
 - **Status Git**: Branch `dev`, remote `origin` (`https://github.com/005-rgb/JOBENPAY-1.0.git`). Perubahan lokal belum di-push ke remote.
@@ -46,6 +46,8 @@
 | P5-AUTH | DONE | P5-AUTH | 2026-11-05 | Google OAuth 2.0 auth token login, email verification outbox worker terenkripsi, retry backoff, dan pembersihan akun kedaluwarsa |
 | CPANEL-OPT | DONE | CPANEL-OPT | 2026-11-05 | Optimasi alokasi memori V8 (`--max-old-space-size=256`), threadpool=2, eliminasi crash `Aborted (core dumped)` di cPanel |
 | MOBILE-RESPONSIVE | DONE | d94f68f | 2026-11-06 | Layout mobile responsif di seluruh halaman (AppShell, Dashboard 2x2, kartu data tabel, filter bar, hero typography), 0 regresi desktop |
+| LEDGER-CSV | DONE | feat(ledger-csv) | 2026-11-06 | Streaming ekspor CSV audit ledger (FR-902/FR-1206) dengan mitigasi OWASP formula injection, tombol UI di halaman Ledger |
+| APPROVAL-EMAIL | DONE | feat(approval-email) | 2026-11-06 | Email notifikasi persetujuan (FR-704) template `approvalNeeded`, enqueue outbox otomatis terenkripsi AES-256-GCM saat status `PENDING_APPROVAL` |
 
 ## Resume
 Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Rute beranda publik (`/` untuk domain `nh.jobenapp.cloud`) kini aktif melayani Landing Page dengan navigasi tombol Login di pojok kanan atas menuju `/login`, rute proteksi `/dashboard` untuk sesi aktif, tata letak token murni, dan kepatuhan penuh terhadap guard sistem.

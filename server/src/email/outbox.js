@@ -25,8 +25,9 @@ export async function enqueueEmail(dbOrPool, {
     ...data,
   });
 
+  const encKey = env.JOBENPAY_ENC_KEY || process.env.JOBENPAY_ENC_KEY || (env.NODE_ENV === 'test' ? 'k'.repeat(32) : null);
   const encryptedPayload = encrypt({
-    key: env.JOBENPAY_ENC_KEY,
+    key: encKey,
     plaintext: payloadPlain,
     aad: AAD_EMAIL_PAYLOAD,
   });
@@ -66,8 +67,9 @@ export async function claimAndSendEmail(outboxId, { db = pool } = {}) {
 
   let payload;
   try {
+    const encKey = env.JOBENPAY_ENC_KEY || process.env.JOBENPAY_ENC_KEY || (env.NODE_ENV === 'test' ? 'k'.repeat(32) : null);
     const decrypted = decrypt({
-      key: env.JOBENPAY_ENC_KEY,
+      key: encKey,
       payload: row.payload,
       aad: AAD_EMAIL_PAYLOAD,
     });
@@ -90,6 +92,8 @@ export async function claimAndSendEmail(outboxId, { db = pool } = {}) {
     rendered = templates.accountExistsNotice(payload.loginLink);
   } else if (row.template === 'welcome') {
     rendered = templates.welcome();
+  } else if (row.template === 'approvalNeeded') {
+    rendered = templates.approvalNeeded(payload);
   } else {
     logger.error({ outboxId: row.id, template: row.template, status: 'FAILED' }, 'Unknown email template');
     await db.query(`

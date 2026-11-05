@@ -1,6 +1,7 @@
 import { performance } from 'node:perf_hooks';
 
 import { AppError } from '../lib/errors.js';
+import { env } from '../config.js';
 import { withTx } from '../db/tx.js';
 import { enqueue } from '../jobs/queue.js';
 import { getRequest } from '../repositories/requests.js';
@@ -153,9 +154,16 @@ async function finalizeEvaluation(tx, request, context, deterministic, aiResult 
       [request.org_id, request.id, BigInt(request.amount_minor) >= BigInt(context.policy.stepUpApprovalAboveMinor),
         request.request_hash, context.policy.approvalTtlHours],
     );
+    const approvalExpiresAt = approval.rows[0]?.expires_at ?? null;
+    const amountStr = (Number(request.amount_minor || 0) / 100).toFixed(2);
     await notifyOrgRoles(tx, request.org_id, ['OWNER', 'ADMIN', 'APPROVER'], 'REQUEST_PENDING_APPROVAL', {
       requestId: request.id,
-      approvalExpiresAt: approval.rows[0]?.expires_at ?? null,
+      amount: amountStr,
+      currency: request.currency || 'USD',
+      payeeName: context?.payee?.name || request.payee_id || 'Payee',
+      mandateName: context?.mandate?.name || 'Payment Mandate',
+      reviewUrl: `${env.PUBLIC_BASE_URL || 'https://nh.jobenapp.cloud'}/requests/${request.id}`,
+      approvalExpiresAt,
     });
   } else if (status === 'APPROVED') {
     await enqueue(tx, {

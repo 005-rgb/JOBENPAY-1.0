@@ -61,6 +61,28 @@ test('Email templates render clean text, simple HTML, and required sandbox discl
   assert.ok(welcome.subject.includes('Welcome'));
   assert.ok(welcome.text.includes(footerRequired));
   assert.ok(welcome.html.includes(footerRequired));
+
+  const approval = templates.approvalNeeded({
+    requestId: 'req-123-abc',
+    amount: '450.00',
+    currency: 'USD',
+    payeeName: 'Acme Supplies',
+    mandateName: 'Operational Expenses',
+    reviewUrl: 'https://jobenpay.test/requests/req-123-abc',
+    expiresAt: '2026-11-06T12:00:00.000Z',
+  });
+  assert.ok(approval.subject.includes('Payment Approval Needed: USD 450.00'));
+  assert.ok(approval.text.includes('req-123-abc'));
+  assert.ok(approval.text.includes('USD 450.00'));
+  assert.ok(approval.text.includes('Acme Supplies'));
+  assert.ok(approval.text.includes('Operational Expenses'));
+  assert.ok(approval.text.includes('https://jobenpay.test/requests/req-123-abc'));
+  assert.ok(approval.text.includes(footerRequired));
+  assert.ok(approval.html.includes('req-123-abc'));
+  assert.ok(approval.html.includes('USD 450.00'));
+  assert.ok(approval.html.includes('Acme Supplies'));
+  assert.ok(approval.html.includes('https://jobenpay.test/requests/req-123-abc'));
+  assert.ok(approval.html.includes(footerRequired));
 });
 
 test('Logger redacts SMTP_PASS and password fields from logs and objects', () => {

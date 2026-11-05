@@ -206,9 +206,16 @@ test('ledger export streams JSON and verification rejects missing or altered hea
     assert.equal(entries.length, 1);
     assert.equal(entries[0].payload.note, 'SYNTHETIC export test');
     assert.ok((await listOrgIds()).includes(orgId));
+    const csvChunks = [];
+    for await (const chunk of exportLedger(orgId, { format: 'csv' })) csvChunks.push(chunk);
+    const csvContent = csvChunks.join('');
+    assert.ok(csvContent.startsWith('seq,created_at,type,subject_type,subject_id,entry_hash,prev_hash,kid,signature,payload\r\n'));
+    assert.ok(csvContent.includes('REQUEST_RECEIVED'));
+    assert.ok(csvContent.includes('SYNTHETIC export test'));
+
     await assert.rejects(async () => {
-      for await (const _chunk of exportLedger(orgId, { format: 'csv' })) {}
-    }, /Only JSON/);
+      for await (const _chunk of exportLedger(orgId, { format: 'xml' })) {}
+    }, /Unsupported ledger export format/);
     await assert.rejects(async () => {
       for await (const _chunk of exportLedger(null)) {}
     }, /orgId is required/);
