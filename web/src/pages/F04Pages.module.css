@@ -641,7 +641,10 @@ fieldset.editorField {
   }
 
   .dataTable tr {
-    border-bottom: var(--jp-border-width) solid var(--jp-border);
+    background: var(--jp-surface);
+    border: var(--jp-border-width) solid var(--jp-border);
+    border-radius: var(--jp-radius-card);
+    margin-bottom: var(--jp-space-3);
     padding: var(--jp-space-2) 0;
   }
 
@@ -654,5 +657,11 @@ fieldset.editorField {
 
   .amountCell {
     text-align: left !important;
+  }
+
+  .pagination {
+    align-items: center;
+    justify-content: center;
+    gap: var(--jp-space-3);
   }
 }

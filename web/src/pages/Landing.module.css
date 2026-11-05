@@ -431,6 +431,48 @@
 }
 
 @media (--jp-mobile-down) {
+  .headerInner {
+    padding: 0 var(--jp-space-3);
+  }
+
+  .brandLogo {
+    height: 26px;
+  }
+
+  .headerRight {
+    gap: var(--jp-space-2);
+  }
+
+  .headerLoginBtn,
+  .headerSignupBtn {
+    height: 34px;
+    padding: 0 var(--jp-space-3);
+    font-size: 13px;
+  }
+
+  .container {
+    padding: 0 var(--jp-space-4);
+  }
+
+  .heroSection {
+    padding-top: var(--jp-space-6);
+    padding-bottom: var(--jp-space-6);
+  }
+
+  .heroTitle {
+    font-size: clamp(26px, 7vw, 38px);
+  }
+
+  .heroSub {
+    font-size: 15px;
+    margin-bottom: var(--jp-space-6);
+  }
+
+  .section {
+    padding-top: var(--jp-space-8);
+    padding-bottom: var(--jp-space-8);
+  }
+
   .stepsGrid {
     grid-template-columns: 1fr;
   }

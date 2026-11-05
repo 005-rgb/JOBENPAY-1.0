@@ -258,5 +258,38 @@
   .actions {
     align-items: stretch;
     flex-direction: column;
+    gap: var(--jp-space-2);
+  }
+
+  .filterBar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--jp-space-2);
+    padding: var(--jp-space-3);
+  }
+
+  .filterPill,
+  .searchBox {
+    min-height: 40px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .tableCard,
+  .simulatorCard {
+    border-radius: var(--jp-radius-card);
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pagination {
+    align-items: center;
+    justify-content: center;
+    gap: var(--jp-space-3);
+  }
+
+  .detailGrid {
+    grid-template-columns: 1fr;
   }
 }

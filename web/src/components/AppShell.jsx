@@ -382,9 +382,14 @@ function Sidebar({ pathname, t, onNavigate }) {
   const [openGroups, setOpenGroups] = useState({});
   return (
     <aside className={styles.sidebar} data-testid="sidebar">
-      <RouterLink aria-label={t('app.name')} className={styles.wordmark} data-testid="wordmark" to="/dashboard" onClick={onNavigate}>
-        <img alt={t('app.name')} className={styles.wordmarkImage} src={wordmarkUrl} />
-      </RouterLink>
+      <div className={styles.sidebarHeader}>
+        <RouterLink aria-label={t('app.name')} className={styles.wordmark} data-testid="wordmark" to="/dashboard" onClick={onNavigate}>
+          <img alt={t('app.name')} className={styles.wordmarkImage} src={wordmarkUrl} />
+        </RouterLink>
+        <button aria-label={t('app.dismiss') || 'Close navigation'} className={styles.drawerCloseBtn} onClick={onNavigate} type="button">
+          <X aria-hidden="true" size={20} />
+        </button>
+      </div>
       <CreateMenu t={t} />
       <SideNavigation
         onNavigate={onNavigate}

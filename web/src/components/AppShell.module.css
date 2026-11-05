@@ -22,6 +22,18 @@
   z-index: var(--jp-sidebar-z);
 }
 
+.sidebarHeader {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+
+.drawerCloseBtn {
+  display: none;
+}
+
 .wordmark {
   align-items: center;
   display: flex;
@@ -333,8 +345,10 @@
 
 .mobileWordmarkImage {
   display: block;
-  height: auto;
-  width: 118px;
+  height: 26px;
+  max-width: 120px;
+  object-fit: contain;
+  width: auto;
 }
 
 .mainContent {
@@ -963,8 +977,28 @@
     font-size: var(--jp-mobile-title-size);
   }
 
-  .wordmark {
-    display: none;
+  .drawerCloseBtn {
+    align-items: center;
+    background: var(--jp-transparent);
+    border: 0;
+    border-radius: var(--jp-radius-pill);
+    color: var(--jp-text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    height: 36px;
+    justify-content: center;
+    padding: 0;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    z-index: 2;
+  }
+
+  .drawerCloseBtn:hover {
+    background: var(--jp-secondary-hover);
+    color: var(--jp-text);
   }
 
   .mobileWordmark {
@@ -1102,5 +1136,11 @@
     left: var(--jp-space-3);
     right: var(--jp-space-3);
     top: auto;
+  }
+
+  .feedbackTab {
+    font-size: 10px;
+    height: 64px;
+    width: 20px;
   }
 }

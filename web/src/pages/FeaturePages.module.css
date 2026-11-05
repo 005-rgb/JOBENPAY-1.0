@@ -1008,8 +1008,18 @@
     flex-direction: column;
   }
 
+  .loginPage {
+    padding: var(--jp-space-3);
+  }
+
+  .loginCard {
+    padding: var(--jp-space-4);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
   .brandCard {
-    padding: 20px;
+    padding: var(--jp-space-4);
   }
 
   .brandGlow {
@@ -1022,11 +1032,42 @@
     width: 80px;
   }
 
-  .quickItems,
+  .brandStats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--jp-space-2);
+  }
+
+  .brandStat {
+    padding: var(--jp-space-2) var(--jp-space-3);
+    border-radius: var(--jp-radius-card);
+  }
+
+  .brandStat span {
+    font-size: 10px;
+  }
+
+  .brandStat strong {
+    font-size: 15px;
+  }
+
+  .quickItems {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--jp-space-2);
+  }
+
   .setupCards,
   .metricsGrid,
   .detailsList {
     grid-template-columns: 1fr;
+  }
+
+  .tableCard {
+    border-radius: var(--jp-radius-card);
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .tableActions,
@@ -1034,5 +1075,9 @@
   .historyList li {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .formCard {
+    padding: var(--jp-space-4);
   }
 }
