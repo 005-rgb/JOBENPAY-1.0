@@ -58,12 +58,15 @@ export async function runRealPreflight(orgId, options = {}) {
 
   if (conn?.webhook_token && publicBaseUrl) {
     try {
-      const parsed = new URL(`/api/v1/paypal/webhook/${conn.webhook_token}`, publicBaseUrl);
+      const normalizedBase = publicBaseUrl.startsWith('http://') || publicBaseUrl.startsWith('https://')
+        ? publicBaseUrl
+        : `https://${publicBaseUrl}`;
+      const parsed = new URL(`/webhooks/paypal/${conn.webhook_token}`, normalizedBase);
       const isHttps = parsed.protocol === 'https:';
       const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname.endsWith('.localhost');
       const isIp = net.isIP(parsed.hostname) !== 0;
       if (!isHttps) {
-        webhookUrlReason = 'Webhook URL scheme must be https:';
+        webhookUrlReason = `Webhook URL scheme must be https: (configured PUBLIC_BASE_URL: '${publicBaseUrl}')`;
       } else if (isLocalhost || isIp) {
         webhookUrlReason = `Webhook host '${parsed.hostname}' cannot be localhost or an IP address.`;
       } else {
@@ -75,26 +78,26 @@ export async function runRealPreflight(orgId, options = {}) {
   } else if (!conn?.webhook_token) {
     webhookUrlReason = 'Webhook token is missing from connection.';
   } else {
-    webhookUrlReason = 'PUBLIC_BASE_URL is not configured.';
+    webhookUrlReason = 'PUBLIC_BASE_URL is not configured in .env.';
   }
 
   if (!conn) {
     checks.push({
       id: 'PF-02',
       status: 'FAIL',
-      detail: 'No PayPal connection found for this organization.',
+      detail: 'No PayPal connection found for this organization. Konfigurasi kredensial Sandbox di /settings/paypal atau via CLI setup.',
     });
   } else if (conn.status !== 'CONNECTED') {
     checks.push({
       id: 'PF-02',
       status: 'FAIL',
-      detail: `PayPal connection status is '${conn.status}', expected 'CONNECTED'.`,
+      detail: `PayPal connection status is '${conn.status}', expected 'CONNECTED'. Buka /settings/paypal dan klik 'Test connection'.`,
     });
   } else if (!conn.webhook_id) {
     checks.push({
       id: 'PF-02',
       status: 'FAIL',
-      detail: 'PayPal webhook_id is not set.',
+      detail: 'PayPal webhook_id is not set. Masukkan Webhook ID dari PayPal Developer di /settings/paypal.',
     });
   } else if (!webhookUrlValid) {
     checks.push({
@@ -114,18 +117,20 @@ export async function runRealPreflight(orgId, options = {}) {
   const health = options.processorHealth ?? await getProcessorHealth(db);
   const tickOk = health.tickHeartbeatAgeSec !== null && health.tickHeartbeatAgeSec < 120;
   const workerOk = health.workerHeartbeatAgeSec !== null && health.workerHeartbeatAgeSec < 30;
+  const tickStr = health.tickHeartbeatAgeSec !== null ? `${health.tickHeartbeatAgeSec}s` : 'none';
+  const workerStr = health.workerHeartbeatAgeSec !== null ? `${health.workerHeartbeatAgeSec}s` : 'none';
 
   if (tickOk || workerOk) {
     checks.push({
       id: 'PF-03',
       status: 'PASS',
-      detail: `Processor is alive (tick: ${health.tickHeartbeatAgeSec ?? 'none'}s, worker: ${health.workerHeartbeatAgeSec ?? 'none'}s).`,
+      detail: `Processor is alive (tick: ${tickStr}, worker: ${workerStr}).`,
     });
   } else {
     checks.push({
       id: 'PF-03',
       status: 'FAIL',
-      detail: `Processor heartbeat is stale or missing (tick: ${health.tickHeartbeatAgeSec ?? 'none'}s >= 120s, worker: ${health.workerHeartbeatAgeSec ?? 'none'}s >= 30s). Saran: pasang cron tick.js tiap menit.`,
+      detail: `Processor heartbeat is stale or missing (tick: ${tickStr} >= 120s, worker: ${workerStr} >= 30s). Saran: pasang cron tick.js tiap menit.`,
     });
   }
 
@@ -214,10 +219,24 @@ export async function runRealPreflight(orgId, options = {}) {
     activeMandate = mandateResult.rows[0] ?? null;
 
     if (!activeMandate) {
+      let draftDetail = '';
+      try {
+        const anyMandateRes = await db.query(
+          'SELECT id, name, status FROM mandates WHERE org_id = $1 AND agent_id = $2 ORDER BY created_at DESC LIMIT 1',
+          [orgId, activeAgent.id],
+        );
+        if (anyMandateRes.rows[0]) {
+          const m = anyMandateRes.rows[0];
+          draftDetail = ` Mandat '${m.name}' ditemukan berstatus '${m.status}' — aktifkan mandat dengan tanda tangan Ed25519 agar berstatus ACTIVE.`;
+        } else {
+          draftDetail = ' Belum ada mandat untuk agen ini. Buat mandat di /mandates/new atau jalankan real:setup.';
+        }
+      } catch {}
+
       checks.push({
         id: 'PF-07',
         status: 'FAIL',
-        detail: `No ACTIVE mandate found for agent '${activeAgent.name}'.`,
+        detail: `No ACTIVE mandate found for agent '${activeAgent.name}'.${draftDetail}`,
       });
     } else {
       activePolicy = activeMandate.policy;
@@ -294,10 +313,26 @@ export async function runRealPreflight(orgId, options = {}) {
     trustedPayee = payeesResult.rows.find((p) => allowlistIds.includes(p.id) || allowNewPayees);
 
     if (!trustedPayee) {
+      let payeeHint = '';
+      try {
+        const anyPayeesRes = await db.query(
+          'SELECT id, display_name, trust, kind FROM payees WHERE org_id = $1',
+          [orgId],
+        );
+        if (anyPayeesRes.rows.length === 0) {
+          payeeHint = ' Belum ada payee di organisasi ini. Buat payee jenis EMAIL di /payees/new dan ubah ke TRUSTED.';
+        } else {
+          const untrusted = anyPayeesRes.rows.filter((p) => p.trust !== 'TRUSTED');
+          if (untrusted.length > 0) {
+            payeeHint = ` Ditemukan ${anyPayeesRes.rows.length} payee tetapi status belum TRUSTED (${untrusted.map((p) => `${p.display_name}:${p.trust}`).join(', ')}). Buka /payees untuk menyetujui.`;
+          }
+        }
+      } catch {}
+
       checks.push({
         id: 'PF-08',
         status: 'FAIL',
-        detail: 'No TRUSTED payee with kind EMAIL matching the mandate allowlist was found.',
+        detail: `No TRUSTED payee with kind EMAIL matching the mandate allowlist was found.${payeeHint}`,
       });
     } else {
       checks.push({
@@ -388,7 +423,7 @@ export async function runRealPreflight(orgId, options = {}) {
     checks.push({
       id: 'PF-11',
       status: 'FAIL',
-      detail: 'No encrypted PayPal credentials found for this organization.',
+      detail: 'No encrypted PayPal credentials found for this organization. Masukkan Client ID dan Secret di /settings/paypal atau via CLI setup.',
     });
   } else {
     try {

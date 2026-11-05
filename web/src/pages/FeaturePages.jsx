@@ -918,6 +918,53 @@ export function PaypalSettingsPage() {
         )}
         {connection.webhookUrl ? <div className={styles.webhookBlock}><h3>{t('app.webhookUrl')}</h3><CodeBlock value={connection.webhookUrl} /></div> : null}
       </Card>
+      <Card className={styles.formCard} padding="form">
+        <div className={styles.cardHeading}>
+          <h2>{t('app.preflightTitle') || 'Real-Payout Preflight Checks'}</h2>
+          {preflightResult ? (
+            <StatusPill
+              status={preflightResult.ready ? 'COMPLETED' : 'FAILED'}
+              label={preflightResult.ready ? 'READY (PASS)' : 'NOT READY (FAIL)'}
+            />
+          ) : null}
+        </div>
+        <p className={styles.fieldHint}>
+          {t('app.preflightDesc') || 'Verify all 12 operational readiness checks (PF-01 to PF-12) before executing payouts against PayPal Sandbox.'}
+        </p>
+        <div className={styles.inlineActions}>
+          <Button disabled={preflightLoading} onClick={runPreflight} type="button">
+            {preflightLoading ? (t('app.runningPreflight') || 'Running checks...') : (t('app.runPreflight') || 'Run real-payout preflight')}
+          </Button>
+        </div>
+        {preflightError ? <p className={styles.formFeedback} role="alert">{preflightError}</p> : null}
+        {preflightResult?.checks ? (
+          <div className={styles.tableCard}>
+            <table className={styles.dataTable}>
+              <thead>
+                <tr>
+                  <th scope="col">{t('app.status') || 'Status'}</th>
+                  <th scope="col">{t('app.checkId') || 'Check'}</th>
+                  <th scope="col">{t('app.detail') || 'Detail'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preflightResult.checks.map((check) => (
+                  <tr key={check.id}>
+                    <td>
+                      <StatusPill
+                        status={check.status === 'PASS' ? 'COMPLETED' : (check.status === 'WARN' ? 'PENDING' : 'FAILED')}
+                        label={check.status}
+                      />
+                    </td>
+                    <td><code>{check.id}</code></td>
+                    <td>{check.detail}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </Card>
       <StepUpDialog
         onConfirm={async (grantId) => {
           const form = pendingCredentials;
