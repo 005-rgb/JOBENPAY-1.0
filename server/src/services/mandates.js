@@ -38,9 +38,10 @@ export function validatePolicy(policy) {
   try {
     return parsePolicy(policy);
   } catch (error) {
-    error.code = 'VALIDATION_FAILED';
-    error.statusCode = 400;
-    throw error;
+    const err = new AppError('VALIDATION_FAILED', error.message || 'Validation failed.');
+    err.statusCode = 400;
+    err.details = error?.issues || error?.errors;
+    throw err;
   }
 }
 
