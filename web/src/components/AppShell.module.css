@@ -10,8 +10,12 @@
 .sidebar {
   background: var(--jp-surface-sidebar);
   bottom: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   left: 0;
   overflow-y: auto;
+  padding: var(--jp-space-2) var(--jp-sidebar-pad-x) var(--jp-space-6);
   position: fixed;
   top: 0;
   width: var(--jp-sidebar-w);
@@ -21,13 +25,10 @@
 .wordmark {
   align-items: center;
   display: flex;
-  height: var(--jp-wordmark-h);
   justify-content: center;
-  left: var(--jp-sidebar-pad-x);
-  position: absolute;
+  padding: var(--jp-space-1) 0;
   text-decoration: none;
-  top: var(--jp-wordmark-top);
-  width: var(--jp-sidebar-content-w);
+  width: 100%;
 }
 
 .wordmarkImage {
@@ -50,10 +51,8 @@
   gap: var(--jp-space-2);
   height: var(--jp-create-h);
   justify-content: center;
-  left: var(--jp-create-left);
   line-height: var(--jp-font-line-button-md);
-  position: absolute;
-  top: var(--jp-create-top);
+  margin: var(--jp-space-2) auto var(--jp-space-4);
   width: var(--jp-create-w);
 }
 
@@ -62,6 +61,51 @@
 }
 
 .navigation {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.parityShell .sidebar {
+  display: block;
+  padding: 0;
+}
+
+.parityShell .wordmark {
+  align-items: center;
+  display: flex;
+  height: var(--jp-wordmark-h);
+  justify-content: center;
+  left: var(--jp-sidebar-pad-x);
+  padding: 0;
+  position: absolute;
+  text-decoration: none;
+  top: var(--jp-wordmark-top);
+  width: var(--jp-sidebar-content-w);
+}
+
+.parityShell .createButton {
+  align-items: center;
+  background: var(--jp-black);
+  border: 0;
+  border-radius: var(--jp-radius-pill);
+  color: var(--jp-white);
+  cursor: pointer;
+  display: flex;
+  font-size: var(--jp-font-size-button-md);
+  font-weight: var(--jp-font-weight-bold);
+  gap: var(--jp-space-2);
+  height: var(--jp-create-h);
+  justify-content: center;
+  left: var(--jp-create-left);
+  line-height: var(--jp-font-line-button-md);
+  margin: 0;
+  position: absolute;
+  top: var(--jp-create-top);
+  width: var(--jp-create-w);
+}
+
+.parityShell .navigation {
   display: flex;
   flex-direction: column;
   left: var(--jp-sidebar-pad-x);
