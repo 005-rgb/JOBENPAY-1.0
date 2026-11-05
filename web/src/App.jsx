@@ -20,6 +20,7 @@ const DocumentsPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => 
 const AuditPage = lazy(() => import('./pages/F05Pages.jsx').then((pages) => ({ default: pages.AuditPage })));
 const DeveloperPage = lazy(() => import('./pages/F05Pages.jsx').then((pages) => ({ default: pages.DeveloperPage })));
 const LedgerPage = lazy(() => import('./pages/F05Pages.jsx').then((pages) => ({ default: pages.LedgerPage })));
+const LandingPage = lazy(() => import('./pages/Landing.jsx'));
 const LoginPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.LoginPage })));
 const SignupPage = lazy(() => import('./pages/SignupPage.jsx'));
 const CheckEmailPage = lazy(() => import('./pages/CheckEmailPage.jsx'));
@@ -117,15 +118,15 @@ function RootPage() {
     return <BrandLoadingScreen fullScreen label={t('app.loadingWorkspace')} />;
   }
 
-  if (!auth.user) {
-    return (
-      <Suspense fallback={<BrandLoadingScreen fullScreen />}>
-        <LoginPage />
-      </Suspense>
-    );
+  if (auth.user) {
+    return <AuthenticatedApp />;
   }
 
-  return <AuthenticatedApp />;
+  return (
+    <Suspense fallback={<BrandLoadingScreen fullScreen />}>
+      <LandingPage />
+    </Suspense>
+  );
 }
 
 function AppRoutes() {

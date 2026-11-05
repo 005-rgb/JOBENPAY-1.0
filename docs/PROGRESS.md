@@ -1,8 +1,8 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: HARDEN-1 (Pengujian isolasi per-route lintas tenant IDOR otomatis, verifikasi D16/D18, sinkronisasi integritas hash-chain ledger).
-- **Langkah saat ini**: LANGKAH LANDING — **TERBLOKIR (BLOCKED)** pada tahap prasyarat aset.
+- **Langkah terakhir dikerjakan**: LANDING (Homepage publik aktif di `/` [`nh.jobenapp.cloud`] dengan tombol Login di pojok kanan atas menuju `/login`, struktur hero, 5 langkah, 3 kontrol, 4 fakta, try 3 menit, honest limits strip, dan footer terintegrasi token).
+- **Langkah saat ini**: Selesai; siap untuk pengujian end-to-end / deployment cPanel.
 - **Validasi lokal terkini**:
   - `npm test`: 280/280 tes lulus tanpa gagal/skip (279 tes suite + 1 pemeriksaan akhir integritas ledger 7 organisasi valid dan deteksi 6/6 tamper classes).
   - `npm run coverage`: line 96,73%, branch 90,19% (469/520 >= 90%), function 100%, statements 96,73%.
@@ -42,21 +42,17 @@
 | F04 | DONE | F04 | 2026-11-01 | UI mandates, documents, requests, approvals teruji |
 | F05 | DONE | F05 | 2026-11-01 | UI ledger, audit listing, simulator, tamper & restore teruji |
 | HARDEN-1 | DONE | HARDEN-1 | 2026-11-05 | Pengujian otomatis lintas tenant 404/403 seluruh rute Express, D16 & D18 teruji |
-| LANDING | BLOCKED | - | 2026-11-05 | Prasyarat aset ilustrasi `jobenpay-board.svg` & `jobenpay-board-static.png` belum ada |
+| LANDING | DONE | LANDING | 2026-11-05 | Homepage publik aktif di `/` (`nh.jobenapp.cloud`), tombol login di pojok kanan atas ke `/login`, hero, 5 langkah, 3 kontrol, 4 fakta, try 3 menit, honest limits strip, dan footer terintegrasi token |
 
 ## Resume
-Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Tahap HARDEN-1 selesai memverifikasi isolasi rute lintas tenant (IDOR) secara otomatis pada seluruh endpoint Express serta membuktikan keselarasan kebijakan allowlist payee D16 (`PAYEE_NOT_ALLOWED`) dan evaluasi sinkron/sweeper background D18. Langkah LANDING saat ini tertahan pada pemeriksaan prasyarat aset visual wajib yang belum tersedia di repositori.
+Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Rute beranda publik (`/` untuk domain `nh.jobenapp.cloud`) kini aktif melayani Landing Page dengan navigasi tombol Login di pojok kanan atas menuju `/login`, rute proteksi `/dashboard` untuk sesi aktif, tata letak token murni, dan kepatuhan penuh terhadap guard sistem.
 
 ## Blockers
-1. **Prasyarat Aset Ilustrasi Landing Page (LANGKAH LANDING)**:
-   - **Apa**: Berkas `web/public/landing/jobenpay-board.svg` dan `web/public/landing/jobenpay-board-static.png` (serta direktori `docs/landing/` beserta generator `gen-board.mjs`) tidak ditemukan di dalam repositori atau direktori proyek. Sesuai instruksi batas keras: *"PRASYARAT: web/public/landing/jobenpay-board.svg dan jobenpay-board-static.png ADA. Jika tidak, berhenti dan catat di PROGRESS.md 'Blockers'; jangan membuat ilustrasi pengganti."*
-   - **Siapa yang bisa menyelesaikan**: Pemilik proyek (menyediakan aset ilustrasi resmi).
-   - **Langkah penyelesaian**: Letakkan `jobenpay-board.svg` dan `jobenpay-board-static.png` ke dalam direktori `web/public/landing/` (dan `docs/landing/` bila ada skrip generatornya), kemudian perintahkan kembali untuk melanjutkan LANGKAH LANDING.
-2. **Kredensial & Lingkungan Hosting cPanel**:
+1. **Kredensial & Lingkungan Hosting cPanel**:
    - **Apa**: Kredensial hosting cPanel dan PostgreSQL TLS produksi belum tersedia di lingkungan lokal.
    - **Siapa**: Pemilik proyek.
    - **Langkah**: Sediakan akses cPanel/Passenger, konfigurasikan database PostgreSQL TLS, dan verifikasi endpoint `/readyz`.
-3. **Verifikasi PayPal Sandbox Riil End-to-End**:
+2. **Verifikasi PayPal Sandbox Riil End-to-End**:
    - **Apa**: Validasi eksekusi payout live terhadap akun developer PayPal Sandbox nyata menunggu kredensial Sandbox aktif dari pemilik.
    - **Siapa**: Pemilik proyek.
    - **Langkah**: Jalankan `npm run real:preflight` dan verifikasi pembayaran Sandbox sesuai `docs/REAL_PAYOUT_RUNBOOK.md`.

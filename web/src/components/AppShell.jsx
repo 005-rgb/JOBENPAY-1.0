@@ -357,7 +357,7 @@ function FeedbackDialog({ open, onOpenChange, csrfToken, t }) {
   );
 }
 
-function Footer({ t, className = '' }) {
+export function Footer({ t, className = '' }) {
   const firstRowLinks = ['help', 'contact', 'sitemap', 'fees', 'security', 'about', 'developers', 'partners'];
   return (
     <footer className={`${styles.footer} ${className}`.trim()}>
