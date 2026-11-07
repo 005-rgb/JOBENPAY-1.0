@@ -61,6 +61,9 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['POST /org/unfreeze', 'Unfreezes current session tenant'],
   ['POST /vlei/link', 'Links vLEI credential to current authenticated organization'],
   ['GET /vlei/status', 'Gets vLEI credential status for current authenticated organization'],
+  ['POST /intents', 'Creates bounded intent mandate for current authenticated organization'],
+  ['POST /intents/:intent_id/revoke', 'Revokes intent mandate for current authenticated organization'],
+  ['GET /intents/:intent_id', 'Retrieves intent mandate for current authenticated organization'],
   ['GET /agent/v1/ping', 'Agent API authentication probe returning pong for active key'],
   ['POST /agent/v1/requests', 'Submits payment request bound to authenticated agent'],
   ['POST /agent/v1/payout-requests', 'Alias for /agent/v1/requests bound to authenticated agent'],
@@ -450,6 +453,9 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
           }
           if (targetPath.includes(':keyId')) {
             targetPath = targetPath.replace(':keyId', orgB.agentKey.id);
+          }
+          if (targetPath.includes(':intent_id')) {
+            targetPath = targetPath.replace(':intent_id', crypto.randomUUID());
           }
           if (targetPath.includes(':id')) {
             if (targetPath.startsWith('/requests/')) targetPath = targetPath.replace(':id', orgB.requestPending.id);

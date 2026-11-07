@@ -4,8 +4,8 @@
 
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import { pool } from '../db.js';
-import { AppError } from '../errors.js';
+import { query } from '../db/pool.js';
+import { AppError } from '../lib/errors.js';
 import { canonicalJson } from '../../../shared/canonical.js';
 import { env } from '../config.js';
 import {
@@ -37,8 +37,21 @@ export const CreateIntentSchema = z.object({
 /**
  * Normalizes a string for deterministic comparison.
  */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUuid(val) {
+  return typeof val === 'string' && UUID_REGEX.test(val);
+}
+
 function normalize(str) {
   return String(str || '').trim().toLowerCase();
+}
+
+function runQuery(sql, params, client) {
+  if (client && typeof client.query === 'function') {
+    return client.query(sql, params);
+  }
+  return query(sql, params);
 }
 
 /**
@@ -58,10 +71,10 @@ function parseValidDate(val, fieldName) {
  * @param {string} orgId - Organization UUID
  * @param {string} userId - Principal user UUID
  * @param {object} body - Intent payload
- * @param {object} [dbClient=pool] - Optional DB client for transactions
+ * @param {object} [dbClient=null] - Optional DB client for transactions
  * @returns {Promise<object>} Created intent mandate
  */
-export async function createIntent(orgId, userId, body, dbClient = pool) {
+export async function createIntent(orgId, userId, body, dbClient = null) {
   if (!orgId) {
     throw new AppError('VALIDATION_FAILED', 400, 'orgId is required');
   }
@@ -125,7 +138,7 @@ export async function createIntent(orgId, userId, body, dbClient = pool) {
               valid_from, valid_to, status, created_at;
   `;
 
-  const { rows } = await dbClient.query(insertSql, [
+  const { rows } = await runQuery(insertSql, [
     orgId,
     userId,
     natural_language_input,
@@ -135,7 +148,7 @@ export async function createIntent(orgId, userId, body, dbClient = pool) {
     finalKeyId,
     validFromIso,
     validToIso,
-  ]);
+  ], dbClient);
 
   return rows[0];
 }
@@ -144,12 +157,16 @@ export async function createIntent(orgId, userId, body, dbClient = pool) {
  * Revokes an existing intent mandate.
  * @param {string} orgId - Organization UUID
  * @param {string} intentId - Intent mandate UUID
- * @param {object} [dbClient=pool] - Optional DB client
+ * @param {object} [dbClient=null] - Optional DB client
  * @returns {Promise<object>} Status object
  */
-export async function revokeIntent(orgId, intentId, dbClient = pool) {
+export async function revokeIntent(orgId, intentId, dbClient = null) {
   if (!orgId || !intentId) {
     throw new AppError('VALIDATION_FAILED', 400, 'orgId and intentId are required');
+  }
+
+  if (!isValidUuid(intentId)) {
+    throw new AppError('INTENT_NOT_FOUND', 404, 'Intent mandate not found');
   }
 
   const updateSql = `
@@ -159,7 +176,7 @@ export async function revokeIntent(orgId, intentId, dbClient = pool) {
     RETURNING intent_id, status;
   `;
 
-  const { rows } = await dbClient.query(updateSql, [orgId, intentId]);
+  const { rows } = await runQuery(updateSql, [orgId, intentId], dbClient);
   if (!rows || rows.length === 0) {
     throw new AppError('INTENT_NOT_FOUND', 404, 'Intent mandate not found');
   }
@@ -171,21 +188,26 @@ export async function revokeIntent(orgId, intentId, dbClient = pool) {
  * Retrieves an intent mandate by ID.
  * @param {string} orgId - Organization UUID
  * @param {string} intentId - Intent mandate UUID
- * @param {object} [dbClient=pool] - Optional DB client
+ * @param {object} [dbClient=null] - Optional DB client
  * @returns {Promise<object>} Intent mandate row
  */
-export async function getIntentMandate(orgId, intentId, dbClient = pool) {
+export async function getIntentMandate(orgId, intentId, dbClient = null) {
   if (!orgId || !intentId) {
     throw new AppError('VALIDATION_FAILED', 400, 'orgId and intentId are required');
   }
 
-  const { rows } = await dbClient.query(
+  if (!isValidUuid(intentId)) {
+    throw new AppError('INTENT_NOT_FOUND', 404, 'Intent mandate not found');
+  }
+
+  const { rows } = await runQuery(
     `SELECT intent_id, org_id, principal_user_id, natural_language_input,
             structured_intent, intent_hash, signature, signing_key_id,
             valid_from, valid_to, status, created_at
      FROM intent_mandates
      WHERE org_id = $1 AND intent_id = $2;`,
-    [orgId, intentId]
+    [orgId, intentId],
+    dbClient
   );
 
   if (!rows || rows.length === 0) {
@@ -200,19 +222,20 @@ export async function getIntentMandate(orgId, intentId, dbClient = pool) {
  * @param {string} orgId - Organization UUID
  * @param {string} intentMandateId - Mandate UUID
  * @param {object} transaction - Proposed transaction intent or request
- * @param {object} [dbClient=pool] - DB client
+ * @param {object} [dbClient=null] - DB client
  * @returns {Promise<{ valid: boolean, reason?: string, details?: object }>}
  */
-export async function validateIntentMatch(orgId, intentMandateId, transaction, dbClient = pool) {
-  if (!intentMandateId) {
+export async function validateIntentMatch(orgId, intentMandateId, transaction, dbClient = null) {
+  if (!intentMandateId || !isValidUuid(intentMandateId)) {
     return { valid: false, reason: 'INTENT_MANDATE_MISSING' };
   }
 
-  const { rows } = await dbClient.query(
+  const { rows } = await runQuery(
     `SELECT intent_id, structured_intent, valid_from, valid_to, status
      FROM intent_mandates
      WHERE org_id = $1 AND intent_id = $2;`,
-    [orgId, intentMandateId]
+    [orgId, intentMandateId],
+    dbClient
   );
 
   if (!rows || rows.length === 0) {
