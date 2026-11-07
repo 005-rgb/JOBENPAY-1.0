@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   AlertCircle,
   AlertTriangle,
@@ -19,15 +20,16 @@ import {
   Layers,
   Loader2,
   Play,
+  Plus,
   ShieldCheck,
   Upload,
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import styles from './TransactionPages.module.css';
 
 export function BulkPage({ batchId = null }) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState('list');
 
   const {
     data: batchData,
@@ -45,21 +47,21 @@ export function BulkPage({ batchId = null }) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-center" data-testid="bulk-loading">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
-        <p className="text-sm text-gray-500">Memuat data batch transaksi massal (bulk)...</p>
+      <div className={styles.emptyCard} data-testid="bulk-loading">
+        <Loader2 className="animate-spin" size={32} />
+        <p className={styles.emptyDesc}>Loading bulk payout batch data...</p>
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="p-6 max-w-2xl mx-auto" data-testid="bulk-error">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+      <div className={styles.pageStack} data-testid="bulk-error">
+        <div className={styles.errorBanner}>
+          <AlertCircle size={20} />
           <div>
-            <h3 className="text-sm font-semibold text-red-800">Gagal Memuat Batch Bulk</h3>
-            <p className="text-sm text-red-700 mt-1">{error?.message || 'Terjadi kesalahan sistem'}</p>
+            <strong>Failed to Load Bulk Payout Batch</strong>
+            <p style={{ margin: '4px 0 0 0' }}>{error?.message || 'A system error occurred while contacting the server.'}</p>
           </div>
         </div>
       </div>
@@ -75,89 +77,121 @@ export function BulkPage({ batchId = null }) {
   };
 
   const items = batchData?.items || [
-    { intent_id: 'child-01', amount_minor: '10000', currency: 'USD', status: 'COMPLETED', metadata: { recipientEmail: 'a@example.com' } },
-    { intent_id: 'child-02', amount_minor: '10000', currency: 'USD', status: 'COMPLETED', metadata: { recipientEmail: 'b@example.com' } },
-    { intent_id: 'child-03', amount_minor: '10000', currency: 'USD', status: 'FAILED', metadata: { recipientEmail: 'c@example.com' } },
-    { intent_id: 'child-04', amount_minor: '10000', currency: 'USD', status: 'COMPLETED', metadata: { recipientEmail: 'd@example.com' } },
-    { intent_id: 'child-05', amount_minor: '10000', currency: 'USD', status: 'COMPLETED', metadata: { recipientEmail: 'e@example.com' } },
+    { intent_id: 'child-01', amount_minor: '10000', currency: 'USD', status: 'COMPLETED', metadata: { recipientEmail: 'alice@example.com' } },
+    { intent_id: 'child-02', amount_minor: '10000', currency: 'USD', status: 'COMPLETED', metadata: { recipientEmail: 'bob@example.com' } },
+    { intent_id: 'child-03', amount_minor: '10000', currency: 'USD', status: 'FAILED', metadata: { recipientEmail: 'carol@example.com' } },
+    { intent_id: 'child-04', amount_minor: '10000', currency: 'USD', status: 'COMPLETED', metadata: { recipientEmail: 'david@example.com' } },
+    { intent_id: 'child-05', amount_minor: '10000', currency: 'USD', status: 'COMPLETED', metadata: { recipientEmail: 'eva@example.com' } },
   ];
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6" data-testid="bulk-page">
+    <div className={styles.pageStack} data-testid="bulk-page">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-            <Layers className="w-7 h-7 text-indigo-600" />
-            Distribusi Pembayaran Massal (Bulk Payouts)
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Eksekusi batch hingga 15.000 item dengan streaming payload, reservasi total & pelepasan presisi (K-BULK, T-19)
+      <div className={styles.pageHeader}>
+        <div className={styles.pageTitleGroup}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 className={styles.pageTitle}>Bulk Payout Batches</h1>
+            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+              TIER B / PAYPAL
+            </span>
+          </div>
+          <p className={styles.pageSubtitle}>
+            High-volume batch payout orchestration up to 15,000 items with stream processing and precise fund reservation (K-BULK, T-19).
           </p>
         </div>
+
+        <div className={styles.headerActions}>
+          <Link to="/transactions/new?category=BULK" className={styles.primaryLink}>
+            <Plus size={16} />
+            Submit New Batch
+          </Link>
+        </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="text-xs font-medium text-gray-500 uppercase">Total Item</div>
-          <div className="text-2xl font-bold text-gray-900 mt-1">{batch.item_count}</div>
+      {/* Summary Metrics */}
+      <div className={styles.formGrid} data-testid="bulk-batch-summary">
+        <div className={styles.calculationCard}>
+          <span className={styles.fieldLabel}>Total Batch Volume</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span style={{ fontSize: '28px', fontWeight: 'bold', color: 'var(--jp-text)' }}>
+              ${(Number(batch.total_amount_minor) / 100).toFixed(2)}
+            </span>
+            <span className={styles.mono} style={{ fontSize: '12px', color: 'var(--jp-text-muted)' }}>
+              {batch.currency}
+            </span>
+          </div>
+          <p className={styles.calcRow} style={{ margin: '8px 0 0 0' }}>
+            <span className={styles.calcLabel}>Batch Status:</span>
+            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>{batch.status}</span>
+          </p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="text-xs font-medium text-gray-500 uppercase">Total Nominal</div>
-          <div className="text-2xl font-bold text-gray-900 mt-1">
-            {(Number(batch.total_amount_minor) / 100).toFixed(2)} {batch.currency}
+
+        <div className={styles.calculationCard}>
+          <span className={styles.fieldLabel}>Batch Item Execution</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--jp-text-muted)' }}>Total Items:</span>
+              <strong className={styles.mono}>{batch.item_count} items</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--jp-text-muted)' }}>Completed Items:</span>
+              <strong className={styles.mono} style={{ color: 'var(--jp-success)' }}>
+                {items.filter((i) => i.status === 'COMPLETED').length} items
+              </strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--jp-text-muted)' }}>Failed Items:</span>
+              <strong className={styles.mono} style={{ color: 'var(--jp-badge-red)' }}>
+                {items.filter((i) => i.status === 'FAILED').length} items
+              </strong>
+            </div>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="text-xs font-medium text-gray-500 uppercase">Status Batch Induk</div>
-          <div className="text-lg font-bold text-indigo-600 mt-1">{batch.status}</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="text-xs font-medium text-gray-500 uppercase">Batas Maksimum</div>
-          <div className="text-2xl font-bold text-gray-700 mt-1">15.000</div>
-        </div>
       </div>
 
-      {/* Item List Table */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">Rincian Item Payout</h2>
+      {/* Items Table */}
+      <div className={styles.tableCard}>
+        <div style={{ padding: 'var(--jp-space-4)', borderBottom: '1px solid var(--jp-border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <FileSpreadsheet size={18} />
+          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Batch Items Progress Tracking</h2>
         </div>
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID Item</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Penerima</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nominal</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {items.map((it) => (
-              <tr key={it.intent_id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-mono text-gray-600">{it.intent_id.slice(0, 8)}...</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{it.metadata?.recipientEmail || '-'}</td>
-                <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                  {(Number(it.amount_minor) / 100).toFixed(2)} {it.currency}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    it.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                    it.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {it.status}
-                  </span>
-                </td>
+
+        <div className={styles.tableScroll}>
+          <table className={styles.dataTable} data-testid="bulk-items-table">
+            <thead>
+              <tr>
+                <th>Item Intent ID</th>
+                <th>Recipient Email</th>
+                <th>Amount</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.intent_id}>
+                  <td className={styles.mono} style={{ fontWeight: 'bold' }}>{item.intent_id}</td>
+                  <td>{item.metadata?.recipientEmail || 'payee@example.com'}</td>
+                  <td className={styles.mono} style={{ fontWeight: 'bold' }}>
+                    ${(Number(item.amount_minor) / 100).toFixed(2)} {item.currency}
+                  </td>
+                  <td>
+                    <span
+                      className={`${styles.providerBadge} ${
+                        item.status === 'COMPLETED' ? styles.successBanner : styles.errorBanner
+                      }`}
+                      style={{ padding: '2px 8px', fontSize: '10px' }}
+                    >
+                      {item.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 }
 
 export default BulkPage;
-

@@ -15,6 +15,7 @@ import {
   Clock,
   Filter,
   Layers,
+  Loader2,
   Plus,
   RefreshCw,
   Search,
@@ -23,7 +24,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { TRANSACTION_CATEGORIES, TRANSACTION_STATUSES, CATEGORY_PROVIDERS } from '../../../shared/transaction.js';
-import styles from './F04Pages.module.css';
+import styles from './TransactionPages.module.css';
 
 function formatMoney(amountMinor, currency = 'USD') {
   if (amountMinor === null || amountMinor === undefined) return '—';
@@ -39,7 +40,7 @@ function dateLabel(isoString) {
   if (!isoString) return '—';
   try {
     const d = new Date(isoString);
-    return d.toLocaleString(undefined, {
+    return d.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -53,20 +54,19 @@ function dateLabel(isoString) {
 
 export function StatusPill({ status }) {
   const normalized = (status || '').toUpperCase();
-  let colorStyle = 'bg-gray-100 text-gray-800 border-gray-200';
+  let badgeStyle = styles.badgeSandbox;
   if (normalized === 'COMPLETED' || normalized === 'APPROVED' || normalized === 'SETTLED' || normalized === 'RECONCILED') {
-    colorStyle = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    badgeStyle = styles.successBanner;
   } else if (normalized === 'NEEDS_APPROVAL' || normalized === 'PENDING' || normalized === 'AWAITING_BUYER') {
-    colorStyle = 'bg-amber-100 text-amber-800 border-amber-300';
-  } else if (normalized === 'EXECUTING' || normalized === 'SUBMITTED' || normalized === 'EVALUATING') {
-    colorStyle = 'bg-blue-100 text-blue-800 border-blue-300';
+    badgeStyle = styles.badgeSimulated;
   } else if (normalized === 'FAILED' || normalized === 'REJECTED' || normalized === 'MISMATCH') {
-    colorStyle = 'bg-rose-100 text-rose-800 border-rose-300';
+    badgeStyle = styles.errorBanner;
   }
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${colorStyle}`}
+      className={`${styles.providerBadge} ${badgeStyle}`}
+      style={{ padding: '2px 8px', fontSize: '10px' }}
       data-testid={`status-${status?.toLowerCase()}`}
     >
       {status?.replaceAll('_', ' ') || 'UNKNOWN'}
@@ -78,9 +78,7 @@ export function ProviderBadge({ provider }) {
   const isSimulated = provider === 'SIMULATED';
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${
-        isSimulated ? 'bg-purple-100 text-purple-800 border border-purple-300' : 'bg-slate-100 text-slate-700 border border-slate-300'
-      }`}
+      className={`${styles.providerBadge} ${isSimulated ? styles.badgeSimulated : styles.badgeSandbox}`}
       data-testid="provider-badge"
     >
       {provider || 'SANDBOX'}
@@ -158,73 +156,71 @@ export function TransactionsPage() {
   return (
     <div className={styles.pageStack} data-testid="transactions-page">
       {/* Header Toolbar */}
-      <div className={styles.pageToolbar}>
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">{t('transactions.title', 'Transactions')}</h2>
-          <p className="text-sm text-gray-500">
-            {t('transactions.subtitle', 'Universal transaction engine monitoring across all 15 categories')}
+      <div className={styles.pageHeader}>
+        <div className={styles.pageTitleGroup}>
+          <h1 className={styles.pageTitle}>Transactions</h1>
+          <p className={styles.pageSubtitle}>
+            Universal transaction engine monitoring across all 15 financial categories.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className={styles.headerActions}>
           <button
             type="button"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="p-2 border rounded-md text-gray-600 hover:bg-gray-50 transition"
-            title="Refresh"
+            className={styles.secondaryLink}
+            title="Refresh transactions"
           >
-            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
+            Refresh
           </button>
           <Link
             to="/transactions/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-semibold rounded-full hover:bg-gray-800 transition shadow-sm"
+            className={styles.primaryLink}
             data-testid="new-transaction-btn"
           >
-            <Plus className="w-4 h-4" />
-            {t('transactions.new', 'New Transaction')}
+            <Plus size={16} />
+            New Transaction
           </Link>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white border rounded-xl p-4 shadow-sm space-y-4">
+      {/* Filter Card */}
+      <div className={styles.formCard} style={{ maxWidth: '100%', gap: 'var(--jp-space-4)' }}>
         {/* Search Input */}
-        <form onSubmit={handleSearchSubmit} className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--jp-text-muted)' }} />
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder={t('transactions.searchPlaceholder', 'Search by ID, payee, counterparty, description...')}
-              className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black"
+              placeholder="Search by Intent ID, payee, counterparty, description..."
+              className={styles.fieldInput}
+              style={{ paddingLeft: '36px' }}
               data-testid="transactions-search"
             />
           </div>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium rounded-lg transition"
-          >
-            {t('transactions.search', 'Search')}
+          <button type="submit" className={styles.secondaryLink}>
+            Search
           </button>
           {(selectedCategories.length > 0 || selectedStatuses.length > 0 || searchTerm) && (
             <button
               type="button"
               onClick={clearAllFilters}
-              className="px-3 py-2 text-rose-600 hover:bg-rose-50 text-sm font-medium rounded-lg transition flex items-center gap-1"
+              className={styles.secondaryLink}
+              style={{ color: '#9b1c2a', borderColor: '#f8b4be' }}
             >
-              <X className="w-4 h-4" />
-              {t('transactions.clearFilters', 'Clear')}
+              <X size={14} />
+              Clear Filters
             </button>
           )}
         </form>
 
         {/* Category Filter Pills */}
-        <div>
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">
-            {t('transactions.filterCategory', 'Filter by Category')}
-          </span>
-          <div className="flex flex-wrap gap-1.5" data-testid="category-filters">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span className={styles.fieldLabel}>Filter by Category</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }} data-testid="category-filters">
             {TRANSACTION_CATEGORIES.map((cat) => {
               const active = selectedCategories.includes(cat);
               return (
@@ -232,11 +228,8 @@ export function TransactionsPage() {
                   key={cat}
                   type="button"
                   onClick={() => toggleCategory(cat)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
-                    active
-                      ? 'bg-black text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={active ? styles.primaryLink : styles.secondaryLink}
+                  style={{ height: '26px', fontSize: '11px', padding: '0 10px' }}
                   data-testid={`filter-cat-${cat.toLowerCase()}`}
                 >
                   {cat}
@@ -247,23 +240,18 @@ export function TransactionsPage() {
         </div>
 
         {/* Status Filter Pills */}
-        <div>
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">
-            {t('transactions.filterStatus', 'Filter by Status')}
-          </span>
-          <div className="flex flex-wrap gap-1.5" data-testid="status-filters">
-            {['SUBMITTED', 'NEEDS_APPROVAL', 'APPROVED', 'EXECUTING', 'COMPLETED', 'FAILED', 'REJECTED'].map((st) => {
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span className={styles.fieldLabel}>Filter by Status</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }} data-testid="status-filters">
+            {TRANSACTION_STATUSES.map((st) => {
               const active = selectedStatuses.includes(st);
               return (
                 <button
                   key={st}
                   type="button"
                   onClick={() => toggleStatus(st)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
-                    active
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={active ? styles.primaryLink : styles.secondaryLink}
+                  style={{ height: '26px', fontSize: '11px', padding: '0 10px' }}
                   data-testid={`filter-status-${st.toLowerCase()}`}
                 >
                   {st.replaceAll('_', ' ')}
@@ -274,99 +262,96 @@ export function TransactionsPage() {
         </div>
       </div>
 
-      {/* Main Content: Loading, Error, Empty, or Table */}
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-white border rounded-xl text-center space-y-3" data-testid="transactions-loading">
-          <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-500">{t('transactions.loading', 'Loading transactions...')}</p>
+      {/* Main Content Area */}
+      {isLoading && (
+        <div className={styles.emptyCard} data-testid="transactions-loading">
+          <Loader2 className="animate-spin" size={32} />
+          <p className={styles.emptyDesc}>Loading transactions from universal engine...</p>
         </div>
-      ) : isError ? (
-        <div className="p-6 bg-red-50 border border-red-200 rounded-xl space-y-2" data-testid="transactions-error">
-          <div className="flex items-center gap-2 text-red-800 font-semibold">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            {t('transactions.errorTitle', 'Failed to load transactions')}
-          </div>
-          <p className="text-sm text-red-700">{error?.message || 'Unknown network error'}</p>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-xs font-medium transition"
-          >
-            {t('app.retry', 'Retry')}
-          </button>
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="p-12 bg-white border rounded-xl text-center space-y-4" data-testid="transactions-empty">
-          <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto">
-            <Layers className="w-6 h-6" />
-          </div>
+      )}
+
+      {isError && (
+        <div className={styles.errorBanner} data-testid="transactions-error">
+          <AlertCircle size={20} />
           <div>
-            <h3 className="text-base font-semibold text-gray-900">{t('transactions.noResults', 'No transactions found')}</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              {t('transactions.noResultsDesc', 'Transactions matching current filter criteria will be listed here.')}
-            </p>
+            <strong>Failed to Load Transactions</strong>
+            <p style={{ margin: '4px 0 0 0' }}>{error?.message || 'Error communicating with backend transaction API.'}</p>
           </div>
+        </div>
+      )}
+
+      {!isLoading && !isError && rows.length === 0 && (
+        <div className={styles.emptyCard} data-testid="transactions-empty">
+          <Layers size={36} color="var(--jp-text-muted)" />
+          <h3 className={styles.emptyTitle}>No Transactions Found</h3>
+          <p className={styles.emptyDesc}>
+            Transactions matching current filter criteria will be listed here.
+          </p>
           {(selectedCategories.length > 0 || selectedStatuses.length > 0 || searchTerm) && (
             <button
               type="button"
               onClick={clearAllFilters}
-              className="px-4 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              className={styles.secondaryLink}
             >
-              {t('transactions.resetFilters', 'Reset Filters')}
+              Reset Filters
             </button>
           )}
         </div>
-      ) : (
-        <div className="bg-white border rounded-xl shadow-sm overflow-hidden" data-testid="transactions-table-card">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm" data-testid="transactions-table">
-              <thead className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wider">
+      )}
+
+      {!isLoading && !isError && rows.length > 0 && (
+        <div className={styles.tableCard} data-testid="transactions-table-card">
+          <div className={styles.tableScroll}>
+            <table className={styles.dataTable} data-testid="transactions-table">
+              <thead>
                 <tr>
-                  <th className="py-3 px-4">{t('transactions.colDate', 'Date')}</th>
-                  <th className="py-3 px-4">{t('transactions.colCategory', 'Category')}</th>
-                  <th className="py-3 px-4">{t('transactions.colAmount', 'Amount')}</th>
-                  <th className="py-3 px-4">{t('transactions.colCounterparty', 'Counterparty')}</th>
-                  <th className="py-3 px-4">{t('transactions.colProvider', 'Provider')}</th>
-                  <th className="py-3 px-4">{t('transactions.colStatus', 'Status')}</th>
-                  <th className="py-3 px-4 text-right">{t('transactions.colAction', 'Action')}</th>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Amount</th>
+                  <th>Counterparty</th>
+                  <th>Provider</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {rows.map((tx) => (
-                  <tr key={tx.intent_id || tx.id} className="hover:bg-gray-50/80 transition" data-testid={`tx-row-${tx.intent_id}`}>
-                    <td className="py-3.5 px-4 font-mono text-xs text-gray-600 whitespace-nowrap">
-                      {dateLabel(tx.created_at)}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-semibold text-gray-900 flex items-center gap-1.5">
-                        <span>{tx.category}</span>
-                        <span className="text-xs text-gray-400 font-normal">/ {tx.sub_type}</span>
-                      </div>
-                      <div className="text-[11px] font-mono text-gray-400 truncate max-w-[140px]">
-                        {tx.intent_id}
+                  <tr key={tx.intent_id || tx.id}>
+                    <td className={styles.mono}>{dateLabel(tx.created_at)}</td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 'bold' }}>{tx.category}</span>
+                        <span className={styles.pageSubtitle} style={{ fontSize: '11px' }}>
+                          {tx.sub_type || 'standard'}
+                        </span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 font-semibold text-gray-900 whitespace-nowrap">
+                    <td className={styles.mono} style={{ fontWeight: 'bold' }}>
                       {formatMoney(tx.amount_minor, tx.currency)}
                     </td>
-                    <td className="py-3.5 px-4 text-gray-700">
-                      <div className="font-medium text-xs truncate max-w-[200px]">
-                        {tx.counterparty_name || '—'}
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: '500' }}>{tx.counterparty_name || 'Internal Ledger'}</span>
+                        {tx.counterparty_id && (
+                          <span className={styles.mono} style={{ fontSize: '11px', color: 'var(--jp-text-muted)' }}>
+                            {tx.counterparty_id.slice(0, 8)}...
+                          </span>
+                        )}
                       </div>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <ProviderBadge provider={tx.provider} />
+                    <td>
+                      <ProviderBadge provider={tx.provider || CATEGORY_PROVIDERS[tx.category] || 'SANDBOX'} />
                     </td>
-                    <td className="py-3.5 px-4">
+                    <td>
                       <StatusPill status={tx.status} />
                     </td>
-                    <td className="py-3.5 px-4 text-right">
+                    <td style={{ textAlign: 'right' }}>
                       <Link
                         to={`/transactions/${tx.intent_id || tx.id}`}
-                        className="text-xs font-semibold text-black hover:underline"
-                        data-testid={`view-tx-${tx.intent_id}`}
+                        className={styles.primaryLink}
+                        style={{ height: '28px', fontSize: '12px', padding: '0 10px' }}
                       >
-                        {t('transactions.viewDetails', 'View')} &rarr;
+                        View &rarr;
                       </Link>
                     </td>
                   </tr>
@@ -374,11 +359,9 @@ export function TransactionsPage() {
               </tbody>
             </table>
           </div>
-          <div className="p-3 bg-gray-50 border-t flex items-center justify-between text-xs text-gray-500">
-            <span>
-              {t('transactions.showingCount', { count: rows.length, total: data?.totalCount || rows.length })}
-            </span>
-            <span className="font-mono text-[11px] text-gray-400">Double-entry verified & idempotency enforced</span>
+
+          <div style={{ padding: 'var(--jp-space-3) var(--jp-space-4)', background: 'var(--jp-surface-sidebar)', borderTop: '1px solid var(--jp-border)', fontSize: '12px', color: 'var(--jp-text-muted)' }}>
+            Showing {rows.length} of {data?.totalCount || rows.length} transactions
           </div>
         </div>
       )}
@@ -387,4 +370,3 @@ export function TransactionsPage() {
 }
 
 export default TransactionsPage;
-

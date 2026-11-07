@@ -19,10 +19,10 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import styles from './TransactionPages.module.css';
 
 export function PayoutPage({ payoutId = null }) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState('overview');
 
   const {
     data: payout,
@@ -38,118 +38,104 @@ export function PayoutPage({ payoutId = null }) {
     enabled: Boolean(payoutId),
   });
 
-  // 1. Loading State
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-center" data-testid="payout-loading">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
-        <p className="text-sm text-gray-500">Memuat data transaksi payout...</p>
+      <div className={styles.emptyCard} data-testid="payout-loading">
+        <Loader2 className="animate-spin" size={32} />
+        <p className={styles.emptyDesc}>Loading payout transaction data...</p>
       </div>
     );
   }
 
-  // 2. Error State
   if (isError) {
     return (
-      <div className="p-6 max-w-2xl mx-auto" data-testid="payout-error">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+      <div className={styles.pageStack} data-testid="payout-error">
+        <div className={styles.errorBanner}>
+          <AlertCircle size={20} />
           <div>
-            <h3 className="text-sm font-semibold text-red-800">Gagal Memuat Payout</h3>
-            <p className="text-sm text-red-700 mt-1">{error?.message || 'Terjadi kesalahan sistem'}</p>
+            <strong>Failed to Load Payout</strong>
+            <p style={{ margin: '4px 0 0 0' }}>{error?.message || 'An internal system error occurred.'}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // 3. Empty State (no payout selected or no payouts found)
   if (!payoutId || !payout) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[350px] p-8 text-center max-w-md mx-auto" data-testid="payout-empty">
-        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4 text-gray-400">
-          <DollarSign className="w-6 h-6" />
-        </div>
-        <h3 className="text-base font-semibold text-gray-900">Belum Ada Transaksi Payout</h3>
-        <p className="text-sm text-gray-500 mt-1 mb-6">
-          Buat usulan payout baru dari agen atau simulator transaksi.
+      <div className={styles.emptyCard} data-testid="payout-empty">
+        <DollarSign size={36} color="var(--jp-text-muted)" />
+        <h3 className={styles.emptyTitle}>No Payout Transactions Found</h3>
+        <p className={styles.emptyDesc}>
+          Submit a new payout proposal from an agent, API request, or the transaction proposal hub.
         </p>
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-          SANDBOX ONLY — Simulasi Dana
+        <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+          SANDBOX ONLY — Simulated Funds
         </span>
       </div>
     );
   }
 
-  // 4. Detail / Success State
-  const statusColors = {
-    DRAFT: 'bg-gray-100 text-gray-800',
-    SUBMITTED: 'bg-blue-100 text-blue-800',
-    EVALUATING: 'bg-purple-100 text-purple-800',
-    NEEDS_APPROVAL: 'bg-amber-100 text-amber-800',
-    APPROVED: 'bg-teal-100 text-teal-800',
-    EXECUTING: 'bg-indigo-100 text-indigo-800',
-    COMPLETED: 'bg-green-100 text-green-800',
-    FAILED: 'bg-red-100 text-red-800',
-  };
-
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6" data-testid="payout-detail">
+    <div className={styles.pageStack} data-testid="payout-detail">
       {/* Sandbox Warning Banner */}
-      <div className="rounded-md bg-amber-50 border border-amber-200 p-3 flex items-center justify-between text-xs text-amber-900">
-        <span className="font-semibold tracking-wide">SANDBOX ONLY</span>
-        <span>Lingkungan Uji Coba — Tidak ada pergerakan uang nyata</span>
+      <div className={styles.calculationCard} style={{ margin: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+          <strong style={{ color: 'var(--jp-blue-dark)' }}>SANDBOX ONLY</strong>
+          <span style={{ color: 'var(--jp-text-muted)' }}>Testing Environment — No real money movement</span>
+        </div>
       </div>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-200">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-gray-900">Payout #{payout.intent_id?.slice(0, 8)}</h1>
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColors[payout.status] || 'bg-gray-100'}`}>
+      <div className={styles.pageHeader}>
+        <div className={styles.pageTitleGroup}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 className={styles.pageTitle}>Payout #{payout.intent_id?.slice(0, 8)}</h1>
+            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
               {payout.status}
             </span>
           </div>
-          <p className="text-sm text-gray-500 mt-0.5">Kategori: PAYOUT (standard)</p>
+          <p className={styles.pageSubtitle}>Category: PAYOUT (standard)</p>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-gray-900">
+        <div style={{ textAlign: 'right' }}>
+          <div className={styles.mono} style={{ fontSize: '24px', fontWeight: 'bold' }}>
             {payout.currency} {(Number(payout.amount_minor || 0) / 100).toFixed(2)}
           </div>
-          <p className="text-xs text-gray-500">Rekonsiliasi: {payout.reconciliation_status}</p>
-        </div>
-      </div>
-
-      {/* Maker / Checker Control Notice */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-        <UserCheck className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div>
-          <h4 className="text-sm font-semibold text-blue-900">Kontrol Maker/Checker Terintegrasi</h4>
-          <p className="text-xs text-blue-800 mt-0.5">
-            Setiap usulan payout oleh agen wajib melewati Decision Engine (Tahap A/B/C/D) dan persetujuan manusia
-            (Approver) bila melampaui batas auto-approve.
+          <p className={styles.pageSubtitle} style={{ fontSize: '11px' }}>
+            Reconciliation: {payout.reconciliation_status}
           </p>
         </div>
       </div>
 
+      {/* Maker / Checker Control Notice */}
+      <div className={styles.formCard} style={{ maxWidth: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <UserCheck size={18} />
+          <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold' }}>Integrated Maker / Checker Governance</h4>
+        </div>
+        <p className={styles.pageSubtitle} style={{ margin: 0 }}>
+          Every payout proposal initiated by an AI agent must clear the 4-stage Decision Engine (Stages A/B/C/D) and requires human approver sign-off if policy thresholds are met.
+        </p>
+      </div>
+
       {/* Double-Entry Ledger Preview */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          Buku Besar Berimbang (Double-Entry Balanced)
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div className="p-3 bg-red-50 border border-red-100 rounded">
-            <span className="font-semibold text-red-700">DEBIT (Pengurangan Kas)</span>
-            <div className="mt-1 font-mono text-gray-800">Akun: org:main</div>
-            <div className="font-mono text-red-900 font-bold mt-0.5">
+      <div className={styles.tableCard}>
+        <div style={{ padding: 'var(--jp-space-4)', borderBottom: '1px solid var(--jp-border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShieldCheck size={18} />
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold' }}>Balanced Double-Entry Financial Ledger</h3>
+        </div>
+        <div className={styles.formGrid} style={{ padding: 'var(--jp-space-4)' }}>
+          <div className={styles.calculationCard} style={{ background: '#fdecef', borderColor: '#f8b4be' }}>
+            <span style={{ fontWeight: 'bold', color: '#9b1c2a', fontSize: '12px' }}>DEBIT (Cash Outflow)</span>
+            <div className={styles.mono} style={{ fontSize: '12px', marginTop: '4px' }}>Account: org:main</div>
+            <div className={styles.mono} style={{ fontSize: '18px', fontWeight: 'bold', color: '#9b1c2a', marginTop: '4px' }}>
               -{payout.currency} {(Number(payout.amount_minor || 0) / 100).toFixed(2)}
             </div>
           </div>
-          <div className="p-3 bg-green-50 border border-green-100 rounded">
-            <span className="font-semibold text-green-700">CREDIT (Hak Tagih Penerima)</span>
-            <div className="mt-1 font-mono text-gray-800">Akun: payee:{payout.counterparty_id?.slice(0, 8)}...</div>
-            <div className="font-mono text-green-900 font-bold mt-0.5">
+          <div className={styles.calculationCard} style={{ background: '#e8f5ee', borderColor: '#a3d9b8' }}>
+            <span style={{ fontWeight: 'bold', color: '#0c6b3c', fontSize: '12px' }}>CREDIT (Payee Entitlement)</span>
+            <div className={styles.mono} style={{ fontSize: '12px', marginTop: '4px' }}>Account: payee:{payout.counterparty_id?.slice(0, 8)}...</div>
+            <div className={styles.mono} style={{ fontSize: '18px', fontWeight: 'bold', color: '#0c6b3c', marginTop: '4px' }}>
               +{payout.currency} {(Number(payout.amount_minor || 0) / 100).toFixed(2)}
             </div>
           </div>
@@ -160,4 +146,3 @@ export function PayoutPage({ payoutId = null }) {
 }
 
 export default PayoutPage;
-

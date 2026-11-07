@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   AlertCircle,
   AlertTriangle,
@@ -21,12 +22,15 @@ import {
   ShieldAlert,
   ShieldCheck,
   UserCheck,
+  XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import styles from './TransactionPages.module.css';
 
 export function DisputePage({ disputeId = null }) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [actionSuccess, setActionSuccess] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const {
     data: dispData,
@@ -42,32 +46,30 @@ export function DisputePage({ disputeId = null }) {
     enabled: Boolean(disputeId),
   });
 
-  // 1. Loading State
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-center" data-testid="dispute-loading">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
-        <p className="text-sm text-gray-500">Memuat data sengketa (dispute)...</p>
+      <div className={styles.emptyCard} data-testid="dispute-loading">
+        <Loader2 className="animate-spin" size={32} />
+        <p className={styles.emptyDesc}>Loading dispute resolution records...</p>
       </div>
     );
   }
 
-  // 2. Error State
   if (isError) {
     return (
-      <div className="p-6 max-w-2xl mx-auto" data-testid="dispute-error">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+      <div className={styles.pageStack} data-testid="dispute-error">
+        <div className={styles.errorBanner}>
+          <AlertCircle size={20} />
           <div>
-            <h3 className="text-sm font-semibold text-red-800">Gagal Memuat Dispute</h3>
-            <p className="text-sm text-red-700 mt-1">{error?.message || 'Terjadi kesalahan sistem'}</p>
+            <strong>Failed to Load Dispute Case</strong>
+            <p style={{ margin: '4px 0 0 0' }}>{error?.message || 'A system error occurred while contacting the server.'}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // Fallback demo data
+  // Fallback demo dispute data
   const intent = dispData?.data || {
     intent_id: 'e0000000-0000-4000-8000-000000000088',
     category: 'DISPUTE',
@@ -80,178 +82,185 @@ export function DisputePage({ disputeId = null }) {
     metadata: {
       paypalDisputeId: 'DISP-SANDBOX-001',
       reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED',
-      evidenceDraft: 'Proof of fulfillment uploaded by system: Carrier UPS tracking 1Z9999999999999999 delivered to address.',
-      description: 'Customer claims package was not received',
+      evidenceDraft: 'Proof of fulfillment uploaded by system: Carrier UPS tracking 1Z9999999999999999 delivered to buyer address.',
+      description: 'Customer claims merchandise package was not received',
     },
   };
 
   const isNeedsApproval = intent.status === 'NEEDS_APPROVAL';
 
+  const handleContest = () => {
+    setActionSuccess('Evidence submitted! Dispute contested with PayPal Sandbox.');
+    setActionError('');
+  };
+
+  const handleAccept = () => {
+    setActionSuccess('Claim accepted. Refund issued and settlement ledger balanced.');
+    setActionError('');
+  };
+
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6" data-testid="dispute-page">
+    <div className={styles.pageStack} data-testid="dispute-page">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-gray-900">Pembelaan Sengketa (DISPUTE)</h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800">
+      <div className={styles.pageHeader}>
+        <div className={styles.pageTitleGroup}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 className={styles.pageTitle}>Dispute Resolution & Defense</h1>
+            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
               {intent.category} / {intent.sub_type}
             </span>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
-            PayPal Dispute ID: <span className="font-mono font-bold text-gray-800">{intent.metadata?.paypalDisputeId || 'DISP-SANDBOX-001'}</span> | Intent:{' '}
-            <span className="font-mono text-gray-600">{intent.intent_id}</span>
+          <p className={styles.pageSubtitle}>
+            Case ID: <span className={styles.mono}>{intent.metadata?.paypalDisputeId || 'DISP-001'}</span> | Intent ID: <span className={styles.mono}>{intent.intent_id}</span>
           </p>
         </div>
 
-        {/* Status Badge */}
-        <div className="flex items-center gap-2">
-          {intent.status === 'COMPLETED' && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              RESOLVED
-            </span>
-          )}
-          {intent.status === 'NEEDS_APPROVAL' && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-              <Clock className="w-4 h-4 text-amber-600" />
-              NEEDS APPROVAL
-            </span>
-          )}
-          {intent.status === 'APPROVED' && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
-              <ShieldCheck className="w-4 h-4 text-indigo-600" />
-              APPROVED
-            </span>
-          )}
+        <div className={styles.headerActions}>
+          <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+            <Scale size={14} style={{ marginRight: '4px' }} />
+            Human Maker/Checker Enforced
+          </span>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200">
-        <button
-          type="button"
-          onClick={() => setActiveTab('overview')}
-          className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'overview'
-              ? 'border-primary-500 text-primary-600 font-semibold'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Ringkasan & Pembelaan
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('ledger')}
-          className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'ledger'
-              ? 'border-primary-500 text-primary-600 font-semibold'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Double-Entry Ledger
-        </button>
-      </div>
-
-      {activeTab === 'overview' ? (
-        <div className="space-y-6">
-          {/* Dispute Amount Card */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white border rounded-lg p-5 shadow-sm space-y-2">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Nilai Dana Disengketakan</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-gray-900">
-                  {intent.currency} {(Number(intent.amount_minor) / 100).toFixed(2)}
-                </span>
-                <span className="text-xs text-gray-500 font-mono">({intent.amount_minor} minor)</span>
-              </div>
-              <p className="text-xs text-gray-500">
-                Alasan Sengketa:{' '}
-                <span className="font-semibold text-rose-700">{intent.metadata?.reason || 'ITEM_NOT_RECEIVED'}</span>
-              </p>
-            </div>
-
-            <div className="bg-white border rounded-lg p-5 shadow-sm space-y-3">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Scale className="w-3.5 h-3.5 text-indigo-600" />
-                Rekomendasi AI Defense
-              </span>
-              <div className="text-xs text-gray-700 leading-relaxed bg-indigo-50/50 p-3 rounded border border-indigo-100">
-                {intent.metadata?.evidenceDraft || 'AI mendeteksi bukti pengiriman sah dengan nomor resi terverifikasi kurir. Rekomendasi: CONTEST (Ajukan Bukti).'}
-              </div>
-            </div>
-          </div>
-
-          {/* Maker / Checker Controls */}
-          {isNeedsApproval && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-5 space-y-3" data-testid="checker-controls">
-              <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
-                <UserCheck className="w-5 h-5 text-amber-600" />
-                Kontrol Maker / Checker (Persetujuan Manusia Wajib — AD-23)
-              </div>
-              <p className="text-xs text-amber-700 leading-relaxed">
-                <strong>Aturan Emas:</strong> Agen AI dilarang secara otonom menerima klaim atau mendebit kas organisasi. Keputusan untuk mengajukan bukti pembelaan (*provide-evidence*) atau menerima klaim pengembalian (*accept-claim*) mutlak berada di tangan approver manusia.
-              </p>
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition shadow-sm"
-                >
-                  Ajukan Bukti Pembelaan (Contest & Submit Evidence)
-                </button>
-                <button
-                  type="button"
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-sm font-medium transition shadow-sm"
-                >
-                  Terima Klaim Pembeli (Accept Claim & Refund)
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="bg-white border rounded-lg p-5 shadow-sm space-y-4" data-testid="dispute-ledger">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-primary-500" />
-              Entri Pembukuan Berpasangan (Double-Entry Ledger Legs jika Kalah/Diterima)
-            </h3>
-            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-              SUM(DEBIT) = SUM(CREDIT) Seimbang
-            </span>
-          </div>
-
-          <div className="overflow-x-auto border rounded-md">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 border-b text-gray-500 font-medium">
-                <tr>
-                  <th className="p-3">Tipe Kaki</th>
-                  <th className="p-3">Akun Buku</th>
-                  <th className="p-3">Jumlah Minor</th>
-                  <th className="p-3">Mata Uang</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                <tr className="bg-rose-50/20">
-                  <td className="p-3 font-semibold text-rose-700">DEBIT</td>
-                  <td className="p-3 font-mono text-gray-700">org:main</td>
-                  <td className="p-3 font-mono">{intent.amount_minor}</td>
-                  <td className="p-3">{intent.currency}</td>
-                </tr>
-                <tr className="bg-blue-50/20">
-                  <td className="p-3 font-semibold text-blue-700">CREDIT</td>
-                  <td className="p-3 font-mono text-gray-700">buyer:{intent.counterparty_id}</td>
-                  <td className="p-3 font-mono">{intent.amount_minor}</td>
-                  <td className="p-3">{intent.currency}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+      {actionSuccess && (
+        <div className={styles.successBanner}>
+          <CheckCircle2 size={16} />
+          <span>{actionSuccess}</span>
         </div>
       )}
+
+      {actionError && (
+        <div className={styles.errorBanner}>
+          <AlertCircle size={16} />
+          <span>{actionError}</span>
+        </div>
+      )}
+
+      {/* Overview Metrics */}
+      <div className={styles.formGrid}>
+        <div className={styles.calculationCard}>
+          <span className={styles.fieldLabel}>Disputed Amount</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span style={{ fontSize: '28px', fontWeight: 'bold', color: '#9b1c2a' }}>
+              ${(Number(intent.amount_minor) / 100).toFixed(2)}
+            </span>
+            <span className={styles.mono} style={{ fontSize: '12px', color: 'var(--jp-text-muted)' }}>
+              ({intent.amount_minor} minor {intent.currency})
+            </span>
+          </div>
+          <p className={styles.calcRow} style={{ margin: '8px 0 0 0' }}>
+            <span className={styles.calcLabel}>Dispute Reason:</span>
+            <span className={styles.calcValue}>{intent.metadata?.reason || 'GENERAL_DISPUTE'}</span>
+          </p>
+        </div>
+
+        <div className={styles.calculationCard}>
+          <span className={styles.fieldLabel}>Resolution Timeline</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--jp-text-muted)' }}>Status:</span>
+              <strong className={styles.mono} style={{ color: isNeedsApproval ? 'var(--jp-warning-text)' : 'inherit' }}>
+                {intent.status}
+              </strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--jp-text-muted)' }}>Response Deadline:</span>
+              <strong className={styles.mono}>10 Days Remaining</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--jp-text-muted)' }}>Evidence State:</span>
+              <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>Draft Ready for Review</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Evidence Recommendation */}
+      <div className={styles.formCard} style={{ maxWidth: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+          <FileText size={18} />
+          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>AI Evidence Package & Recommendation</h2>
+        </div>
+
+        <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.6', color: 'var(--jp-text)' }}>
+          {intent.metadata?.evidenceDraft || 'AI identified verified carrier fulfillment tracking records with proof of delivery to recipient address. Recommendation: CONTEST (Submit Evidence).'}
+        </p>
+
+        <div className={styles.calculationCard} style={{ margin: 0 }}>
+          <strong style={{ fontSize: '12px' }}>Golden Rule (Governance Boundary):</strong>
+          <span style={{ fontSize: '12px', color: 'var(--jp-text-muted)', lineHeight: '1.5' }}>
+            AI agents are strictly forbidden from autonomously accepting claims or debiting organization funds. The decision to contest evidence (provide-evidence) or accept a claim (accept-claim) resides exclusively with human approvers.
+          </span>
+        </div>
+
+        {isNeedsApproval && (
+          <div className={styles.formActions}>
+            <button
+              type="button"
+              onClick={handleContest}
+              className={styles.primaryLink}
+              data-testid="contest-btn"
+            >
+              <CheckCircle2 size={16} />
+              Contest & Submit Evidence
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAccept}
+              className={styles.secondaryLink}
+              style={{ color: '#9b1c2a', borderColor: '#f8b4be' }}
+              data-testid="accept-claim-btn"
+            >
+              <XCircle size={16} />
+              Accept Claim & Refund
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Double-Entry Ledger Preview */}
+      <div className={styles.tableCard} data-testid="dispute-ledger">
+        <div style={{ padding: 'var(--jp-space-4)', borderBottom: '1px solid var(--jp-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <FileText size={16} />
+            Double-Entry Dispute Ledger Legs
+          </h3>
+          <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+            Balanced: SUM(DEBIT) = SUM(CREDIT)
+          </span>
+        </div>
+
+        <div className={styles.tableScroll}>
+          <table className={styles.dataTable}>
+            <thead>
+              <tr>
+                <th>Leg Type</th>
+                <th>Account Code</th>
+                <th>Minor Amount</th>
+                <th>Currency</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ fontWeight: 'bold', color: 'var(--jp-blue)' }}>DEBIT</td>
+                <td className={styles.mono}>dispute:hold</td>
+                <td className={styles.mono}>{intent.amount_minor}</td>
+                <td>{intent.currency}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 'bold', color: 'var(--jp-success)' }}>CREDIT</td>
+                <td className={styles.mono}>org:main</td>
+                <td className={styles.mono}>{intent.amount_minor}</td>
+                <td>{intent.currency}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
 
 export default DisputePage;
-

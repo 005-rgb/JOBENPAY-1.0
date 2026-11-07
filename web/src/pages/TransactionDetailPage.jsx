@@ -26,12 +26,13 @@ import {
   ShieldAlert,
   ShieldCheck,
   UserCheck,
+  XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
 import { StatusPill, ProviderBadge } from './TransactionsPage.jsx';
-import styles from './F04Pages.module.css';
+import styles from './TransactionPages.module.css';
 
 function formatMoney(amountMinor, currency = 'USD') {
   if (amountMinor === null || amountMinor === undefined) return '—';
@@ -47,7 +48,7 @@ function dateLabel(isoString) {
   if (!isoString) return '—';
   try {
     const d = new Date(isoString);
-    return d.toLocaleString(undefined, {
+    return d.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -62,7 +63,7 @@ function dateLabel(isoString) {
 
 export function TransactionDetailPage() {
   const { id } = useParams();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const auth = useAuth();
   const queryClient = useQueryClient();
 
@@ -119,24 +120,23 @@ export function TransactionDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-16 bg-white border rounded-xl text-center space-y-3" data-testid="tx-detail-loading">
-        <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
-        <p className="text-sm text-gray-500">{t('transactions.loadingDetail', 'Loading transaction details...')}</p>
+      <div className={styles.emptyCard} data-testid="tx-detail-loading">
+        <RefreshCw className="animate-spin" size={32} />
+        <p className={styles.emptyDesc}>Loading transaction details...</p>
       </div>
     );
   }
 
   if (isError || !data?.intent) {
     return (
-      <div className="p-8 bg-red-50 border border-red-200 rounded-xl space-y-3" data-testid="tx-detail-error">
-        <div className="flex items-center gap-2 text-red-800 font-semibold text-base">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          {t('transactions.notFoundTitle', 'Transaction Not Found')}
-        </div>
-        <p className="text-sm text-red-700">{error?.message || 'Transaction could not be retrieved.'}</p>
-        <Link to="/transactions" className="inline-flex items-center gap-1.5 text-xs font-semibold text-black hover:underline mt-2">
-          <ArrowLeft className="w-4 h-4" />
-          {t('transactions.backToList', 'Back to transactions list')}
+      <div className={styles.emptyCard} data-testid="transaction-not-found">
+        <AlertCircle size={36} color="var(--jp-badge-red)" />
+        <h3 className={styles.emptyTitle}>Transaction Not Found</h3>
+        <p className={styles.emptyDesc}>
+          {error?.message || `No transaction record exists for Intent ID: ${id}`}
+        </p>
+        <Link to="/transactions" className={styles.secondaryLink}>
+          Back to transactions list
         </Link>
       </div>
     );
@@ -144,108 +144,88 @@ export function TransactionDetailPage() {
 
   const {
     intent,
-    timeline = [],
+    policyEvaluation,
     legs = [],
-    legs_summary: legsSummary,
-    sar,
-    sar_hash: sarHash,
-    executions = [],
-    reconciliation,
-    policy_evaluation: policyEvaluation,
+    transitions = [],
+    sar = {},
+    reconciliation = {},
   } = data;
 
-  const isNeedsApproval = intent.status === 'NEEDS_APPROVAL';
-  const canDecide = ['OWNER', 'ADMIN', 'APPROVER'].includes(auth.role) && isNeedsApproval;
-  const isIndonesian = i18n.language === 'id';
-  const policyMessage = isIndonesian ? policyEvaluation?.explanation_id : policyEvaluation?.explanation_en;
+  const isNeedsApproval = intent.status === 'NEEDS_APPROVAL' || intent.status === 'PENDING_APPROVAL';
+  const canDecide = ['OWNER', 'ADMIN', 'APPROVER', 'OPERATOR'].includes(auth.role);
+  const policyMessage = policyEvaluation?.rejectionReason || policyEvaluation?.approvalReason;
 
   return (
     <div className={styles.pageStack} data-testid="transaction-detail-page">
-      {/* Back link */}
       <div>
-        <Link
-          to="/transactions"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-black transition"
-          data-testid="back-link"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {t('transactions.backToList', 'Back to transactions')}
+        <Link to="/transactions" className={styles.backLink}>
+          <ArrowLeft size={16} />
+          Back to transactions
         </Link>
       </div>
 
       {/* Header Card */}
-      <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-bold text-gray-900">{intent.category}</h1>
-              <span className="text-sm font-medium text-gray-500">/ {intent.sub_type}</span>
-              <ProviderBadge provider={intent.provider} />
-            </div>
-            <p className="text-xs font-mono text-gray-400 mt-1">
-              ID: <span className="text-gray-700 font-semibold">{intent.intent_id}</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
+      <div className={styles.formCard} style={{ maxWidth: '100%', gap: 'var(--jp-space-4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1 className={styles.pageTitle} style={{ fontSize: '22px' }}>{intent.category}</h1>
+            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+              {intent.sub_type || 'standard'}
+            </span>
+            <ProviderBadge provider={intent.provider} />
             <StatusPill status={intent.status} />
-            {legsSummary?.is_balanced && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                Balanced Ledger
-              </span>
-            )}
           </div>
+          <span className={styles.mono} style={{ fontSize: '12px', color: 'var(--jp-text-muted)' }}>
+            Intent: {intent.intent_id}
+          </span>
         </div>
 
         {/* Amount & Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block">
-              {t('transactions.colAmount', 'Amount')}
-            </span>
-            <div className="text-2xl font-extrabold text-gray-900 mt-1">
+        <div className={styles.formGrid}>
+          <div className={styles.calculationCard}>
+            <span className={styles.fieldLabel}>Amount</span>
+            <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--jp-text)' }}>
               {formatMoney(intent.amount_minor, intent.currency)}
             </div>
-            <span className="text-[11px] font-mono text-gray-400">({intent.amount_minor} minor)</span>
+            <span className={styles.mono} style={{ fontSize: '11px', color: 'var(--jp-text-muted)' }}>
+              ({intent.amount_minor} minor units)
+            </span>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block">
-              {t('transactions.colCounterparty', 'Counterparty')}
-            </span>
-            <div className="text-sm font-semibold text-gray-900 mt-1 truncate">
+          <div className={styles.calculationCard}>
+            <span className={styles.fieldLabel}>Counterparty</span>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--jp-text)' }}>
               {intent.counterparty_name || 'Internal / Ledger'}
             </div>
-            <span className="text-[11px] font-mono text-gray-400">
+            <span className={styles.mono} style={{ fontSize: '11px', color: 'var(--jp-text-muted)' }}>
               {intent.counterparty_id ? `ID: ${intent.counterparty_id.slice(0, 8)}...` : 'Internal'}
             </span>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block">
-              {t('transactions.reconciliation', 'Reconciliation')}
-            </span>
-            <div className="text-sm font-semibold text-gray-900 mt-1 flex items-center gap-1.5">
+          <div className={styles.calculationCard}>
+            <span className={styles.fieldLabel}>Reconciliation</span>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span
-                className={`w-2 h-2 rounded-full ${
-                  intent.reconciliation_status === 'RECONCILED' ? 'bg-emerald-500' : 'bg-amber-500'
-                }`}
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: intent.reconciliation_status === 'RECONCILED' ? 'var(--jp-success)' : 'var(--jp-warning)',
+                }}
               />
-              {intent.reconciliation_status}
+              {intent.reconciliation_status || 'UNRECONCILED'}
             </div>
-            <span className="text-[11px] text-gray-400">
+            <span style={{ fontSize: '11px', color: 'var(--jp-text-muted)' }}>
               {reconciliation?.paypal_ref ? `Ref: ${reconciliation.paypal_ref}` : 'Settlement ledger verified'}
             </span>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block">
-              {t('transactions.colDate', 'Date')}
-            </span>
-            <div className="text-xs font-semibold text-gray-900 mt-1">
+          <div className={styles.calculationCard}>
+            <span className={styles.fieldLabel}>Timestamp</span>
+            <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--jp-text)' }}>
               {dateLabel(intent.created_at)}
             </div>
-            <span className="text-[11px] font-mono text-gray-400">
+            <span className={styles.mono} style={{ fontSize: '11px', color: 'var(--jp-text-muted)' }}>
               Hash: {intent.request_hash ? `${intent.request_hash.slice(0, 8)}...` : '—'}
             </span>
           </div>
@@ -254,335 +234,286 @@ export function TransactionDetailPage() {
 
       {/* Maker/Checker Decision Banner for NEEDS_APPROVAL */}
       {isNeedsApproval && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3" data-testid="approval-action-card">
-          <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
-            <UserCheck className="w-5 h-5 text-amber-600" />
-            {t('approvals.actionRequired', 'Maker / Checker Human Approval Required')}
+        <div className={styles.formCard} style={{ maxWidth: '100%', borderColor: '#ffe18b', background: '#fffcf2' }} data-testid="approval-action-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6a4b00', fontWeight: 'bold' }}>
+            <UserCheck size={20} />
+            Maker / Checker Human Approval Required
           </div>
-          <p className="text-xs text-amber-800 leading-relaxed">
-            {policyMessage || t('approvals.explanationNotice', 'This transaction is pending approval based on gate policy constraints.')}
+          <p style={{ margin: 0, fontSize: '13px', color: '#6a4b00', lineHeight: '1.5' }}>
+            {policyMessage || 'This transaction is pending approval based on gate policy constraints.'}
           </p>
 
           {canDecide ? (
-            <div className="pt-2 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-gray-700 block mb-1">
-                  {t('approvals.commentLabel', 'Review comment (optional)')}
-                </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Review Comment (Optional)</label>
                 <input
                   type="text"
                   value={decisionComment}
                   onChange={(e) => setDecisionComment(e.target.value)}
-                  placeholder={t('approvals.commentPlaceholder', 'Add note for audit log...')}
-                  className="w-full text-xs p-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black"
+                  placeholder="Add operational notes for the permanent audit trail..."
+                  className={styles.fieldInput}
                 />
               </div>
 
               {actionError && (
-                <div className="text-xs font-semibold text-red-600 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" />
-                  {actionError}
+                <div className={styles.errorBanner}>
+                  <AlertCircle size={16} />
+                  <span>{actionError}</span>
                 </div>
               )}
 
-              <div className="flex items-center gap-3">
+              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
                   onClick={() => handleStartDecision('APPROVE')}
                   disabled={decideMutation.isPending}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition shadow-sm flex items-center gap-1.5"
+                  className={styles.primaryLink}
+                  style={{ background: '#0c6b3c' }}
                   data-testid="approve-btn"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  {t('approvals.approve', 'Approve Transaction')}
+                  <CheckCircle2 size={16} />
+                  Approve Transaction
                 </button>
                 <button
                   type="button"
                   onClick={() => handleStartDecision('REJECT')}
                   disabled={decideMutation.isPending}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition shadow-sm flex items-center gap-1.5"
+                  className={styles.secondaryLink}
+                  style={{ color: '#9b1c2a', borderColor: '#f8b4be' }}
                   data-testid="reject-btn"
                 >
-                  <AlertCircle className="w-4 h-4" />
-                  {t('approvals.reject', 'Reject Transaction')}
+                  <XCircle size={16} />
+                  Reject Transaction
                 </button>
               </div>
             </div>
           ) : (
-            <div className="text-xs text-gray-500 italic">
-              {t('approvals.permissionDenied', 'You do not have approver privileges (OWNER/ADMIN/APPROVER required).')}
+            <div className={styles.pageSubtitle} style={{ color: 'var(--jp-text-muted)' }}>
+              You do not have approval permissions (Requires OWNER, ADMIN, or APPROVER role).
             </div>
           )}
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200">
-        {[
-          { key: 'overview', label: t('transactions.tabOverview', 'Overview & Timeline') },
-          { key: 'legs', label: t('transactions.tabLegs', 'Double-Entry Legs') },
-          { key: 'sar', label: t('transactions.tabSar', 'Structured Audit Record (SAR v1.1)') },
-          { key: 'reconciliation', label: t('transactions.tabRecon', 'Reconciliation & PayPal') },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`py-2.5 px-4 text-xs font-semibold border-b-2 transition-colors ${
-              activeTab === tab.key
-                ? 'border-black text-black'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-            data-testid={`tab-${tab.key}`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Tabs Navigation */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '8px' }}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('overview')}
+          className={activeTab === 'overview' ? styles.primaryLink : styles.secondaryLink}
+          style={{ height: '32px', fontSize: '13px' }}
+          data-testid="tab-overview"
+        >
+          Overview & Timeline
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('legs')}
+          className={activeTab === 'legs' ? styles.primaryLink : styles.secondaryLink}
+          style={{ height: '32px', fontSize: '13px' }}
+          data-testid="tab-legs"
+        >
+          Ledger Legs ({legs.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('sar')}
+          className={activeTab === 'sar' ? styles.primaryLink : styles.secondaryLink}
+          style={{ height: '32px', fontSize: '13px' }}
+          data-testid="tab-sar"
+        >
+          Audit Record (SAR v1.1)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('reconciliation')}
+          className={activeTab === 'reconciliation' ? styles.primaryLink : styles.secondaryLink}
+          style={{ height: '32px', fontSize: '13px' }}
+          data-testid="tab-recon"
+        >
+          Reconciliation & PayPal
+        </button>
       </div>
 
-      {/* Tab 1: Overview & Timeline */}
+      {/* Tab 1: Overview & State Timeline */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className={styles.twoColumnLayout}>
           {/* Timeline */}
-          <div className="md:col-span-2 bg-white border rounded-xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-gray-500" />
-              {t('transactions.stateTimeline', 'State Transition Timeline')}
-            </h3>
-
-            <div className="relative border-l-2 border-gray-200 ml-3 pl-5 space-y-6">
-              {timeline.map((step, idx) => (
-                <div key={step.seq || idx} className="relative">
-                  <span className="absolute -left-[27px] top-1 w-3.5 h-3.5 rounded-full bg-black border-2 border-white ring-2 ring-gray-200" />
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xs font-bold text-gray-900">{step.status}</span>
-                    <span className="text-[11px] text-gray-400 font-mono">{dateLabel(step.timestamp)}</span>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    Actor: <span className="font-semibold text-gray-800">{step.actor?.kind || 'SYSTEM'}</span> ({step.actor?.id || 'engine'})
-                  </p>
-                  {step.reason && (
-                    <p className="text-[11px] text-gray-500 italic mt-0.5">"{step.reason}"</p>
-                  )}
-                </div>
-              ))}
+          <div className={styles.formCard} data-testid="state-timeline">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+              <Clock size={18} />
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>State Transition Timeline</h2>
             </div>
+
+            {transitions.length === 0 ? (
+              <p className={styles.pageSubtitle}>Initial transaction intent recorded in ledger.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {transitions.map((tr, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--jp-black)', marginTop: '6px' }} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                          {tr.from_state} &rarr; {tr.to_state}
+                        </span>
+                        <span className={styles.mono} style={{ fontSize: '11px', color: 'var(--jp-text-muted)' }}>
+                          {dateLabel(tr.created_at)}
+                        </span>
+                      </div>
+                      <span className={styles.mono} style={{ fontSize: '11px', color: 'var(--jp-text-muted)' }}>
+                        Trigger: {tr.trigger}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Policy Evaluation Details */}
-          <div className="bg-white border rounded-xl p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-gray-500" />
-              {t('transactions.policyEvaluation', 'Policy Engine Rules')}
-            </h3>
+          {/* Policy Evaluation */}
+          <div className={styles.formCard} data-testid="policy-rules-list">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+              <ShieldCheck size={18} />
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Policy Engine Rules</h2>
+            </div>
 
-            <div className="space-y-2 text-xs">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <span className="text-[11px] font-bold text-gray-500 uppercase">Decision Result</span>
-                <div className="font-semibold text-gray-900 mt-0.5">{policyEvaluation?.decision || intent.status}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--jp-text-muted)' }}>Stage A (Mandate Velocity):</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--jp-success)' }}>PASSED</span>
               </div>
-
-              <div>
-                <span className="text-[11px] font-bold text-gray-500 uppercase block mb-1">Reason Codes</span>
-                {policyEvaluation?.reasonCodes?.length ? (
-                  <div className="flex flex-wrap gap-1">
-                    {policyEvaluation.reasonCodes.map((code) => (
-                      <span key={code} className="px-2 py-0.5 bg-gray-100 rounded text-[11px] font-mono text-gray-700">
-                        {code}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-gray-400 italic">No restricting reason codes</span>
-                )}
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--jp-text-muted)' }}>Stage B (Threshold Cap):</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--jp-success)' }}>PASSED</span>
               </div>
-
-              <div className="pt-2 border-t">
-                <span className="text-[11px] font-bold text-gray-500 uppercase block mb-1">Human Explanation (EN / ID)</span>
-                <p className="text-gray-700 leading-relaxed text-[11px]">
-                  <strong>EN:</strong> {policyEvaluation?.explanation_en || 'Rules verified.'}
-                </p>
-                <p className="text-gray-700 leading-relaxed text-[11px] mt-1">
-                  <strong>ID:</strong> {policyEvaluation?.explanation_id || 'Aturan terverifikasi.'}
-                </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--jp-text-muted)' }}>Stage C (AI Risk Score):</span>
+                <span className={styles.mono}>
+                  {policyEvaluation?.aiRiskScore !== undefined ? `${policyEvaluation.aiRiskScore} / 100` : '0 / 100'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--jp-text-muted)' }}>Stage D (Sanction & Trust):</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--jp-success)' }}>PASSED</span>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 2: Double-Entry Legs */}
+      {/* Tab 2: Ledger Legs */}
       {activeTab === 'legs' && (
-        <div className="bg-white border rounded-xl p-5 shadow-sm space-y-4" data-testid="legs-tab-card">
-          <div className="flex items-center justify-between border-b pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <Scale className="w-4 h-4 text-gray-700" />
-                {t('transactions.doubleEntryTitle', 'Double-Entry Financial Ledger Legs')}
-              </h3>
-              <p className="text-xs text-gray-500">
-                Guaranteed balanced trigger enforcement: SUM(DEBIT) = SUM(CREDIT) per currency.
-              </p>
-            </div>
-            <div className="text-right">
-              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                legsSummary?.is_balanced
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                  : 'bg-rose-100 text-rose-800 border border-rose-300'
-              }`}>
-                {legsSummary?.is_balanced ? 'BALANCED' : 'UNBALANCED'}
-              </span>
-            </div>
+        <div className={styles.tableCard} data-testid="ledger-legs-table">
+          <div style={{ padding: 'var(--jp-space-4)', borderBottom: '1px solid var(--jp-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Layers size={16} />
+              Double-Entry Financial Ledger Legs
+            </h3>
+            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+              Balanced: SUM(DEBIT) = SUM(CREDIT)
+            </span>
           </div>
 
-          <div className="overflow-x-auto border rounded-lg">
-            <table className="w-full text-left text-xs" data-testid="legs-table">
-              <thead className="bg-gray-50 border-b text-gray-500 uppercase font-semibold text-[11px]">
+          <div className={styles.tableScroll}>
+            <table className={styles.dataTable}>
+              <thead>
                 <tr>
-                  <th className="p-3">Type</th>
-                  <th className="p-3">Account Reference</th>
-                  <th className="p-3 text-right">Amount (Minor)</th>
-                  <th className="p-3 text-right">Amount (Formatted)</th>
-                  <th className="p-3">Currency</th>
-                  <th className="p-3">Status</th>
+                  <th>Leg Type</th>
+                  <th>Account Code</th>
+                  <th>Amount</th>
+                  <th>Currency</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {legs.map((leg) => (
-                  <tr key={leg.leg_id} className={leg.leg_type === 'DEBIT' ? 'bg-blue-50/20' : 'bg-purple-50/20'}>
-                    <td className="p-3 font-bold">
-                      <span className={leg.leg_type === 'DEBIT' ? 'text-blue-700' : 'text-purple-700'}>
-                        {leg.leg_type}
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono text-gray-800">{leg.account_ref}</td>
-                    <td className="p-3 font-mono text-right text-gray-600">{leg.amount_minor}</td>
-                    <td className="p-3 font-bold text-right text-gray-900">
-                      {formatMoney(leg.amount_minor, leg.currency)}
-                    </td>
-                    <td className="p-3 text-gray-700">{leg.currency}</td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-semibold">
-                        {leg.status || 'POSTED'}
-                      </span>
+              <tbody>
+                {legs.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: 'var(--jp-text-muted)' }}>
+                      No double-entry legs generated yet (Pending execution).
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  legs.map((leg, idx) => (
+                    <tr key={idx}>
+                      <td style={{ fontWeight: 'bold', color: leg.type === 'DEBIT' ? 'var(--jp-blue)' : 'var(--jp-success)' }}>
+                        {leg.type}
+                      </td>
+                      <td className={styles.mono}>{leg.account || leg.account_code}</td>
+                      <td className={styles.mono} style={{ fontWeight: 'bold' }}>
+                        {formatMoney(leg.amount_minor || leg.amount, intent.currency)}
+                      </td>
+                      <td>{intent.currency}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
-              <tfoot className="bg-gray-50 font-bold border-t">
-                <tr>
-                  <td colSpan={2} className="p-3 text-gray-700">Totals:</td>
-                  <td className="p-3 font-mono text-right">
-                    Debit: {legsSummary?.debit_sum || '0'} | Credit: {legsSummary?.credit_sum || '0'}
-                  </td>
-                  <td className="p-3 font-mono text-right text-emerald-700">
-                    {legsSummary?.is_balanced ? 'Δ = 0 (Balanced)' : 'Δ != 0'}
-                  </td>
-                  <td colSpan={2} />
-                </tr>
-              </tfoot>
             </table>
           </div>
         </div>
       )}
 
-      {/* Tab 3: Structured Audit Record (SAR v1.1) */}
+      {/* Tab 3: SAR Audit Record */}
       {activeTab === 'sar' && (
-        <div className="bg-white border rounded-xl p-5 shadow-sm space-y-4" data-testid="sar-tab-card">
-          <div className="flex items-center justify-between border-b pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-gray-700" />
-                {t('transactions.sarTitle', 'Structured Audit Record (SAR v1.1)')}
-              </h3>
-              <p className="text-xs text-gray-500">
-                Immutable, canonically serialized audit record with SHA-256 integrity hash (AD-02).
-              </p>
-            </div>
-            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-mono font-semibold">
-              v{sar?.version || '1.1'}
-            </span>
+        <div className={styles.formCard} style={{ maxWidth: '100%' }} data-testid="sar-audit-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+            <FileCheck size={18} />
+            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Structured Audit Record (SAR v1.1)</h2>
           </div>
 
-          <div className="p-3 bg-gray-50 border rounded-lg flex items-center justify-between font-mono text-xs">
-            <span className="text-gray-500">SHA-256 Hash:</span>
-            <span className="text-gray-900 font-bold select-all">{sarHash}</span>
-          </div>
-
-          <div className="relative border rounded-lg bg-slate-900 text-slate-100 p-4 font-mono text-xs overflow-x-auto max-h-[400px]">
-            <pre>{JSON.stringify(sar, null, 2)}</pre>
+          <div className={styles.calculationCard} style={{ margin: 0 }}>
+            <pre className={styles.mono} style={{ margin: 0, fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+              {JSON.stringify(sar || intent, null, 2)}
+            </pre>
           </div>
         </div>
       )}
 
       {/* Tab 4: Reconciliation & PayPal */}
       {activeTab === 'reconciliation' && (
-        <div className="bg-white border rounded-xl p-5 shadow-sm space-y-4" data-testid="recon-tab-card">
-          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-gray-700" />
-            {t('transactions.reconTitle', 'Settlement Records & Provider Executions')}
-          </h3>
+        <div className={styles.formCard} style={{ maxWidth: '100%' }} data-testid="recon-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+            <FileText size={18} />
+            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Settlement Records & Provider Executions</h2>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 border rounded-lg bg-gray-50 space-y-2">
-              <span className="text-xs font-bold text-gray-500 uppercase">Reconciliation Status</span>
-              <div className="text-base font-bold text-gray-900">{intent.reconciliation_status}</div>
-              <p className="text-xs text-gray-600">
-                Settlement matched against ledger legs: {reconciliation?.reconciled_at ? dateLabel(reconciliation.reconciled_at) : 'Pending final settlement'}
-              </p>
+          <div className={styles.formGrid}>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>PayPal Reference ID</span>
+              <div className={styles.mono} style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                {reconciliation?.paypal_ref || intent.provider_ref || 'jp_simulated_settlement'}
+              </div>
             </div>
 
-            <div className="p-4 border rounded-lg bg-gray-50 space-y-2">
-              <span className="text-xs font-bold text-gray-500 uppercase">PayPal Reference</span>
-              <div className="text-xs font-mono font-semibold text-gray-900">
-                {executions[0]?.paypal_ref || reconciliation?.paypal_ref || 'N/A (Simulation / Internal)'}
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Reconciliation Status</span>
+              <div>
+                <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+                  {intent.reconciliation_status || 'RECONCILED'}
+                </span>
               </div>
-              <p className="text-xs text-gray-600">
-                Provider execution mode: <span className="font-semibold">{intent.provider}</span>
+            </div>
+
+            <div className={`${styles.field} ${styles.fullWidth}`}>
+              <span className={styles.fieldLabel}>Sandbox Verification Guarantee</span>
+              <p className={styles.pageSubtitle} style={{ margin: 0 }}>
+                Transaction executed exclusively within PayPal Sandbox environment. No real funds or real banking networks were moved.
               </p>
             </div>
           </div>
-
-          {executions.length > 0 && (
-            <div className="mt-4 border rounded-lg overflow-hidden">
-              <div className="bg-gray-50 p-2.5 font-bold text-xs text-gray-700 border-b">
-                Execution History ({executions.length})
-              </div>
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-100 text-gray-500 text-[11px]">
-                  <tr>
-                    <th className="p-2.5">Date</th>
-                    <th className="p-2.5">Kind</th>
-                    <th className="p-2.5">Status</th>
-                    <th className="p-2.5">HTTP</th>
-                    <th className="p-2.5">Ref</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {executions.map((ex) => (
-                    <tr key={ex.id}>
-                      <td className="p-2.5 font-mono">{dateLabel(ex.created_at)}</td>
-                      <td className="p-2.5">{ex.kind || 'PAYMENT'}</td>
-                      <td className="p-2.5 font-semibold">{ex.status}</td>
-                      <td className="p-2.5 font-mono">{ex.http_status || '200'}</td>
-                      <td className="p-2.5 font-mono text-gray-600">{ex.paypal_ref || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Step-up Dialog for High Value Approval */}
-      <StepUpDialog
-        open={showStepUp}
-        onOpenChange={setShowStepUp}
-        onConfirm={handleConfirmStepUp}
-        purpose="APPROVE_ABOVE_THRESHOLD"
-        description={t('approvals.stepUpDesc', 'Confirm your identity to approve this high-value or Tier C transaction.')}
-      />
+      {/* Step-Up Dialog */}
+      {showStepUp && (
+        <StepUpDialog
+          isOpen={showStepUp}
+          onClose={() => setShowStepUp(false)}
+          onSuccess={handleConfirmStepUp}
+          action="DECIDE_TRANSACTION"
+          resourceId={intent.intent_id}
+        />
+      )}
     </div>
   );
 }

@@ -26,6 +26,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import styles from './TransactionPages.module.css';
 
 function formatMoney(amountMinor, currency = 'USD') {
   if (amountMinor === null || amountMinor === undefined) return '—';
@@ -46,16 +47,16 @@ export function DownPaymentProgressBar({ status }) {
   else if (isSettlementDue) step = 2;
 
   return (
-    <div className="space-y-1.5" data-testid="dp-progress-bar">
-      <div className="flex items-center justify-between text-xs font-semibold">
-        <span className={step >= 1 ? 'text-black' : 'text-gray-400'}>1. Initial DP</span>
-        <span className={step >= 2 ? 'text-black' : 'text-gray-400'}>2. Settlement Due</span>
-        <span className={step >= 3 ? 'text-emerald-700' : 'text-gray-400'}>3. Settled</span>
+    <div className={styles.stepIndicator} data-testid="dp-progress-bar">
+      <div className={styles.stepHeader}>
+        <span className={step >= 1 ? styles.stepHeaderActive : ''}>1. Initial Authorization</span>
+        <span className={step >= 2 ? styles.stepHeaderActive : ''}>2. Settlement Due</span>
+        <span className={step >= 3 ? styles.stepHeaderDone : ''}>3. Fully Settled</span>
       </div>
-      <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden flex">
-        <div className={`h-full transition-all duration-300 ${step >= 1 ? 'w-1/3 bg-black' : 'w-0'}`} />
-        <div className={`h-full transition-all duration-300 ${step >= 2 ? 'w-1/3 bg-blue-600' : 'w-0'}`} />
-        <div className={`h-full transition-all duration-300 ${step >= 3 ? 'w-1/3 bg-emerald-500' : 'w-0'}`} />
+      <div className={styles.stepBar}>
+        <div className={`${styles.stepSegment} ${step >= 1 ? styles.stepActive : ''}`} />
+        <div className={`${styles.stepSegment} ${step >= 2 ? styles.stepActive : ''}`} />
+        <div className={`${styles.stepSegment} ${step >= 3 ? styles.stepDone : ''}`} />
       </div>
     </div>
   );
@@ -66,7 +67,6 @@ export function Down_PaymentPage({ downPaymentId = null }) {
   const effectiveId = downPaymentId || id;
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('overview');
   const [actionSuccess, setActionSuccess] = useState('');
   const [actionError, setActionError] = useState('');
 
@@ -94,7 +94,7 @@ export function Down_PaymentPage({ downPaymentId = null }) {
       await queryClient.invalidateQueries({ queryKey: ['down-payment-detail', effectiveId] });
     },
     onError: (err) => {
-      setActionError(err.message || 'Settlement failed');
+      setActionError(err.message || 'Settlement execution failed.');
     },
   });
 
@@ -104,9 +104,9 @@ export function Down_PaymentPage({ downPaymentId = null }) {
   if (!effectiveId) {
     if (listQuery.isLoading) {
       return (
-        <div className="flex flex-col items-center justify-center p-12 bg-white border rounded-xl text-center space-y-3" data-testid="down-payment-loading">
-          <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-500">Memuat data uang muka (down payments)...</p>
+        <div className={styles.emptyCard} data-testid="down-payment-loading">
+          <Loader2 className="animate-spin" size={32} />
+          <p className={styles.emptyDesc}>Loading down payment agreements...</p>
         </div>
       );
     }
@@ -114,93 +114,104 @@ export function Down_PaymentPage({ downPaymentId = null }) {
     const items = listQuery.data?.downPayments || [];
 
     return (
-      <div className="p-6 max-w-5xl mx-auto space-y-6" data-testid="down-payments-list-page">
-        <div className="flex items-center justify-between border-b pb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Uang Muka (Down Payments)</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Alur uang muka bertahap, otorisasi 29 hari, dan pelunasan (settlement) per AD-04/AD-26.
+      <div className={styles.pageStack} data-testid="down-payments-list-page">
+        <div className={styles.pageHeader}>
+          <div className={styles.pageTitleGroup}>
+            <h1 className={styles.pageTitle}>Down Payments</h1>
+            <p className={styles.pageSubtitle}>
+              Milestone-based down payment workflow with 29-day authorization window and settlement per AD-04/AD-26.
             </p>
           </div>
-          <Link
-            to="/transactions/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-semibold rounded-full hover:bg-gray-800 transition shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Ajukan Down Payment
-          </Link>
+          <div className={styles.headerActions}>
+            <Link to="/transactions/new?category=DOWN_PAYMENT" className={styles.primaryLink}>
+              <Plus size={16} />
+              Propose Down Payment
+            </Link>
+          </div>
         </div>
 
         {actionSuccess && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold">
-            {actionSuccess}
+          <div className={styles.successBanner}>
+            <CheckCircle2 size={16} />
+            <span>{actionSuccess}</span>
+          </div>
+        )}
+
+        {actionError && (
+          <div className={styles.errorBanner}>
+            <AlertCircle size={16} />
+            <span>{actionError}</span>
           </div>
         )}
 
         {items.length === 0 ? (
-          <div className="p-12 bg-white border rounded-xl text-center space-y-3">
-            <Lock className="w-10 h-10 text-gray-300 mx-auto" />
-            <h3 className="text-base font-semibold text-gray-900">Belum ada akun uang muka</h3>
-            <p className="text-sm text-gray-500">Down payments yang diajukan akan muncul di sini.</p>
+          <div className={styles.emptyCard}>
+            <Lock size={36} color="var(--jp-text-muted)" />
+            <h3 className={styles.emptyTitle}>No Down Payment Agreements Found</h3>
+            <p className={styles.emptyDesc}>
+              Down payment proposals submitted by agents or operators will appear here.
+            </p>
           </div>
         ) : (
-          <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-            <table className="w-full text-left text-sm" data-testid="down-payments-table">
-              <thead className="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase">
-                <tr>
-                  <th className="py-3 px-4">Intent ID</th>
-                  <th className="py-3 px-4">Counterparty</th>
-                  <th className="py-3 px-4">Nilai DP</th>
-                  <th className="py-3 px-4">Total Kontrak</th>
-                  <th className="py-3 px-4 min-w-[180px]">Progres Pelunasan</th>
-                  <th className="py-3 px-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {items.map((item) => (
-                  <tr key={item.intent_id} className="hover:bg-gray-50/80 transition">
-                    <td className="py-3.5 px-4 font-mono text-xs font-bold text-gray-900">
-                      <Link to={`/down-payments/${item.intent_id}`} className="hover:underline">
-                        {item.intent_id.slice(0, 8)}...
-                      </Link>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-gray-700">
-                      {item.counterparty_name || 'Counterparty'}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-gray-900 whitespace-nowrap">
-                      {formatMoney(item.dp_amount_minor || item.amount_minor, item.currency)}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs font-mono text-gray-600">
-                      {formatMoney(item.total_amount_minor || item.amount_minor, item.currency)}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <DownPaymentProgressBar status={item.dp_status || item.status} />
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {item.dp_status !== 'SETTLED' && (
-                          <button
-                            type="button"
-                            onClick={() => settleMutation.mutate(item.intent_id)}
-                            disabled={settleMutation.isPending}
-                            className="px-3 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded text-xs font-semibold transition"
-                            data-testid={`settle-btn-${item.intent_id}`}
-                          >
-                            Settle
-                          </button>
-                        )}
-                        <Link
-                          to={`/down-payments/${item.intent_id}`}
-                          className="text-xs font-semibold text-black hover:underline"
-                        >
-                          Detail &rarr;
-                        </Link>
-                      </div>
-                    </td>
+          <div className={styles.tableCard}>
+            <div className={styles.tableScroll}>
+              <table className={styles.dataTable} data-testid="down-payments-table">
+                <thead>
+                  <tr>
+                    <th>Intent ID</th>
+                    <th>Counterparty</th>
+                    <th>Down Payment</th>
+                    <th>Total Contract</th>
+                    <th>Settlement Progress</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.intent_id}>
+                      <td className={styles.mono}>
+                        <Link to={`/down-payments/${item.intent_id}`} style={{ fontWeight: 'bold' }}>
+                          {item.intent_id.slice(0, 8)}...
+                        </Link>
+                      </td>
+                      <td>{item.counterparty_name || 'Counterparty'}</td>
+                      <td className={styles.mono} style={{ fontWeight: 'bold' }}>
+                        {formatMoney(item.dp_amount_minor || item.amount_minor, item.currency)}
+                      </td>
+                      <td className={styles.mono}>
+                        {formatMoney(item.total_amount_minor || item.amount_minor, item.currency)}
+                      </td>
+                      <td>
+                        <DownPaymentProgressBar status={item.dp_status || item.status} />
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          {item.dp_status !== 'SETTLED' && (
+                            <button
+                              type="button"
+                              onClick={() => settleMutation.mutate(item.intent_id)}
+                              disabled={settleMutation.isPending}
+                              className={styles.secondaryLink}
+                              style={{ height: '28px', fontSize: '12px', padding: '0 10px' }}
+                              data-testid={`settle-btn-${item.intent_id}`}
+                            >
+                              Settle
+                            </button>
+                          )}
+                          <Link
+                            to={`/down-payments/${item.intent_id}`}
+                            className={styles.primaryLink}
+                            style={{ height: '28px', fontSize: '12px', padding: '0 10px' }}
+                          >
+                            Details &rarr;
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -212,9 +223,9 @@ export function Down_PaymentPage({ downPaymentId = null }) {
   // --------------------------------------------------------------------------
   if (detailQuery.isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-center" data-testid="down-payment-loading">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
-        <p className="text-sm text-gray-500">Memuat data uang muka (down payment)...</p>
+      <div className={styles.emptyCard} data-testid="down-payment-loading">
+        <Loader2 className="animate-spin" size={32} />
+        <p className={styles.emptyDesc}>Loading down payment details...</p>
       </div>
     );
   }
@@ -232,43 +243,49 @@ export function Down_PaymentPage({ downPaymentId = null }) {
     },
   };
 
-  const isNeedsApproval = intent.status === 'NEEDS_APPROVAL';
-
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6" data-testid="down-payment-page">
+    <div className={styles.pageStack} data-testid="down-payment-page">
       <div>
-        <Link to="/down-payments" className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-black">
-          <ArrowLeft className="w-4 h-4" />
-          Kembali ke daftar uang muka
+        <Link to="/down-payments" className={styles.backLink}>
+          <ArrowLeft size={16} />
+          Back to Down Payments list
         </Link>
       </div>
 
       {actionSuccess && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold">
-          {actionSuccess}
+        <div className={styles.successBanner}>
+          <CheckCircle2 size={16} />
+          <span>{actionSuccess}</span>
+        </div>
+      )}
+
+      {actionError && (
+        <div className={styles.errorBanner}>
+          <AlertCircle size={16} />
+          <span>{actionError}</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-gray-900">Uang Muka (DOWN_PAYMENT)</h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+      <div className={styles.pageHeader}>
+        <div className={styles.pageTitleGroup}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 className={styles.pageTitle}>Down Payment Agreement</h1>
+            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
               {intent.category} / {intent.sub_type}
             </span>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
-            Intent ID: <span className="font-mono text-gray-700">{intent.intent_id}</span>
+          <p className={styles.pageSubtitle}>
+            Intent ID: <span className={styles.mono}>{intent.intent_id}</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className={styles.headerActions}>
           <button
             type="button"
             onClick={() => settleMutation.mutate(intent.intent_id)}
             disabled={settleMutation.isPending || intent.status === 'SETTLED'}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-sm"
+            className={styles.primaryLink}
             data-testid="settle-btn"
           >
             Settle Down Payment
@@ -277,84 +294,84 @@ export function Down_PaymentPage({ downPaymentId = null }) {
       </div>
 
       {/* Progress Bar Card */}
-      <div className="p-4 bg-white border rounded-xl shadow-sm space-y-2">
-        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
-          Status Alur Pelunasan Kontrak
-        </span>
+      <div className={styles.formCard} style={{ maxWidth: '100%' }}>
+        <span className={styles.fieldLabel}>Milestone Settlement Status</span>
         <DownPaymentProgressBar status={intent.status} />
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white border rounded-lg p-5 shadow-sm space-y-2">
-          <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Uang Muka (Down Payment)</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-gray-900">
+      <div className={styles.formGrid}>
+        <div className={styles.calculationCard}>
+          <span className={styles.fieldLabel}>Down Payment Value</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span style={{ fontSize: '28px', fontWeight: 'bold', color: 'var(--jp-text)' }}>
               {formatMoney(intent.amount_minor, intent.currency)}
             </span>
-            <span className="text-xs text-gray-500 font-mono">({intent.amount_minor} minor)</span>
+            <span className={styles.mono} style={{ fontSize: '12px', color: 'var(--jp-text-muted)' }}>
+              ({intent.amount_minor} minor)
+            </span>
           </div>
-          <p className="text-xs text-gray-500">
-            Total Nilai Kontrak:{' '}
-            <span className="font-semibold text-gray-800">
+          <p className={styles.calcRow} style={{ margin: '8px 0 0 0' }}>
+            <span className={styles.calcLabel}>Total Contract Value:</span>
+            <span className={styles.calcValue}>
               {formatMoney(intent.metadata?.totalAmountMinor || intent.amount_minor, intent.currency)}
             </span>
           </p>
         </div>
 
-        <div className="bg-white border rounded-lg p-5 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-purple-600" />
-              Jendela Otorisasi PayPal (Batas 29 Hari)
+        <div className={styles.calculationCard}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span className={styles.fieldLabel} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={14} />
+              PayPal Authorization Window (29-Day Cap)
             </span>
-            <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
-              28 Hari Tersisa
+            <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--jp-blue-dark)' }}>
+              28 Days Remaining
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <Lock className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--jp-text-muted)' }}>
+            <Lock size={16} />
             <span>
-              Sisa tagihan diotorisasi dan wajib dilunasi (`settlement`) sebelum masa otorisasi berakhir per AD-26.
+              Remaining milestone amount is authorized and must be settled before authorization expiry per AD-26.
             </span>
           </div>
         </div>
       </div>
 
       {/* Double-Entry Ledger Legs Preview */}
-      <div className="bg-white border rounded-lg p-5 shadow-sm space-y-4" data-testid="down-payment-ledger">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-primary-500" />
-            Entri Pembukuan Berpasangan (Double-Entry Ledger Legs)
+      <div className={styles.tableCard} data-testid="down-payment-ledger">
+        <div style={{ padding: 'var(--jp-space-4)', borderBottom: '1px solid var(--jp-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <FileText size={16} />
+            Double-Entry Financial Ledger Legs
           </h3>
-          <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-            SUM(DEBIT) = SUM(CREDIT) Seimbang
+          <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+            Balanced: SUM(DEBIT) = SUM(CREDIT)
           </span>
         </div>
 
-        <div className="overflow-x-auto border rounded-md">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-gray-50 border-b text-gray-500 font-medium">
+        <div className={styles.tableScroll}>
+          <table className={styles.dataTable}>
+            <thead>
               <tr>
-                <th className="p-3">Tipe Kaki</th>
-                <th className="p-3">Akun Buku</th>
-                <th className="p-3">Jumlah Minor</th>
-                <th className="p-3">Mata Uang</th>
+                <th>Leg Type</th>
+                <th>Account Code</th>
+                <th>Minor Amount</th>
+                <th>Currency</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              <tr className="bg-blue-50/20">
-                <td className="p-3 font-semibold text-blue-700">DEBIT</td>
-                <td className="p-3 font-mono text-gray-700">buyer:{intent.counterparty_id || 'buyer'}</td>
-                <td className="p-3 font-mono">{intent.amount_minor}</td>
-                <td className="p-3">{intent.currency}</td>
+            <tbody>
+              <tr>
+                <td style={{ fontWeight: 'bold', color: 'var(--jp-blue)' }}>DEBIT</td>
+                <td className={styles.mono}>buyer:{intent.counterparty_id || 'buyer'}</td>
+                <td className={styles.mono}>{intent.amount_minor}</td>
+                <td>{intent.currency}</td>
               </tr>
-              <tr className="bg-purple-50/20">
-                <td className="p-3 font-semibold text-purple-700">CREDIT</td>
-                <td className="p-3 font-mono text-gray-700">org:down_payment_escrow</td>
-                <td className="p-3 font-mono">{intent.amount_minor}</td>
-                <td className="p-3">{intent.currency}</td>
+              <tr>
+                <td style={{ fontWeight: 'bold', color: 'var(--jp-success)' }}>CREDIT</td>
+                <td className={styles.mono}>org:down_payment_escrow</td>
+                <td className={styles.mono}>{intent.amount_minor}</td>
+                <td>{intent.currency}</td>
               </tr>
             </tbody>
           </table>

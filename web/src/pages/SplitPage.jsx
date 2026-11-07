@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   AlertCircle,
   AlertTriangle,
@@ -25,15 +26,17 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import styles from './TransactionPages.module.css';
 
 export function SplitPage({ splitId = null }) {
   const { t } = useTranslation();
-  const [totalAmount, setTotalAmount] = useState('');
+  const [totalAmount, setTotalAmount] = useState('1000.00');
   const [currency, setCurrency] = useState('USD');
   const [platformFeeBps, setPlatformFeeBps] = useState(250); // Default 2.5%
-  const [recipientId, setRecipientId] = useState('');
-  const [description, setDescription] = useState('');
+  const [recipientId, setRecipientId] = useState('payee-recipient-001');
+  const [description, setDescription] = useState('Marketplace split payout');
   const [formError, setFormError] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
 
   const {
     data: splitData,
@@ -57,270 +60,235 @@ export function SplitPage({ splitId = null }) {
   const handleValidateForm = (e) => {
     e.preventDefault();
     setFormError('');
+    setFormSuccess('');
 
     if (parsedTotal <= 0) {
-      setFormError('Nominal total split harus lebih besar dari 0.');
+      setFormError('Total split transaction amount must be greater than zero.');
       return;
     }
 
-    if (platformFeeBps < 0 || platformFeeBps > 10000) {
-      setFormError('Platform fee bps harus berada di antara 0 dan 10.000.');
+    if (platformFeeBps < 0 || platformFeeBps > 5000) {
+      setFormError('Platform fee must be between 0 and 5,000 basis points (0% - 50%).');
       return;
     }
+
+    if (!recipientId) {
+      setFormError('Recipient counterparty ID is required.');
+      return;
+    }
+
+    setFormSuccess('Split payment distribution parameters successfully validated.');
   };
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-center" data-testid="split-loading">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
-        <p className="text-sm text-gray-500">Memuat data split payments...</p>
+      <div className={styles.emptyCard} data-testid="split-loading">
+        <Loader2 className="animate-spin" size={32} />
+        <p className={styles.emptyDesc}>Loading split payment details...</p>
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="p-6 max-w-2xl mx-auto" data-testid="split-error">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+      <div className={styles.pageStack} data-testid="split-error">
+        <div className={styles.errorBanner}>
+          <AlertCircle size={20} />
           <div>
-            <h3 className="text-sm font-semibold text-red-800">Gagal memuat transaksi split</h3>
-            <p className="text-sm text-red-700 mt-1">{error?.message || 'Terjadi kesalahan internal'}</p>
+            <strong>Failed to Load Split Payment</strong>
+            <p style={{ margin: '4px 0 0 0' }}>{error?.message || 'A system error occurred while contacting the server.'}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  const split = splitData?.data || {
-    intent_id: splitId || 'demo-split-id',
-    status: 'SUBMITTED',
-    amount_minor: '50000',
-    currency: 'USD',
-    platform_fee_bps: 250,
-    platform_fee_minor: '1250',
-    recipient_share_minor: '48750',
-    created_at: new Date().toISOString(),
-  };
-
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6" data-testid="split-page">
+    <div className={styles.pageStack} data-testid="split-page">
       {/* Header */}
-      <div className="flex items-center justify-between border-b pb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
-            <Split className="w-6 h-6" />
+      <div className={styles.pageHeader}>
+        <div className={styles.pageTitleGroup}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 className={styles.pageTitle}>Multi-Party Split Payments</h1>
+            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+              TIER B / PAYPAL
+            </span>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">Split Payments Engine</h1>
-            <p className="text-sm text-gray-500">
-              Distribusi pembayaran multi-pihak dengan platform fee berimbang (Tier B, AD-13, AD-17, T-13, T-14)
-            </p>
-          </div>
+          <p className={styles.pageSubtitle}>
+            Multi-party revenue distribution with balanced platform fee deductions (Tier B, AD-13, AD-17, T-13, T-14).
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-            Tier B
-          </span>
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-            RULE_SPLIT_SPLIT
-          </span>
+
+        <div className={styles.headerActions}>
+          <Link to="/transactions/new?category=SPLIT" className={styles.primaryLink}>
+            New Split Proposal
+          </Link>
         </div>
       </div>
 
-      {/* Split Proposal Form */}
-      <div className="bg-white border rounded-xl p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <PieChart className="w-5 h-5 text-purple-600" />
-          Formulir Usulan Split Payments
-        </h2>
+      <div className={styles.twoColumnLayout}>
+        {/* Left Column: Form & Calculation */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--jp-space-6)' }}>
+          <form onSubmit={handleValidateForm} className={styles.formCard} data-testid="split-form">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+              <Split size={18} />
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Split Distribution Parameters</h2>
+            </div>
 
-        {formError && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{formError}</span>
-          </div>
-        )}
+            {formError && (
+              <div className={styles.errorBanner}>
+                <AlertCircle size={16} />
+                <span>{formError}</span>
+              </div>
+            )}
 
-        <form onSubmit={handleValidateForm} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
-              Nominal Total Transaksi
-            </label>
-            <input
-              type="number"
-              placeholder="e.g. 500.00"
-              value={totalAmount}
-              onChange={(e) => setTotalAmount(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
+            {formSuccess && (
+              <div className={styles.successBanner}>
+                <CheckCircle2 size={16} />
+                <span>{formSuccess}</span>
+              </div>
+            )}
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
-              Mata Uang
-            </label>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="USD">USD - US Dollar</option>
-              <option value="EUR">EUR - Euro</option>
-              <option value="GBP">GBP - British Pound</option>
-            </select>
-          </div>
+            <div className={styles.formGrid}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Total Transaction Amount ($)</label>
+                <input
+                  type="number"
+                  step="any"
+                  className={styles.fieldInput}
+                  placeholder="1000.00"
+                  value={totalAmount}
+                  onChange={(e) => setTotalAmount(e.target.value)}
+                  data-testid="split-amount-input"
+                />
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
-              Platform Fee (Basis Points / bps) — {feePercent}%
-            </label>
-            <input
-              type="number"
-              placeholder="e.g. 250 (2.5%)"
-              value={platformFeeBps}
-              onChange={(e) => setPlatformFeeBps(Number(e.target.value))}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Currency</label>
+                <select
+                  className={styles.fieldSelect}
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                >
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="GBP">GBP - British Pound</option>
+                </select>
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
-              Penerima Utama (Recipient Counterparty ID)
-            </label>
-            <input
-              type="text"
-              placeholder="UUID Penerima"
-              value={recipientId}
-              onChange={(e) => setRecipientId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Platform Fee (bps)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="5000"
+                  className={styles.fieldInput}
+                  value={platformFeeBps}
+                  onChange={(e) => setPlatformFeeBps(parseInt(e.target.value, 10) || 0)}
+                  data-testid="platform-fee-bps-input"
+                />
+                <span className={styles.pageSubtitle} style={{ fontSize: '11px', marginTop: '2px' }}>
+                  {feePercent}% platform fee cut
+                </span>
+              </div>
 
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
-              Deskripsi Pembayaran
-            </label>
-            <input
-              type="text"
-              placeholder="Catatan split pembayaran marketplace..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Primary Recipient (Payee ID)</label>
+                <input
+                  type="text"
+                  className={styles.fieldInput}
+                  value={recipientId}
+                  onChange={(e) => setRecipientId(e.target.value)}
+                  placeholder="payee-uuid"
+                  data-testid="recipient-id-input"
+                />
+              </div>
 
-          {/* Real-time Calculation Breakdown */}
-          {parsedTotal > 0 && (
-            <div className="md:col-span-2 p-3 bg-purple-50 rounded-lg border border-purple-100 flex items-center justify-between text-xs text-purple-900">
-              <span>Total: <strong>{parsedTotal.toFixed(2)} {currency}</strong></span>
-              <span>Platform Fee ({feePercent}%): <strong>{calculatedFee} {currency}</strong></span>
-              <span>Hak Bersih Penerima: <strong>{calculatedPayee} {currency}</strong></span>
-              <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Konservasi 100% Berimbang
+              <div className={`${styles.field} ${styles.fullWidth}`}>
+                <label className={styles.fieldLabel}>Distribution Description</label>
+                <input
+                  type="text"
+                  className={styles.fieldInput}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Memo for settlement report..."
+                />
+              </div>
+            </div>
+
+            {/* Split Distribution Preview */}
+            <div className={styles.calculationCard}>
+              <span className={styles.fieldLabel}>Calculated Distribution Shares</span>
+              <div className={styles.calcRow}>
+                <span className={styles.calcLabel}>Platform Fee Share ({feePercent}%):</span>
+                <span className={styles.calcValue} style={{ color: 'var(--jp-blue)' }}>${calculatedFee} {currency}</span>
+              </div>
+              <div className={styles.calcRow}>
+                <span className={styles.calcLabel}>Net Payee Share (Post-Fee):</span>
+                <span className={styles.calcValue} style={{ color: 'var(--jp-success)' }}>${calculatedPayee} {currency}</span>
+              </div>
+              <div className={`${styles.calcRow} ${styles.calcTotal}`}>
+                <span>Total Disbursed:</span>
+                <span>${parsedTotal.toFixed(2)} {currency}</span>
+              </div>
+            </div>
+
+            <div className={styles.formActions}>
+              <button
+                type="submit"
+                className={styles.primaryLink}
+                data-testid="submit-split-button"
+              >
+                Validate Split Distribution
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Right Column: Ledger Preview & Governance */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--jp-space-6)' }}>
+          {/* Double-Entry Ledger Preview */}
+          <div className={styles.formCard} data-testid="split-ledger">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+              <Layers size={18} />
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Split Double-Entry Ledger</h2>
+            </div>
+
+            <p className={styles.pageSubtitle} style={{ margin: 0 }}>
+              Split execution debits escrow for full gross amount and credits platform fee revenue alongside payee entitlements.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ padding: '10px 12px', background: '#eaf3ff', border: '1px solid #b3cdfb', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#003087' }}>DEBIT escrow:split (Gross Inflow)</span>
+                <p className={styles.mono} style={{ margin: '4px 0 0 0', color: '#003087', fontWeight: 'bold' }}>
+                  ${parsedTotal.toFixed(2)} {currency}
+                </p>
+              </div>
+
+              <div style={{ padding: '10px 12px', background: '#f5f0ff', border: '1px solid #d4c2fc', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#5521b5' }}>CREDIT platform:fee (Platform Revenue)</span>
+                <p className={styles.mono} style={{ margin: '4px 0 0 0', color: '#5521b5', fontWeight: 'bold' }}>
+                  ${calculatedFee} {currency}
+                </p>
+              </div>
+
+              <div style={{ padding: '10px 12px', background: '#e8f5ee', border: '1px solid #a3d9b8', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0c6b3c' }}>CREDIT payee:payout (Net Payee Entitlement)</span>
+                <p className={styles.mono} style={{ margin: '4px 0 0 0', color: '#0c6b3c', fontWeight: 'bold' }}>
+                  ${calculatedPayee} {currency}
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--jp-border)', paddingTop: '10px', fontSize: '12px' }}>
+              <span style={{ color: 'var(--jp-text-muted)' }}>Distribution Balance Status:</span>
+              <span style={{ fontWeight: 'bold', color: 'var(--jp-success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CheckCircle2 size={14} />
+                100% Balanced
               </span>
             </div>
-          )}
-
-          <div className="md:col-span-2 flex justify-end">
-            <button
-              type="submit"
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition"
-            >
-              Ajukan Usulan Split
-            </button>
           </div>
-        </form>
-      </div>
-
-      {/* Double-Entry Ledger Preview */}
-      <div className="bg-white border rounded-xl p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-emerald-600" />
-          Pratinjau Pembukuan Berimbang (Double-Entry Ledger)
-        </h2>
-        <p className="text-xs text-gray-500 mb-4">
-          Eksekusi split mendebit rekening escrow sebesar nominal penuh, mengkredit pendapatan platform fee dan hak penerima.
-        </p>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead>
-              <tr className="border-b bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
-                <th className="py-2.5 px-4">Tipe Leg</th>
-                <th className="py-2.5 px-4">Referensi Akun (account_ref)</th>
-                <th className="py-2.5 px-4 text-right">Debit</th>
-                <th className="py-2.5 px-4 text-right">Kredit</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y text-gray-800 font-mono text-xs">
-              <tr>
-                <td className="py-3 px-4 font-sans font-semibold text-blue-600">DEBIT</td>
-                <td className="py-3 px-4">org:split_escrow</td>
-                <td className="py-3 px-4 text-right font-semibold">
-                  {(BigInt(split.amount_minor || '0') / 100n).toString()}.00 {split.currency}
-                </td>
-                <td className="py-3 px-4 text-right text-gray-400">-</td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4 font-sans font-semibold text-emerald-600">CREDIT</td>
-                <td className="py-3 px-4">org:main (Platform Fee)</td>
-                <td className="py-3 px-4 text-right text-gray-400">-</td>
-                <td className="py-3 px-4 text-right font-semibold">
-                  {(BigInt(split.platform_fee_minor || '0') / 100n).toString()}.00 {split.currency}
-                </td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4 font-sans font-semibold text-emerald-600">CREDIT</td>
-                <td className="py-3 px-4">payee:{split.counterparty_id || 'recipient'}</td>
-                <td className="py-3 px-4 text-right text-gray-400">-</td>
-                <td className="py-3 px-4 text-right font-semibold">
-                  {(BigInt(split.recipient_share_minor || '0') / 100n).toString()}.00 {split.currency}
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 bg-gray-50 font-semibold text-xs">
-                <td colSpan="2" className="py-2.5 px-4 uppercase text-gray-600">
-                  Total (Keseimbangan Mutlak: DEBIT = KREDIT)
-                </td>
-                <td className="py-2.5 px-4 text-right text-blue-600">
-                  {(BigInt(split.amount_minor || '0') / 100n).toString()}.00 {split.currency}
-                </td>
-                <td className="py-2.5 px-4 text-right text-emerald-600">
-                  {(BigInt(split.amount_minor || '0') / 100n).toString()}.00 {split.currency}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-
-      {/* Maker / Checker Controls */}
-      <div className="bg-white border rounded-xl p-6 shadow-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <UserCheck className="w-5 h-5 text-gray-600" />
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">Kontrol Maker / Checker (Dual-Control)</h3>
-            <p className="text-xs text-gray-500">
-              Hanya manusia dengan peran Approver yang berhak menyetujui pembagian split pembayaran ini.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="px-4 py-2 border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 rounded-lg text-sm font-medium transition"
-          >
-            Tolak Split
-          </button>
-          <button
-            type="button"
-            className="px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-sm font-medium transition flex items-center gap-2"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            Setujui Split (Approve)
-          </button>
         </div>
       </div>
     </div>
@@ -328,4 +296,3 @@ export function SplitPage({ splitId = null }) {
 }
 
 export default SplitPage;
-

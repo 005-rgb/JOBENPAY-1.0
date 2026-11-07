@@ -1,0 +1,439 @@
+/**
+ * web/src/pages/TransactionPages.module.css
+ * Unified high-precision design styles for all PRD 1.3 transaction pages and forms.
+ * Follows Jobenpay Design System tokens (pure CSS Modules, zero external frameworks).
+ */
+
+.pageStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-6);
+  min-width: 0;
+  width: 100%;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--jp-space-4);
+  padding-bottom: var(--jp-space-4);
+  border-bottom: var(--jp-border-width) solid var(--jp-border);
+}
+
+.pageTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-1);
+}
+
+.pageTitle {
+  font-size: var(--jp-font-size-page-title);
+  line-height: var(--jp-font-line-page-title);
+  font-weight: var(--jp-font-weight-bold);
+  color: var(--jp-text);
+  margin: 0;
+}
+
+.pageSubtitle {
+  font-size: var(--jp-font-size-caption);
+  line-height: var(--jp-font-line-caption);
+  color: var(--jp-text-muted);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--jp-space-3);
+  flex-wrap: wrap;
+}
+
+.primaryLink {
+  align-items: center;
+  background: var(--jp-black);
+  border-radius: var(--jp-radius-pill);
+  color: var(--jp-white);
+  display: inline-flex;
+  font-size: var(--jp-font-size-button-md);
+  font-weight: var(--jp-font-weight-bold);
+  gap: var(--jp-space-2);
+  height: var(--jp-btn-h-md);
+  justify-content: center;
+  padding: 0 var(--jp-space-4);
+  text-decoration: none;
+  cursor: pointer;
+  border: 0;
+  transition: background var(--jp-transition-standard);
+}
+
+.primaryLink:hover {
+  background: var(--jp-button-hover);
+}
+
+.secondaryLink {
+  align-items: center;
+  background: var(--jp-surface);
+  border: var(--jp-border-width) solid var(--jp-border);
+  border-radius: var(--jp-radius-pill);
+  color: var(--jp-text);
+  display: inline-flex;
+  font-size: var(--jp-font-size-button-md);
+  font-weight: var(--jp-font-weight-medium);
+  gap: var(--jp-space-2);
+  height: var(--jp-btn-h-md);
+  justify-content: center;
+  padding: 0 var(--jp-space-4);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--jp-transition-standard);
+}
+
+.secondaryLink:hover {
+  background: var(--jp-secondary-hover);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jp-space-2);
+  font-size: var(--jp-font-size-caption);
+  font-weight: var(--jp-font-weight-medium);
+  color: var(--jp-text-muted);
+  text-decoration: none;
+  margin-bottom: var(--jp-space-2);
+}
+
+.backLink:hover {
+  color: var(--jp-text);
+}
+
+.formCard {
+  background: var(--jp-surface);
+  border: var(--jp-border-width) solid var(--jp-border);
+  border-radius: var(--jp-radius-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-6);
+  padding: var(--jp-space-6);
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.formCardFull {
+  max-width: 100%;
+}
+
+.formGrid {
+  display: grid;
+  gap: var(--jp-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-1);
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: var(--jp-font-weight-bold);
+  color: var(--jp-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fieldInput,
+.fieldSelect {
+  background: var(--jp-surface);
+  border: var(--jp-border-width) solid var(--jp-border-input);
+  border-radius: var(--jp-radius-input);
+  color: var(--jp-text);
+  font-family: inherit;
+  font-size: 14px;
+  height: 40px;
+  padding: 0 var(--jp-space-3);
+  transition: border-color var(--jp-transition-standard), box-shadow var(--jp-transition-standard);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fieldInput:focus,
+.fieldSelect:focus {
+  border-color: var(--jp-blue);
+  box-shadow: 0 0 0 2px var(--jp-nav-active-bg);
+  outline: none;
+}
+
+.fieldTextArea {
+  background: var(--jp-surface);
+  border: var(--jp-border-width) solid var(--jp-border-input);
+  border-radius: var(--jp-radius-input);
+  color: var(--jp-text);
+  font-family: inherit;
+  font-size: 14px;
+  min-height: 84px;
+  padding: var(--jp-space-3);
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fieldTextArea:focus {
+  border-color: var(--jp-blue);
+  box-shadow: 0 0 0 2px var(--jp-nav-active-bg);
+  outline: none;
+}
+
+.calculationCard {
+  background: var(--jp-surface-sidebar);
+  border: var(--jp-border-width) solid var(--jp-border);
+  border-radius: var(--jp-radius-card);
+  padding: var(--jp-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-3);
+}
+
+.calcRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--jp-font-size-caption);
+}
+
+.calcLabel {
+  color: var(--jp-text-muted);
+}
+
+.calcValue {
+  font-weight: var(--jp-font-weight-bold);
+  color: var(--jp-text);
+  font-family: var(--jp-font-mono);
+}
+
+.calcTotal {
+  border-top: var(--jp-border-width) solid var(--jp-border);
+  padding-top: var(--jp-space-2);
+  font-size: var(--jp-font-size-section-title);
+  font-weight: var(--jp-font-weight-bold);
+}
+
+.badgeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--jp-space-2);
+  flex-wrap: wrap;
+}
+
+.tableCard {
+  background: var(--jp-surface);
+  border: var(--jp-border-width) solid var(--jp-border);
+  border-radius: var(--jp-radius-card);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  width: 100%;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.dataTable {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+}
+
+.dataTable th {
+  background: var(--jp-surface-sidebar);
+  border-bottom: var(--jp-border-width) solid var(--jp-border);
+  color: var(--jp-text-muted);
+  font-size: 11px;
+  font-weight: var(--jp-font-weight-bold);
+  letter-spacing: 0.05em;
+  padding: var(--jp-space-3) var(--jp-space-4);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dataTable td {
+  border-bottom: var(--jp-border-width) solid var(--jp-border);
+  color: var(--jp-text);
+  font-size: var(--jp-font-size-caption);
+  padding: var(--jp-space-3) var(--jp-space-4);
+  white-space: nowrap;
+}
+
+.dataTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.dataTable tbody tr:hover {
+  background: var(--jp-surface-sidebar);
+}
+
+.mono {
+  font-family: var(--jp-font-mono);
+}
+
+.emptyCard {
+  background: var(--jp-surface);
+  border: var(--jp-border-width) dashed var(--jp-border);
+  border-radius: var(--jp-radius-card);
+  padding: var(--jp-space-12) var(--jp-space-6);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--jp-space-3);
+}
+
+.emptyTitle {
+  font-size: var(--jp-font-size-section-title);
+  font-weight: var(--jp-font-weight-bold);
+  color: var(--jp-text);
+  margin: 0;
+}
+
+.emptyDesc {
+  font-size: var(--jp-font-size-caption);
+  color: var(--jp-text-muted);
+  margin: 0;
+  max-width: 460px;
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--jp-space-3);
+  padding-top: var(--jp-space-4);
+  border-top: var(--jp-border-width) solid var(--jp-border);
+}
+
+.errorBanner {
+  background: #fdecef;
+  border: var(--jp-border-width) solid #f8b4be;
+  border-radius: var(--jp-radius-card);
+  color: #9b1c2a;
+  padding: var(--jp-space-3) var(--jp-space-4);
+  font-size: var(--jp-font-size-caption);
+  display: flex;
+  align-items: center;
+  gap: var(--jp-space-2);
+}
+
+.successBanner {
+  background: #e8f5ee;
+  border: var(--jp-border-width) solid #a3d9b8;
+  border-radius: var(--jp-radius-card);
+  color: #0c6b3c;
+  padding: var(--jp-space-3) var(--jp-space-4);
+  font-size: var(--jp-font-size-caption);
+  display: flex;
+  align-items: center;
+  gap: var(--jp-space-2);
+}
+
+.stepIndicator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jp-space-1);
+  min-width: 220px;
+}
+
+.stepHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: var(--jp-font-weight-bold);
+  text-transform: uppercase;
+  color: var(--jp-text-muted);
+}
+
+.stepHeaderActive {
+  color: var(--jp-text);
+}
+
+.stepHeaderDone {
+  color: var(--jp-success);
+}
+
+.stepBar {
+  display: flex;
+  height: 6px;
+  background: var(--jp-border);
+  border-radius: var(--jp-radius-pill);
+  overflow: hidden;
+  gap: 2px;
+}
+
+.stepSegment {
+  flex: 1;
+  background: #e4e8ec;
+  transition: background var(--jp-transition-standard);
+}
+
+.stepActive {
+  background: var(--jp-blue);
+}
+
+.stepDone {
+  background: var(--jp-success);
+}
+
+.twoColumnLayout {
+  display: grid;
+  gap: var(--jp-space-6);
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.2fr);
+  align-items: start;
+}
+
+.providerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jp-space-1);
+  padding: 2px 8px;
+  border-radius: var(--jp-radius-pill);
+  font-size: 11px;
+  font-weight: var(--jp-font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badgeSandbox {
+  background: #eaf3ff;
+  color: var(--jp-blue-dark);
+  border: var(--jp-border-width) solid #b3cdfb;
+}
+
+.badgeSimulated {
+  background: #fff6db;
+  color: #6a4b00;
+  border: var(--jp-border-width) solid #ffe18b;
+}
+
+@media (--jp-mobile-down) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .twoColumnLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .formGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   AlertCircle,
   AlertTriangle,
@@ -26,6 +27,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import styles from './TransactionPages.module.css';
 
 export function FinancingPage({ financingId = null }) {
   const { t } = useTranslation();
@@ -38,6 +40,7 @@ export function FinancingPage({ financingId = null }) {
   const [counterpartyHistory, setCounterpartyHistory] = useState(4);
   const [interestBps, setInterestBps] = useState(1200); // 12% p.a.
   const [formError, setFormError] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
 
   const {
     data: financingData,
@@ -77,116 +80,130 @@ export function FinancingPage({ financingId = null }) {
   const handleValidateForm = (e) => {
     e.preventDefault();
     setFormError('');
+    setFormSuccess('');
 
     if (parsedPrincipal <= 0) {
-      setFormError('Nominal pokok pembiayaan harus lebih besar dari 0.');
+      setFormError('Principal financing amount must be greater than zero.');
       return;
     }
 
     if (parsedCollateral <= 0) {
-      setFormError('Nilai jaminan / invoice harus lebih besar dari 0.');
+      setFormError('Collateral / invoice value must be greater than zero.');
       return;
     }
 
     if (isLtvExceeded) {
-      setFormError(`LTV ${ltv.toFixed(1)}% melampaui batas maksimum ${maxLtv}% untuk fasilitas ${facilityType}.`);
+      setFormError(`Loan-to-Value (LTV) of ${ltv.toFixed(1)}% exceeds the maximum cap of ${maxLtv}% for ${facilityType} facility.`);
       return;
     }
 
     if (counterpartyHistory < 3) {
-      setFormError('Pihak lawan membutuhkan minimal 3 riwayat transaksi tanpa sengketa.');
+      setFormError('Counterparty requires a minimum of 3 clean, undisputed historical transactions.');
       return;
     }
 
     if (tenorMonths < 1 || tenorMonths > 6) {
-      setFormError('Tenor pembiayaan harus antara 1 sampai 6 bulan (180 hari).');
+      setFormError('Facility tenor must be between 1 and 6 months (180 days).');
       return;
     }
+
+    setFormSuccess('Facility parameters successfully validated against underwriting policy.');
   };
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-center" data-testid="financing-loading">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
-        <p className="text-sm text-gray-500">Memuat data pembiayaan (financing)...</p>
+      <div className={styles.emptyCard} data-testid="financing-loading">
+        <Loader2 className="animate-spin" size={32} />
+        <p className={styles.emptyDesc}>Loading supply chain financing facility...</p>
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="p-6 bg-red-50 border border-red-200 rounded-lg text-red-700" data-testid="financing-error">
-        <div className="flex items-center gap-2 font-semibold mb-1">
-          <AlertCircle className="w-5 h-5" />
-          <span>Gagal Memuat Data Pembiayaan</span>
+      <div className={styles.pageStack} data-testid="financing-error">
+        <div className={styles.errorBanner}>
+          <AlertCircle size={20} />
+          <div>
+            <strong>Failed to Load Financing Facility</strong>
+            <p style={{ margin: '4px 0 0 0' }}>{error?.message || 'A system error occurred while contacting the server.'}</p>
+          </div>
         </div>
-        <p className="text-sm">{error?.message || 'Terjadi kesalahan sistem saat menghubungi backend.'}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto p-4 sm:p-6" data-testid="financing-page">
-      {/* Header with SIMULATED Badge */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Supply Chain Financing</h1>
-            {/* MANDATORY SIMULATED BADGE */}
+    <div className={styles.pageStack} data-testid="financing-page">
+      {/* Header with Title and Badges */}
+      <div className={styles.pageHeader}>
+        <div className={styles.pageTitleGroup}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 className={styles.pageTitle}>Supply Chain Financing</h1>
             <span
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300"
+              className={`${styles.providerBadge} ${styles.badgeSimulated}`}
               data-testid="simulated-badge"
             >
               SIMULATED
             </span>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
-            Fasilitas Purchase Order & Invoice Financing dengan evaluasi underwriting deterministik (Tier C, AD-17).
+          <p className={styles.pageSubtitle}>
+            Purchase Order and Invoice Financing facilities with deterministic underwriting evaluation (Tier C, AD-17).
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-            <ShieldAlert className="w-3.5 h-3.5" />
+        <div className={styles.headerActions}>
+          <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+            <ShieldAlert size={14} style={{ marginRight: '4px' }} />
             Always Require Approval (0 Auto-Approve)
           </span>
+          <Link to="/transactions/new?category=FINANCING" className={styles.primaryLink}>
+            New Facility Proposal
+          </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Input Form */}
-        <div className="lg:col-span-2 space-y-6">
-          <form onSubmit={handleValidateForm} className="bg-white border rounded-xl p-5 shadow-sm space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <Calculator className="w-4 h-4 text-primary-600" />
-              Parameter Fasilitas Pembiayaan
-            </h2>
+      <div className={styles.twoColumnLayout}>
+        {/* Left Column: Form & Schedule */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--jp-space-6)' }}>
+          <form onSubmit={handleValidateForm} className={styles.formCard} data-testid="financing-form">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+              <Calculator size={18} />
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Financing Facility Parameters</h2>
+            </div>
 
             {formError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+              <div className={styles.errorBanner}>
+                <AlertCircle size={16} />
                 <span>{formError}</span>
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Jenis Fasilitas</label>
+            {formSuccess && (
+              <div className={styles.successBanner}>
+                <CheckCircle2 size={16} />
+                <span>{formSuccess}</span>
+              </div>
+            )}
+
+            <div className={styles.formGrid}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Facility Type</label>
                 <select
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary-500"
+                  className={styles.fieldSelect}
                   value={facilityType}
                   onChange={(e) => setFacilityType(e.target.value)}
                   data-testid="facility-type-select"
                 >
-                  <option value="PO">PO Financing (Max LTV 70%)</option>
-                  <option value="INVOICE">Invoice Financing (Max LTV 80%)</option>
+                  <option value="PO">Purchase Order Financing (Max 70% LTV)</option>
+                  <option value="INVOICE">Invoice Financing (Max 80% LTV)</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Mata Uang</label>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Currency</label>
                 <select
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+                  className={styles.fieldSelect}
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
                 >
@@ -195,15 +212,13 @@ export function FinancingPage({ financingId = null }) {
                   <option value="GBP">GBP - British Pound</option>
                 </select>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Nilai Agunan / Invoice ($)</label>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Collateral / Invoice Value ($)</label>
                 <input
                   type="number"
                   step="any"
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  className={styles.fieldInput}
                   placeholder="100000"
                   value={collateralValue}
                   onChange={(e) => setCollateralValue(e.target.value)}
@@ -211,12 +226,12 @@ export function FinancingPage({ financingId = null }) {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Pokok Pinjaman Diminta ($)</label>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Requested Principal ($)</label>
                 <input
                   type="number"
                   step="any"
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  className={styles.fieldInput}
                   placeholder="50000"
                   value={principalAmount}
                   onChange={(e) => setPrincipalAmount(e.target.value)}
@@ -226,113 +241,121 @@ export function FinancingPage({ financingId = null }) {
             </div>
 
             {/* LTV Real-Time Indicator */}
-            <div className={`p-3 rounded-lg border text-sm flex items-center justify-between ${
-              isLtvExceeded ? 'bg-red-50 border-red-300 text-red-800' : 'bg-green-50 border-green-300 text-green-800'
-            }`}>
-              <div className="flex items-center gap-2">
-                {isLtvExceeded ? <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" /> : <ShieldCheck className="w-4 h-4 shrink-0 text-green-600" />}
-                <span>Loan-to-Value (LTV): <strong>{ltv.toFixed(1)}%</strong> (Batas Maksimum: {maxLtv}%)</span>
+            <div className={isLtvExceeded ? styles.errorBanner : styles.successBanner}>
+              {isLtvExceeded ? <AlertTriangle size={16} /> : <ShieldCheck size={16} />}
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>
+                  Loan-to-Value (LTV): <strong>{ltv.toFixed(1)}%</strong> (Maximum Cap: {maxLtv}%)
+                </span>
+                <strong style={{ fontSize: '11px', textTransform: 'uppercase' }}>
+                  {isLtvExceeded ? 'Exceeds Cap' : 'LTV Compliant'}
+                </strong>
               </div>
-              <span className="text-xs font-semibold uppercase">{isLtvExceeded ? 'Melebihi Cap' : 'Lolos LTV'}</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Tenor (Bulan)</label>
+            <div className={styles.formGrid}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Facility Tenor (Months)</label>
                 <select
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+                  className={styles.fieldSelect}
                   value={tenorMonths}
                   onChange={(e) => setTenorMonths(parseInt(e.target.value, 10))}
                   data-testid="tenor-months-select"
                 >
-                  <option value={1}>1 Bulan (30 Hari)</option>
-                  <option value={2}>2 Bulan (60 Hari)</option>
-                  <option value={3}>3 Bulan (90 Hari)</option>
-                  <option value={4}>4 Bulan (120 Hari)</option>
-                  <option value={5}>5 Bulan (150 Hari)</option>
-                  <option value={6}>6 Bulan (180 Hari - Max Cap)</option>
+                  <option value={1}>1 Month (30 Days)</option>
+                  <option value={2}>2 Months (60 Days)</option>
+                  <option value={3}>3 Months (90 Days)</option>
+                  <option value={4}>4 Months (120 Days)</option>
+                  <option value={5}>5 Months (150 Days)</option>
+                  <option value={6}>6 Months (180 Days - Max Cap)</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Suku Bunga Tetap (p.a.)</label>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Fixed Interest Rate (p.a.)</label>
                 <input
                   type="text"
                   disabled
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500"
+                  className={styles.fieldInput}
                   value="12.00% (1,200 bps pro-rata)"
+                  style={{ background: 'var(--jp-surface-sidebar)', color: 'var(--jp-text-muted)' }}
                 />
+              </div>
+
+              <div className={`${styles.field} ${styles.fullWidth}`}>
+                <label className={styles.fieldLabel}>Counterparty Transaction History</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className={styles.fieldInput}
+                    style={{ width: '120px' }}
+                    value={counterpartyHistory}
+                    onChange={(e) => setCounterpartyHistory(parseInt(e.target.value, 10) || 0)}
+                    data-testid="counterparty-history-input"
+                  />
+                  <span className={styles.pageSubtitle}>
+                    completed transactions (Underwriting minimum threshold: 3)
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Riwayat Transaksi Pihak Lawan</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  className="w-32 border rounded-lg px-3 py-2 text-sm"
-                  value={counterpartyHistory}
-                  onChange={(e) => setCounterpartyHistory(parseInt(e.target.value, 10) || 0)}
-                  data-testid="counterparty-history-input"
-                />
-                <span className="text-xs text-gray-500">transaksi selesai (syarat minimum underwriting: 3)</span>
-              </div>
-            </div>
-
-            <div className="pt-2">
+            <div className={styles.formActions}>
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg text-sm transition-colors shadow-sm"
+                className={styles.primaryLink}
                 data-testid="submit-financing-button"
               >
-                Simulasikan & Usulkan Pembiayaan
+                Validate & Simulate Underwriting
               </button>
             </div>
           </form>
 
           {/* Amortization Schedule Waterfall Table */}
-          <div className="bg-white border rounded-xl p-5 shadow-sm space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-primary-600" />
-              Jadwal Cicilan & Alokasi Pelunasan (Amortization Waterfall)
-            </h2>
+          <div className={styles.tableCard}>
+            <div style={{ padding: 'var(--jp-space-4)', borderBottom: '1px solid var(--jp-border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Calendar size={18} />
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Amortization Waterfall & Repayment Schedule</h2>
+            </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border-collapse">
+            <div className={styles.tableScroll}>
+              <table className={styles.dataTable}>
                 <thead>
-                  <tr className="border-b bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
-                    <th className="py-2.5 px-3">Bulan</th>
-                    <th className="py-2.5 px-3">Total Cicilan</th>
-                    <th className="py-2.5 px-3">Admin Fee (1.5%)</th>
-                    <th className="py-2.5 px-3">Bunga (Interest)</th>
-                    <th className="py-2.5 px-3">Pokok Pinjaman</th>
+                  <tr>
+                    <th>Month</th>
+                    <th>Total Installment</th>
+                    <th>Admin Fee (1.5%)</th>
+                    <th>Interest</th>
+                    <th>Principal</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y text-gray-700">
+                <tbody>
                   {Array.from({ length: tenorMonths }, (_, i) => {
                     const month = i + 1;
                     const isFinal = month === tenorMonths;
                     const amt = isFinal ? monthlyBaseMinor + residueMinor : monthlyBaseMinor;
                     return (
-                      <tr key={month} className="hover:bg-gray-50/50">
-                        <td className="py-2.5 px-3 font-medium">Bulan ke-{month} {isFinal && <span className="text-xs text-primary-600 font-bold">(Residue)</span>}</td>
-                        <td className="py-2.5 px-3 font-semibold text-gray-900">${formatMoney(amt)}</td>
-                        <td className="py-2.5 px-3 text-xs text-gray-600">{month === 1 ? `$${formatMoney(adminFeeMinor)}` : '$0.00'}</td>
-                        <td className="py-2.5 px-3 text-xs text-gray-600">${formatMoney(totalInterestMinor / N)}</td>
-                        <td className="py-2.5 px-3 text-xs text-gray-600">${formatMoney(amt - (month === 1 ? adminFeeMinor : 0n) - (totalInterestMinor / N))}</td>
+                      <tr key={month}>
+                        <td style={{ fontWeight: '600' }}>
+                          Month {month} {isFinal && <span style={{ color: 'var(--jp-blue)', fontSize: '11px', fontWeight: 'bold' }}>(Residue)</span>}
+                        </td>
+                        <td className={styles.mono} style={{ fontWeight: 'bold' }}>${formatMoney(amt)}</td>
+                        <td className={styles.mono}>{month === 1 ? `$${formatMoney(adminFeeMinor)}` : '$0.00'}</td>
+                        <td className={styles.mono}>${formatMoney(totalInterestMinor / N)}</td>
+                        <td className={styles.mono}>${formatMoney(amt - (month === 1 ? adminFeeMinor : 0n) - (totalInterestMinor / N))}</td>
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t bg-gray-50 font-bold text-gray-900">
-                    <td className="py-2.5 px-3">Total Kewajiban</td>
-                    <td className="py-2.5 px-3 text-primary-700">${formatMoney(totalObligationMinor)}</td>
-                    <td className="py-2.5 px-3 text-xs">${formatMoney(adminFeeMinor)}</td>
-                    <td className="py-2.5 px-3 text-xs">${formatMoney(totalInterestMinor)}</td>
-                    <td className="py-2.5 px-3 text-xs">${formatMoney(principalMinor)}</td>
+                  <tr style={{ background: 'var(--jp-surface-sidebar)', fontWeight: 'bold' }}>
+                    <td style={{ padding: '12px 16px' }}>Total Obligation</td>
+                    <td className={styles.mono} style={{ padding: '12px 16px', color: 'var(--jp-blue)' }}>${formatMoney(totalObligationMinor)}</td>
+                    <td className={styles.mono} style={{ padding: '12px 16px' }}>${formatMoney(adminFeeMinor)}</td>
+                    <td className={styles.mono} style={{ padding: '12px 16px' }}>${formatMoney(totalInterestMinor)}</td>
+                    <td className={styles.mono} style={{ padding: '12px 16px' }}>${formatMoney(principalMinor)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -340,69 +363,77 @@ export function FinancingPage({ financingId = null }) {
           </div>
         </div>
 
-        {/* Right Column: Ledger Preview & Maker/Checker Controls */}
-        <div className="space-y-6">
+        {/* Right Column: Ledger Preview & Governance */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--jp-space-6)' }}>
           {/* Double-Entry Ledger Preview */}
-          <div className="bg-white border rounded-xl p-5 shadow-sm space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-primary-600" />
-              Double-Entry Ledger (Pencairan)
-            </h2>
+          <div className={styles.formCard}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+              <Layers size={18} />
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Disbursement Double-Entry Ledger</h2>
+            </div>
 
-            <div className="space-y-2 font-mono text-xs">
-              <div className="p-2.5 bg-green-50/60 border border-green-200 rounded-lg space-y-1">
-                <span className="font-semibold text-green-800">DEBIT org:main (Kas Bersih)</span>
-                <p className="text-green-700">${formatMoney(principalMinor - adminFeeMinor)} {currency}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ padding: '10px 12px', background: '#e8f5ee', border: '1px solid #a3d9b8', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0c6b3c' }}>DEBIT org:main (Net Cash In)</span>
+                <p className={styles.mono} style={{ margin: '4px 0 0 0', color: '#0c6b3c', fontWeight: 'bold' }}>
+                  ${formatMoney(principalMinor - adminFeeMinor)} {currency}
+                </p>
               </div>
 
-              <div className="p-2.5 bg-blue-50/60 border border-blue-200 rounded-lg space-y-1">
-                <span className="font-semibold text-blue-800">DEBIT loan:fee (Admin Fee 1.5%)</span>
-                <p className="text-blue-700">${formatMoney(adminFeeMinor)} {currency}</p>
+              <div style={{ padding: '10px 12px', background: '#eaf3ff', border: '1px solid #b3cdfb', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#003087' }}>DEBIT loan:fee (Admin Fee 1.5%)</span>
+                <p className={styles.mono} style={{ margin: '4px 0 0 0', color: '#003087', fontWeight: 'bold' }}>
+                  ${formatMoney(adminFeeMinor)} {currency}
+                </p>
               </div>
 
-              <div className="p-2.5 bg-purple-50/60 border border-purple-200 rounded-lg space-y-1">
-                <span className="font-semibold text-purple-800">CREDIT loan:principal (Kewajiban Pokok)</span>
-                <p className="text-purple-700">${formatMoney(principalMinor)} {currency}</p>
+              <div style={{ padding: '10px 12px', background: '#f5f0ff', border: '1px solid #d4c2fc', borderRadius: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#5521b5' }}>CREDIT loan:principal (Principal Obligation)</span>
+                <p className={styles.mono} style={{ margin: '4px 0 0 0', color: '#5521b5', fontWeight: 'bold' }}>
+                  ${formatMoney(principalMinor)} {currency}
+                </p>
               </div>
             </div>
 
-            <div className="pt-2 border-t flex items-center justify-between text-xs text-gray-600">
-              <span>Status Keseimbangan:</span>
-              <span className="font-bold text-green-700 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Balanced 100%
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--jp-border)', paddingTop: '10px', fontSize: '12px' }}>
+              <span style={{ color: 'var(--jp-text-muted)' }}>Ledger Balance Status:</span>
+              <span style={{ fontWeight: 'bold', color: 'var(--jp-success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CheckCircle2 size={14} />
+                100% Balanced
               </span>
             </div>
           </div>
 
           {/* Maker / Checker Dual-Control Box */}
-          <div className="bg-white border rounded-xl p-5 shadow-sm space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-primary-600" />
-              Kontrol Dual-Approval (Maker/Checker)
-            </h2>
+          <div className={styles.formCard}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+              <UserCheck size={18} />
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Maker / Checker Governance</h2>
+            </div>
 
-            <p className="text-xs text-gray-500">
-              Tier C FINANCING mewajibkan otorisasi Checker manusia sebelum dana dicairkan oleh engine simulator.
+            <p className={styles.pageSubtitle} style={{ margin: 0 }}>
+              Tier C FINANCING strictly mandates human Checker authorization before funds can be released by the partner simulator.
             </p>
 
-            <div className="space-y-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
                 type="button"
-                className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                className={styles.primaryLink}
+                style={{ width: '100%', background: '#0c6b3c' }}
                 data-testid="checker-approve-button"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                Setujui Pencairan (Checker Approve)
+                <CheckCircle2 size={16} />
+                Approve Disbursement (Checker)
               </button>
 
               <button
                 type="button"
-                className="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                className={styles.secondaryLink}
+                style={{ width: '100%', color: '#9b1c2a', borderColor: '#f8b4be' }}
                 data-testid="checker-reject-button"
               >
-                <XCircle className="w-4 h-4" />
-                Tolak Fasilitas (Checker Reject)
+                <XCircle size={16} />
+                Reject Facility (Checker)
               </button>
             </div>
           </div>
@@ -413,4 +444,3 @@ export function FinancingPage({ financingId = null }) {
 }
 
 export default FinancingPage;
-
