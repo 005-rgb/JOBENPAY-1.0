@@ -33,6 +33,39 @@ export function ruleA3bVlei(ctx = {}) {
   return pass();
 }
 
+export function ruleA3cIntentMandate(ctx = {}) {
+  const { mandate, version, policy, intentCheck, intentMandateId, transaction, request } = ctx;
+  const isIntentCheckEnabled =
+    mandate?.ai?.intentCheck === true ||
+    mandate?.ai?.intent_check === true ||
+    version?.policy?.ai?.intentCheck === true ||
+    version?.policy?.ai?.intent_check === true ||
+    policy?.ai?.intentCheck === true ||
+    policy?.ai?.intent_check === true;
+
+  if (isIntentCheckEnabled) {
+    const id =
+      intentMandateId ||
+      transaction?.intent_mandate_id ||
+      transaction?.intentMandateId ||
+      request?.intent_mandate_id ||
+      request?.intentMandateId ||
+      ctx.intent_mandate_id;
+
+    if (!id) {
+      return fail('INTENT_MANDATE_MISSING', 'Transaction requires an active intent mandate.');
+    }
+
+    if (intentCheck) {
+      if (!intentCheck.valid) {
+        return fail(intentCheck.reason || 'INTENT_MISMATCH', intentCheck.message || 'Intent mandate check failed.');
+      }
+    }
+  }
+
+  return pass();
+}
+
 export function ruleA4ActionAllowed({ action, policy }) {
   if (action !== 'PAYOUT') return fail('ACTION_NOT_ALLOWED', 'Only PAYOUT is enabled in Tier A.');
   if (!policy) return pass('Mandate policy is unavailable because A3 already failed.');
@@ -128,6 +161,7 @@ export const RULES_A = Object.freeze([
   ['A2', ruleA2AgentActive],
   ['A3', ruleA3MandateActive],
   ['A3b', ruleA3bVlei],
+  ['A3c', ruleA3cIntentMandate],
   ['A4', ruleA4ActionAllowed],
   ['A5', ruleA5CurrencyAllowed],
   ['A6', ruleA6Cap],

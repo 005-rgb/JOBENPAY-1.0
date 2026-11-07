@@ -12,6 +12,7 @@ import { requestHash } from './requestHash.js';
 import { transition } from './requestStateMachine.js';
 import { evaluateStageC } from './decision/stageC.js';
 import { notifyOrgRoles } from '../repositories/notifications.js';
+import { validateIntentMatch } from './intent_service.js';
 
 function conflict(message) {
   const error = new AppError('IDEMPOTENCY_CONFLICT', message);
@@ -303,10 +304,25 @@ async function loadContext(tx, input) {
     };
   }
 
+  let intentCheck = null;
+  const intentMandateId = input.intentMandateId || input.intent_mandate_id;
+  if (intentMandateId) {
+    const txObj = {
+      purpose: input.metadata?.purpose || input.purpose || row.policy?.purpose,
+      amount_minor: input.amountMinor,
+      currency: input.currency,
+      counterparty_id: input.payeeId,
+      metadata: input.metadata,
+    };
+    intentCheck = await validateIntentMatch(input.orgId, intentMandateId, txObj, tx);
+  }
+
   return {
     org: row,
     agent: { id: row.agent_id, status: row.agent_status },
     vlei,
+    intentMandateId,
+    intentCheck,
     mandate: row.mandate_id ? { id: row.mandate_id, status: row.mandate_status } : null,
     version: row.mandate_id ? row : null,
     policy: row.policy,
