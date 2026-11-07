@@ -87,7 +87,14 @@ export function PayoutPage({ payoutId = null }) {
       try {
         return await apiClient.get('/transactions?category=PAYOUT&limit=50');
       } catch {
-        return apiClient.get('/payouts');
+        try {
+          return await apiClient.get('/payouts');
+        } catch (err2) {
+          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
+            return { transactions: [], payouts: [] };
+          }
+          throw err2;
+        }
       }
     },
     enabled: !effectiveId,

@@ -2188,9 +2188,23 @@ export function createApp() {
     }
   });
 
-  for (const [prefix, router] of categoryRouterMap) {
-    api.use(prefix, router);
-  }
+  api.use((req, res, next) => {
+    for (const [prefix, router] of categoryRouterMap) {
+      if (req.path === prefix || req.path.startsWith(prefix + '/')) {
+        const originalUrl = req.url;
+        let subUrl = req.url.slice(prefix.length);
+        if (!subUrl || !subUrl.startsWith('/')) {
+          subUrl = '/' + subUrl;
+        }
+        req.url = subUrl;
+        return router(req, res, (err) => {
+          req.url = originalUrl;
+          next(err);
+        });
+      }
+    }
+    next();
+  });
 
   api.use((err, _req, res, next) => {
     errorHandler(err, _req, res, next);

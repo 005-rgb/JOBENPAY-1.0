@@ -79,8 +79,15 @@ export function InvoicePage({ invoiceId = null }) {
       try {
         return await apiClient.get('/invoices');
       } catch {
-        const res = await apiClient.get('/transactions?category=INVOICE&limit=50');
-        return { invoices: res?.transactions || [] };
+        try {
+          const res = await apiClient.get('/transactions?category=INVOICE&limit=50');
+          return { invoices: res?.transactions || [] };
+        } catch (err2) {
+          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
+            return { invoices: [] };
+          }
+          throw err2;
+        }
       }
     },
     enabled: !effectiveId,

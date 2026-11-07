@@ -87,7 +87,14 @@ export function PartialPage({ partialId = null }) {
       try {
         return await apiClient.get('/transactions?category=PARTIAL&limit=50');
       } catch {
-        return apiClient.get('/partials');
+        try {
+          return await apiClient.get('/partials');
+        } catch (err2) {
+          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
+            return { transactions: [], partials: [] };
+          }
+          throw err2;
+        }
       }
     },
     enabled: !effectiveId,

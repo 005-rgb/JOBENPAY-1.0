@@ -77,8 +77,15 @@ export function Down_PaymentPage({ downPaymentId = null }) {
       try {
         return await apiClient.get('/down-payments');
       } catch {
-        const res = await apiClient.get('/transactions?category=DOWN_PAYMENT&limit=50');
-        return { downPayments: res?.transactions || [] };
+        try {
+          const res = await apiClient.get('/transactions?category=DOWN_PAYMENT&limit=50');
+          return { downPayments: res?.transactions || [] };
+        } catch (err2) {
+          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
+            return { downPayments: [] };
+          }
+          throw err2;
+        }
       }
     },
     enabled: !effectiveId,

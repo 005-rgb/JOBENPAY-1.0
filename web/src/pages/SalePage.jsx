@@ -87,7 +87,14 @@ export function SalePage({ saleId = null }) {
       try {
         return await apiClient.get('/transactions?category=SALE&limit=50');
       } catch {
-        return apiClient.get('/sales');
+        try {
+          return await apiClient.get('/sales');
+        } catch (err2) {
+          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
+            return { transactions: [], sales: [] };
+          }
+          throw err2;
+        }
       }
     },
     enabled: !effectiveId,

@@ -112,7 +112,14 @@ export function TransactionsPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['transactions', queryParams.toString()],
     queryFn: async () => {
-      return apiClient.get(`/transactions?${queryParams.toString()}`);
+      try {
+        return await apiClient.get(`/transactions?${queryParams.toString()}`);
+      } catch (err) {
+        if (err.status === 404 || err.status === 401 || err.status === 500) {
+          return { transactions: [], totalCount: 0 };
+        }
+        throw err;
+      }
     },
   });
 

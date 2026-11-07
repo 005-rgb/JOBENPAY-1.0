@@ -45,8 +45,15 @@ export function ScheduledPage({ scheduleId = null }) {
         const res = await apiClient.get('/scheduled');
         return res?.scheduled || res?.transactions || [];
       } catch {
-        const res = await apiClient.get('/transactions?category=SCHEDULED&limit=50');
-        return res?.transactions || [];
+        try {
+          const res = await apiClient.get('/transactions?category=SCHEDULED&limit=50');
+          return res?.transactions || [];
+        } catch (err2) {
+          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
+            return [];
+          }
+          throw err2;
+        }
       }
     },
   });
