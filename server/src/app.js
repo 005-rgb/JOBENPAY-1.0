@@ -32,6 +32,7 @@ import { recurringRouter } from './routes/recurring.js';
 import { financingRouter } from './routes/financing.js';
 import { debitRouter } from './routes/debit.js';
 import booksRouter from './routes/books.js';
+import { createTrustRouter } from './routes/trust.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
 import { decrypt, encrypt, hashPassword, hmacSha256, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
@@ -607,6 +608,7 @@ export function createApp() {
   const api = express.Router();
 
   api.use('/agent/v1', agentAuth);
+  api.use('/trust', createTrustRouter({ requireSession, requireRole }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,

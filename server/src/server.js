@@ -30,4 +30,5 @@ if (isDirectRun) {
 }
 
 export { app };
+export { trustRouter } from './routes/trust.js';
 export default app;
