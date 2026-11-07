@@ -26,6 +26,7 @@ const TEMPLATES = Object.freeze({
   AI_INJECTION_SUSPECTED: 'AI detected possible instruction injection.',
   AI_ANOMALY: 'AI identified an unusual request pattern.',
   AI_UNAVAILABLE: 'AI review was unavailable; human approval is required.',
+  TIER_C_REQUIRES_APPROVAL: 'Tier C transactions (FINANCING, DEBIT) always require human approval.',
 });
 
 const PRIORITY = [
@@ -35,7 +36,7 @@ const PRIORITY = [
   'DUPLICATE_SUSPECTED', 'INVOICE_REQUIRED', 'INVOICE_MISMATCH_AMOUNT', 'BUDGET_EXCEEDED',
   'PAYEE_NEW', 'PAYEE_CHANGED', 'INVOICE_PAYEE_MISMATCH', 'AMOUNT_REQUIRES_APPROVAL',
   'DOC_INJECTION_SUSPECTED', 'AI_HIGH_RISK', 'AI_INTENT_MISMATCH', 'AI_INJECTION_SUSPECTED',
-  'AI_ANOMALY', 'AI_UNAVAILABLE',
+  'AI_ANOMALY', 'AI_UNAVAILABLE', 'TIER_C_REQUIRES_APPROVAL',
 ];
 
 export function explainReasonCodes(reasonCodes = [], aiNote = null) {
@@ -51,3 +52,35 @@ export function explainReasonCodes(reasonCodes = [], aiNote = null) {
 }
 
 export const reasonTemplate = TEMPLATES;
+
+export const TEMPLATES_ID = Object.freeze({
+  ORG_FROZEN: 'Organisasi dibekukan.',
+  AGENT_DISABLED: 'Agen pembayaran dinonaktifkan.',
+  MANDATE_INACTIVE: 'Tidak ada mandat aktif untuk agen ini.',
+  MANDATE_EXPIRED: 'Mandat berada di luar masa berlaku.',
+  ACTION_NOT_ALLOWED: 'Aksi ini tidak diizinkan oleh mandat.',
+  CURRENCY_NOT_ALLOWED: 'Mata uang permintaan tidak sesuai dengan mandat.',
+  VALIDATION_FAILED: 'Jumlah pembayaran tidak valid.',
+  CAP_EXCEEDED: 'Jumlah melebihi batas mandat.',
+  NOT_FOUND: 'Penerima tidak ditemukan pada organisasi ini.',
+  PAYEE_BLOCKED: 'Penerima diblokir.',
+  PAYEE_NOT_ALLOWED: 'Penerima di luar daftar yang diizinkan mandat.',
+  OUTSIDE_TIME_WINDOW: 'Permintaan di luar jadwal yang diizinkan.',
+  VELOCITY_EXCEEDED: 'Batas kecepatan/frekuensi mandat terlampaui.',
+  DUPLICATE_SUSPECTED: 'Permintaan serupa baru saja diajukan.',
+  INVOICE_REQUIRED: 'Faktur yang diekstrak wajib dilampirkan.',
+  INVOICE_MISMATCH_AMOUNT: 'Jumlah atau mata uang faktur tidak cocok.',
+  BUDGET_EXCEEDED: 'Anggaran mandat telah habis.',
+  PAYEE_NEW: 'Penerima membutuhkan persetujuan karena belum tepercaya.',
+  PAYEE_CHANGED: 'Data penerima baru saja diubah dan membutuhkan persetujuan.',
+  INVOICE_PAYEE_MISMATCH: 'Penerima faktur tidak sesuai dengan penerima terdaftar.',
+  AMOUNT_REQUIRES_APPROVAL: 'Jumlah pembayaran memerlukan persetujuan manual.',
+  DOC_INJECTION_SUSPECTED: 'Dokumen memerlukan tinjauan untuk instruksi mencurigakan.',
+  AI_HIGH_RISK: 'AI mendeteksi risiko tinggi pada transaksi ini.',
+  AI_INTENT_MISMATCH: 'AI menemukan ketidaksesuaian maksud dengan mandat.',
+  AI_INJECTION_SUSPECTED: 'AI mendeteksi kemungkinan injeksi instruksi (prompt injection).',
+  AI_ANOMALY: 'AI mengidentifikasi pola transaksi tidak biasa.',
+  AI_UNAVAILABLE: 'Pemeriksaan AI tidak tersedia; persetujuan manusia diwajibkan.',
+  TIER_C_REQUIRES_APPROVAL: 'Transaksi Tier C (FINANCING, DEBIT) wajib persetujuan manusia.',
+});
+

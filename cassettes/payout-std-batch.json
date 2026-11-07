@@ -1,0 +1,43 @@
+{
+  "scenarioId": "payout-std",
+  "step": "batch",
+  "request": {
+    "method": "POST",
+    "path": "/v1/payments/payouts",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "sender_batch_header": {
+        "sender_batch_id": "jp_payout_batch_001",
+        "email_subject": "Payout Notice"
+      },
+      "items": [
+        {
+          "recipient_type": "EMAIL",
+          "amount": { "value": "25.00", "currency": "USD" },
+          "receiver": "sandbox-payee@jobenpay.test",
+          "sender_item_id": "item_1"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "batch_header": {
+        "payout_batch_id": "BATCH-SANDBOX-9001",
+        "batch_status": "PENDING",
+        "sender_batch_header": {
+          "sender_batch_id": "jp_payout_batch_001"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-11-06T00:00:00.000Z",
+  "sandboxFlag": true
+}
+

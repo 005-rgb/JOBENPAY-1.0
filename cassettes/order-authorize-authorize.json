@@ -1,0 +1,43 @@
+{
+  "scenarioId": "order-authorize",
+  "step": "authorize",
+  "request": {
+    "method": "POST",
+    "path": "/v2/checkout/orders/ORD-AUTH-2001/authorize",
+    "headers": {
+      "content-type": "application/json",
+      "paypal-request-id": "jp_order_auth_exec_001"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": "ORD-AUTH-2001",
+      "status": "COMPLETED",
+      "purchase_units": [
+        {
+          "payments": {
+            "authorizations": [
+              {
+                "id": "AUTH-SANDBOX-7001",
+                "status": "CREATED",
+                "amount": {
+                  "currency_code": "USD",
+                  "value": "250.00"
+                },
+                "expiration_time": "2026-12-05T00:00:00.000Z"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "recordedAt": "2026-11-06T00:00:00.000Z",
+  "sandboxFlag": true
+}
+

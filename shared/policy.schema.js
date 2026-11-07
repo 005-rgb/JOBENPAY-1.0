@@ -20,11 +20,8 @@ const timezone = z.string().min(1).refine((value) => {
   }
 }, 'Timezone must be a valid IANA timezone.');
 
-const policyShape = z.object({
-  schemaVersion: z.literal(1),
+const basePolicyFields = {
   purpose: z.string().trim().min(1),
-  allowedActions: z.array(z.enum(['PAYOUT', 'REFUND', 'ACCEPT_DISPUTE'])).min(1)
-    .refine((values) => new Set(values).size === values.length, 'allowedActions must be unique.'),
   currency: z.string().regex(/^[A-Z]{3}$/, 'Currency must be three uppercase letters.'),
   perTransactionCapMinor: SAFE_MINOR,
   budget: z.object({
@@ -71,9 +68,30 @@ const policyShape = z.object({
   approvalTtlHours: SAFE_MINOR,
   validFrom: UTC_ISO,
   validTo: UTC_ISO,
+};
+
+const policyV1Shape = z.object({
+  schemaVersion: z.literal(1),
+  allowedActions: z.array(z.enum(['PAYOUT', 'REFUND', 'ACCEPT_DISPUTE'])).min(1)
+    .refine((values) => new Set(values).size === values.length, 'allowedActions must be unique.'),
+  ...basePolicyFields,
 }).strict();
 
-export const policySchema = policyShape.superRefine((policy, ctx) => {
+const ALL_CATEGORIES = [
+  'SALE', 'DOWN_PAYMENT', 'INVOICE', 'PAYOUT', 'REFUND', 'VOID',
+  'DISPUTE', 'PARTIAL', 'SCHEDULED', 'RECURRING', 'BULK', 'SPLIT',
+  'TRANSFER', 'FINANCING', 'DEBIT',
+];
+
+const policyV2Shape = z.object({
+  schemaVersion: z.literal(2),
+  allowedCategories: z.array(z.enum(ALL_CATEGORIES)).min(1)
+    .refine((values) => new Set(values).size === values.length, 'allowedCategories must be unique.'),
+  allowedActions: z.array(z.enum(['PAYOUT', 'REFUND', 'ACCEPT_DISPUTE'])).optional(),
+  ...basePolicyFields,
+}).strict();
+
+const validatePolicySuperRefine = (policy, ctx) => {
   if (policy.autoApproveBelowMinor > policy.perTransactionCapMinor) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['autoApproveBelowMinor'], message: 'autoApproveBelowMinor cannot exceed perTransactionCapMinor.' });
   }
@@ -86,7 +104,32 @@ export const policySchema = policyShape.superRefine((policy, ctx) => {
   if (Date.parse(policy.validFrom) >= Date.parse(policy.validTo)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['validTo'], message: 'validTo must be after validFrom.' });
   }
-});
+};
+
+export const policyV1Schema = policyV1Shape.superRefine(validatePolicySuperRefine);
+export const policyV2Schema = policyV2Shape.superRefine(validatePolicySuperRefine);
+
+export const policySchema = z.union([policyV1Schema, policyV2Schema]);
+
+export function adaptMandatePolicyV1ToV2(policy) {
+  if (!policy) return null;
+  if (policy.schemaVersion === 2 && Array.isArray(policy.allowedCategories)) {
+    return policy;
+  }
+  // V1 adapter: PRD-R §3.8
+  const allowedCategories = [];
+  for (const action of policy.allowedActions || []) {
+    if (action === 'PAYOUT' && !allowedCategories.includes('PAYOUT')) allowedCategories.push('PAYOUT');
+    if (action === 'REFUND' && !allowedCategories.includes('REFUND')) allowedCategories.push('REFUND');
+    if (action === 'ACCEPT_DISPUTE' && !allowedCategories.includes('DISPUTE')) allowedCategories.push('DISPUTE');
+  }
+  return {
+    ...policy,
+    schemaVersion: 2,
+    allowedCategories,
+    _adaptedFromV1: true,
+  };
+}
 
 export function parsePolicy(value) {
   return policySchema.parse(value);

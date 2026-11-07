@@ -19,6 +19,7 @@ test('job registry contains the supported job types', () => {
     'expire_approvals',
     'cleanup',
     'reset_demo_data',
+    'reconcile_daily',
   ]);
 });
 

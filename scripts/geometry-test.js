@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -97,6 +97,11 @@ try {
   const launchOptions = { headless: true };
   if (process.env.CHROMIUM_EXECUTABLE_PATH) {
     launchOptions.executablePath = process.env.CHROMIUM_EXECUTABLE_PATH;
+  } else if (process.platform === 'win32') {
+    const chromeWin = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+    const edgeWin = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+    if (existsSync(chromeWin)) launchOptions.executablePath = chromeWin;
+    else if (existsSync(edgeWin)) launchOptions.executablePath = edgeWin;
   }
   browser = await chromium.launch(launchOptions);
   const page = await browser.newPage({

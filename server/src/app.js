@@ -14,6 +14,24 @@ import { z } from 'zod';
 
 import { env } from './config.js';
 import { query } from './db/pool.js';
+import { healthRouter } from './routes/health.js';
+import { transactionsRouter } from './routes/transactions.js';
+import { payoutsRouter } from './routes/payouts.js';
+import { salesRouter } from './routes/sales.js';
+import { refundsRouter } from './routes/refunds.js';
+import { voidsRouter } from './routes/voids.js';
+import { partialsRouter } from './routes/partials.js';
+import { downPaymentsRouter } from './routes/down_payments.js';
+import { invoicesRouter } from './routes/invoices.js';
+import { disputesRouter } from './routes/disputes.js';
+import { scheduledRouter } from './routes/scheduled.js';
+import { bulkRouter } from './routes/bulk.js';
+import { transferRouter } from './routes/transfer.js';
+import { splitRouter } from './routes/split.js';
+import { recurringRouter } from './routes/recurring.js';
+import { financingRouter } from './routes/financing.js';
+import { debitRouter } from './routes/debit.js';
+import booksRouter from './routes/books.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
 import { decrypt, encrypt, hashPassword, hmacSha256, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
@@ -477,9 +495,7 @@ export function createApp() {
     });
   }
 
-  app.get('/healthz', (_req, res) => {
-    res.status(200).json({ ok: true, service: 'jobenpay', status: 'healthy' });
-  });
+  app.use(healthRouter);
 
   app.get('/agent/v1/ping', agentAuth, (req, res) => {
     res.status(200).json({ agentId: req.agent.id });
@@ -506,43 +522,6 @@ export function createApp() {
 
   app.post('/mcp', mcpOriginGuard, agentAuth, mcpHandler);
 
-  app.get('/readyz', async (req, res) => {
-    try {
-      const migrations = (await readdir(MIGRATIONS_DIRECTORY))
-        .filter((name) => /^\d+_.*\.sql$/i.test(name))
-        .sort();
-      const latestMigration = migrations.at(-1);
-      const applied = await query(`
-        SELECT filename
-        FROM schema_migrations
-        ORDER BY filename DESC
-        LIMIT 1
-      `);
-      let ready = Boolean(latestMigration && applied.rows[0]?.filename === latestMigration);
-
-      if (ready) {
-        const heartbeat = await query(`
-          SELECT 1
-          FROM jobs
-          WHERE type = '_worker_heartbeat'
-            AND dedupe_key = '_worker_heartbeat'
-            AND status = 'COMPLETED'
-            AND run_at >= now() - interval '30 seconds'
-          LIMIT 1
-        `);
-        ready = heartbeat.rowCount === 1;
-      }
-
-      res.status(ready ? 200 : 503).json({
-        ok: ready,
-        service: 'jobenpay',
-        status: ready ? 'ready' : 'not_ready',
-      });
-    } catch (error) {
-      logger.error({ err: error }, 'Readiness check failed');
-      res.status(503).json({ ok: false, service: 'jobenpay', status: 'not_ready' });
-    }
-  });
 
   app.post('/webhooks/paypal/:webhookToken', async (req, res, next) => {
     try {
@@ -1735,7 +1714,7 @@ export function createApp() {
         if (!granted) {
           throw buildError('STEP_UP_REQUIRED', 'Step-up authentication required.', 403);
         }
-        const updated = await updatePayeeTrust(orgId, current.id, req.body.trust, tx);
+        const updated = await updatePayeeTrust(orgId, current.id, req.body.trust, req.user.id, tx);
         await appendEntry(tx, {
           orgId,
           type: LEDGER_TYPES.PAYEE_TRUST_CHANGED,
@@ -2149,6 +2128,42 @@ export function createApp() {
     } catch (error) {
       next(error);
     }
+  });
+
+  const categoryRouterMap = new Map([
+    ['/transactions', transactionsRouter],
+    ['/payouts', payoutsRouter],
+    ['/sales', salesRouter],
+    ['/refunds', refundsRouter],
+    ['/voids', voidsRouter],
+    ['/partials', partialsRouter],
+    ['/down-payments', downPaymentsRouter],
+    ['/invoices', invoicesRouter],
+    ['/disputes', disputesRouter],
+    ['/scheduled', scheduledRouter],
+    ['/bulk', bulkRouter],
+    ['/transfer', transferRouter],
+    ['/splits', splitRouter],
+    ['/recurring', recurringRouter],
+    ['/financing', financingRouter],
+    ['/debit', debitRouter],
+    ['/books', booksRouter],
+  ]);
+
+  api.use((req, res, next) => {
+    for (const [prefix, router] of categoryRouterMap) {
+      if (req.path === prefix || req.path.startsWith(prefix + '/')) {
+        const originalUrl = req.url;
+        const originalOriginalUrl = req.originalUrl;
+        req.url = req.url.slice(prefix.length) || '/';
+        return router(req, res, (err) => {
+          req.url = originalUrl;
+          req.originalUrl = originalOriginalUrl;
+          next(err);
+        });
+      }
+    }
+    next();
   });
 
   api.use((err, _req, res, next) => {

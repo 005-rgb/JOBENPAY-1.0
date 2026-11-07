@@ -1,0 +1,34 @@
+{
+  "scenarioId": "invoice-create",
+  "step": "create",
+  "request": {
+    "method": "POST",
+    "path": "/v2/invoicing/invoices",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "detail": {
+        "currency_code": "USD",
+        "invoice_number": "INV-2026-001"
+      }
+    }
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": "INV2-SANDBOX-3001",
+      "status": "DRAFT",
+      "detail": {
+        "invoice_number": "INV-2026-001",
+        "currency_code": "USD"
+      }
+    }
+  },
+  "recordedAt": "2026-11-06T00:00:00.000Z",
+  "sandboxFlag": true
+}
+

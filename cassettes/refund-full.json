@@ -1,0 +1,36 @@
+{
+  "scenarioId": "refund-full",
+  "step": "execute",
+  "request": {
+    "method": "POST",
+    "path": "/v2/payments/captures/CAP-SANDBOX-5001/refund",
+    "headers": {
+      "content-type": "application/json",
+      "paypal-request-id": "jp_refund_001"
+    },
+    "body": {
+      "amount": {
+        "currency_code": "USD",
+        "value": "100.00"
+      },
+      "note_to_payer": "Full refund"
+    }
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": "REF-SANDBOX-8001",
+      "status": "COMPLETED",
+      "amount": {
+        "currency_code": "USD",
+        "value": "100.00"
+      }
+    }
+  },
+  "recordedAt": "2026-11-06T00:00:00.000Z",
+  "sandboxFlag": true
+}
+

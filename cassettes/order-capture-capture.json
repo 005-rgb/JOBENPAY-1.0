@@ -1,0 +1,43 @@
+{
+  "scenarioId": "order-capture",
+  "step": "capture",
+  "request": {
+    "method": "POST",
+    "path": "/v2/checkout/orders/ORD-SANDBOX-1001/capture",
+    "headers": {
+      "content-type": "application/json",
+      "paypal-request-id": "jp_order_capture_001"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": "ORD-SANDBOX-1001",
+      "status": "COMPLETED",
+      "purchase_units": [
+        {
+          "payments": {
+            "captures": [
+              {
+                "id": "CAP-SANDBOX-5001",
+                "status": "COMPLETED",
+                "amount": {
+                  "currency_code": "USD",
+                  "value": "100.00"
+                },
+                "final_capture": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "recordedAt": "2026-11-06T00:00:00.000Z",
+  "sandboxFlag": true
+}
+

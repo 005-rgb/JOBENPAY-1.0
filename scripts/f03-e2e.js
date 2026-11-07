@@ -141,6 +141,7 @@ async function main() {
       cwd: root,
       env: {
         ...process.env,
+        GOOGLE_CLIENT_ID: '',
         NODE_ENV: 'test',
         PORT: String(port),
         PUBLIC_BASE_URL: appUrl,

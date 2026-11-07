@@ -48,12 +48,20 @@ export function flagB5DocumentInjection({ document }) {
     ? { code: 'DOC_INJECTION_SUSPECTED', detail: 'Document contains injection indicators.' } : null;
 }
 
+export function flagB6TierCApproval({ request }) {
+  const cat = request?.category;
+  return (cat === 'FINANCING' || cat === 'DEBIT')
+    ? { code: 'TIER_C_REQUIRES_APPROVAL', detail: 'Tier C transactions (FINANCING, DEBIT) always require human approval.' }
+    : null;
+}
+
 export const FLAGS_B = Object.freeze([
   ['B1', flagB1PayeeNew],
   ['B2', flagB2PayeeChanged],
   ['B3', flagB3InvoicePayeeMismatch],
   ['B4', flagB4AmountApproval],
   ['B5', flagB5DocumentInjection],
+  ['B6', flagB6TierCApproval],
 ]);
 
 export { dice, normalize };

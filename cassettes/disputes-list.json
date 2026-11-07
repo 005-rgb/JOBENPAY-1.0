@@ -1,0 +1,35 @@
+{
+  "scenarioId": "disputes-list",
+  "step": "list",
+  "request": {
+    "method": "GET",
+    "path": "/v1/customer-disputes",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "items": [
+        {
+          "dispute_id": "PP-D-SANDBOX-101",
+          "create_time": "2026-11-06T00:00:00.000Z",
+          "status": "OPEN",
+          "dispute_amount": {
+            "currency_code": "USD",
+            "value": "75.00"
+          },
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED"
+        }
+      ]
+    }
+  },
+  "recordedAt": "2026-11-06T00:00:00.000Z",
+  "sandboxFlag": true
+}
+

@@ -1,0 +1,136 @@
+id,jenis,deskripsi,wp,tes,status,bukti
+FR-101,FR,Pembuatan organisasi dan penetapan role OWNER,S04,server/test/unit/auth.test.js,done,commit-008
+FR-102,FR,Undangan anggota tim dan role ASSIGNMENT,S04,server/test/unit/auth.test.js,done,commit-008
+FR-103,FR,Isolasi multi-tenant data organisasi,S04,server/test/integration/idor-routes.test.js,done,commit-harden1
+FR-104,FR,Pengaturan mata uang dan preferensi org,S04,server/test/unit/auth.test.js,done,commit-008
+FR-105,FR,Pembekuan organisasi (Kill-switch freeze),S04,server/test/unit/guard.test.js,done,commit-017
+FR-106,FR,Pencabutan status beku organisasi,S04,server/test/unit/guard.test.js,done,commit-017
+FR-201,FR,Autentikasi login email dan password scrypt,S04,server/test/unit/auth.test.js,done,commit-008
+FR-202,FR,Session cookie aman HttpOnly SameSite Lax,S04,server/test/unit/auth.test.js,done,commit-008
+FR-203,FR,Perlindungan CSRF dengan double-submit cookie,S04,server/test/unit/auth.test.js,done,commit-008
+FR-204,FR,Step-up authentication sebelum mutasi kritis,S04,server/test/unit/auth.test.js,done,commit-008
+FR-301,FR,Penyimpanan kredensial PayPal terenkripsi AES-256-GCM,S05,server/test/unit/crypto.test.js,done,commit-4cbe4c6
+FR-302,FR,Uji konektivitas Sandbox OAuth,S05,server/test/unit/real-preflight.test.js,done,commit-1f5914e
+FR-303,FR,Pendaftaran dan verifikasi webhook listener,S05,server/test/unit/webhook-job.test.js,done,commit-4cbe4c6
+FR-401,FR,Pendaftaran penerima pembayaran (Payee),S06,server/test/unit/agents-payees.test.js,done,commit-010
+FR-402,FR,Hashing identitas payee dengan HMAC-SHA256,S06,server/test/unit/payee-identifiers.test.js,done,commit-010
+FR-403,FR,Status kepercayaan payee (NEW vs TRUSTED),S06,server/test/unit/agents-payees.test.js,done,commit-010
+FR-404,FR,Penetapan allowlist payee per mandat,S06,server/test/unit/decision-d16-d18.test.js,done,commit-harden1
+FR-405,FR,Deteksi perubahan akun payee dalam 30 hari,S06,server/test/unit/agents-payees.test.js,done,commit-010
+FR-501,FR,Pendaftaran agen AI eksternal,S06,server/test/unit/agent-auth.test.js,done,commit-010
+FR-502,FR,Penerbitan API key HMAC-SHA256 untuk agen,S06,server/test/unit/agent-auth.test.js,done,commit-010
+FR-503,FR,Otentikasi request agen via API key header,S06,server/test/unit/agent-auth.test.js,done,commit-010
+FR-504,FR,Rate limit 60 request per menit per agen,S06,server/test/unit/agent-auth.test.js,done,commit-010
+FR-505,FR,Pencabutan dan penonaktifan agen AI,S06,server/test/unit/agent-auth.test.js,done,commit-010
+FR-601,FR,Penyusunan mandat pembayaran terikat agen,S08,server/test/unit/policy-schema.test.js,done,commit-012
+FR-602,FR,Alokasi total anggaran dan limit per transaksi,S08,server/test/unit/policy-schema.test.js,done,commit-012
+FR-603,FR,Versioning mandat immutable bertanda tangan Ed25519,S08,server/test/unit/crypto.test.js,done,commit-012
+FR-604,FR,Penguncian anggaran paralel atomik,S08,server/test/unit/tx.test.js,done,commit-012
+FR-605,FR,Pelepasan anggaran saat usulan ditolak atau gagal,S08,server/test/unit/request-state-machine.test.js,done,commit-012
+FR-606,FR,Masa berlaku mandat (validFrom dan validTo),S08,server/test/unit/policy-schema.test.js,done,commit-012
+FR-607,FR,Penonaktifan mandat secara langsung oleh owner,S08,server/test/unit/guard.test.js,done,commit-012
+FR-701,FR,Penetapan ambang batas approval otomatis,S11,server/test/unit/approvals.test.js,done,commit-S11
+FR-702,FR,Alur dual-approval (four-eyes principle),S11,server/test/unit/approvals.test.js,done,commit-S11
+FR-703,FR,Tanda tangan approver terikat pada request_hash,S11,server/test/unit/approvals.test.js,done,commit-S11
+FR-704,FR,Notifikasi email approval via outbox terenkripsi,S11,server/test/unit/signup.test.js,done,commit-cfef3ec
+FR-801,FR,Evaluasi Tahap A (aturan deterministik universal),S09,server/test/unit/decision-engine.test.js,done,commit-S09
+FR-802,FR,Evaluasi Tahap B (anomali & penanda persetujuan),S09,server/test/unit/decision-engine.test.js,done,commit-S09
+FR-803,FR,Evaluasi Tahap C (analisis risiko AI monotonik),S10,server/test/unit/decision-stage-c.test.js,done,commit-S10
+FR-804,FR,Prinsip fail-closed jika AI timeout atau error,S10,server/test/unit/decision-stage-c.test.js,done,commit-S10
+FR-805,FR,Penolakan revisi longgar dari rekomendasi AI,S10,server/test/unit/decision-stage-c.test.js,done,commit-S10
+FR-901,FR,Pencatatan mutasi ke ledger berantai-hash SHA-256,S03,server/test/unit/ledger.test.js,done,commit-S03
+FR-902,FR,Ekspor audit ledger berformat JSON dan CSV terkurasi,S03,server/test/unit/ledger.test.js,done,commit-cfef3ec
+FR-903,FR,Deteksi 6 kelas manipulasi tamper pada verifier ledger,S03,server/test/security/final-ledger.test.js,done,commit-S03
+FR-1001,FR,Eksekusi idempoten ke PayPal Payouts API,S13,server/test/unit/execution.test.js,done,commit-S13
+FR-1002,FR,Pemberian header PayPal-Request-Id deterministik,S13,server/test/unit/execution.test.js,done,commit-S13
+FR-1003,FR,Rekonsiliasi status webhook dengan intent lokal,S13,server/test/unit/webhook-job.test.js,done,commit-S13
+FR-1004,FR,Penanganan selisih nilai nominal (MISMATCH),S13,server/test/unit/payout-reconciliation.test.js,done,commit-S13
+FR-1101,FR,Pengunggahan dan validasi dokumen invoice PDF,S07,server/test/unit/documents.test.js,done,commit-011
+FR-1102,FR,Ekstraksi teks dokumen berbasis unpdf,S07,server/test/unit/extract-document.test.js,done,commit-011
+FR-1103,FR,Deteksi percobaan prompt injection pada dokumen,S07,server/test/unit/ai.test.js,done,commit-011
+FR-1104,FR,Audit kuota dan pembatasan biaya harian AI,S07,server/test/unit/ai-usage.test.js,done,commit-011
+FR-1201,FR,Laporan ringkasan audit SAR (Standard Audit Record),S18,server/test/unit/real-evidence.test.js,done,commit-1f5914e
+FR-1202,FR,Penyimpanan riwayat transisi status 12x12 lengkap,S09,server/test/unit/request-state-machine.test.js,done,commit-S09
+FR-1203,FR,Penyembunyian rahasia dan redaksi otomatis log pino,S16,server/test/unit/logger.test.js,done,commit-017
+FR-1204,FR,Tabel routing otorisasi rute Express teruji IDOR,S16,server/test/integration/idor-routes.test.js,done,commit-harden1
+FR-1205,FR,Tenggat waktu kedaluwarsa approval otomatis,S11,server/test/unit/approvals.test.js,done,commit-S11
+FR-1206,FR,Sanitasi formula injection OWASP pada ekspor CSV,S03,server/test/unit/ledger.test.js,done,commit-cfef3ec
+FR-1207,FR,Logging terpusat audit login dan mutasi organisasi,S16,server/test/unit/logger.test.js,done,commit-017
+FR-1208,FR,Uji integritas skema database otomatis berkala,S02,server/test/integration/migrate.test.js,done,commit-002
+FR-1301,FR,Penggunaan token desain terpusat (tokens.css),F01,web/scripts/lint-css.js,done,commit-F01
+FR-1302,FR,Geometri piksel terverifikasi terhadap acuan desain,F01,scripts/geometry-test.js,done,commit-F01
+FR-1303,FR,Tata letak responsif penuh mobile dan desktop,F02,web/src/components/AppShell.module.css,done,commit-d94f68f
+FR-1304,FR,Modal interaktif konfirmasi dan step-up dialog,F02,web/src/pages/F04Pages.jsx,done,commit-F02
+FR-1305,FR,Penanda visual permanen label SANDBOX,F02,web/src/components/AppShell.jsx,done,commit-F02
+FR-1306,FR,Dukungan touch scroll pada tabel data mobile,F03,web/src/components/AppShell.module.css,done,commit-d94f68f
+FR-1307,FR,Formulir pengajuan transaksi berbasis kategori,F03,web/src/pages/F04Pages.jsx,done,commit-F03
+PRD13-01,PRD13,8 kategori Tier A dapat dibuat dievaluasi dieksekusi di Sandbox,F0-1,server/test/e2e/payout-e2e.test.js,done,tier-a-e2e
+PRD13-02,PRD13,Double-entry balanced untuk setiap intent (trigger DB aktif),F0-1,docs/spec/sql/prd-2-insert-tests.sql,done,sql-test-suite
+PRD13-03,PRD13,State machine per kategori ditegakkan (transisi ilegal 409),F0-1,server/test/unit/request-state-machine.test.js,done,state-machine-test
+PRD13-04,PRD13,Policy engine menolak kategori yang tidak diizinkan,F0-1,server/test/unit/decision-engine.test.js,done,decision-engine-test
+PRD13-05,PRD13,SAR mencakup category sub_type dan legs_summary seimbang,F0-1,server/test/unit/real-evidence.test.js,done,evidence-test
+PRD13-06,PRD13,Idempotency per kategori request duplikat response sama,F0-1,server/test/unit/execution.test.js,done,execution-test
+PRD13-07,PRD13,Rekonsiliasi settlement_records cocok dengan legs,F0-1,server/test/unit/payout-reconciliation.test.js,done,reconcile-test
+PRD13-08,PRD13,Backward compatible PAYOUT 1.2 tetap berfungsi tanpa perubahan,F0-1,server/test/unit/real-preflight.test.js,done,preflight-test
+PRD13-09,PRD13,UI menampilkan semua kategori dengan formulir sesuai,F0-1,web/src/pages/F04Pages.jsx,done,fase-f7-ui-konsolidasi
+PRD13-10,PRD13,Test suite lulus 100 persen (unit integrasi konkurensi),F0-1,scripts/test-suite.js,done,all-test-pass
+AD-01,AD,payment_requests vs transaction_intents dan VIEW kompatibel,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-02,AD,Arsitektur Dua Ledger: transaction_legs dan ledger_entries,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-03,AD,Bagan akun kanonik ledger_accounts dan aturan ref,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-04,AD,Perbaikan SQL DP dan penegakan seimbang per mata uang,F0-1,docs/spec/sql/prd-2-insert-tests.sql,done,sql-insert-tests
+AD-05,AD,Standar Idempotensi Multilevel dan langkah step baku,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-06,AD,Sumber kebenaran tunggal shared/state-machines.js,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-07,AD,Skema kebijakan mandat v2 dan kompatibilitas v1,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-08,AD,Matriks arah uang dan titik konsumsi anggaran,F0-1,server/test/security/f8-invariants-concurrency.test.js,done,disetujui-g0-opsi-1
+AD-09,AD,Arsitektur Buyer Test Harness Sandbox,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-10,AD,Siklus otorisasi PayPal 29 hari dan konfirmasi barang,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-11,AD,Semantik pembatalan VOID.order internal tanpa HTTP PayPal,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-12,AD,Katalog terkunci endpoint PayPal endpoints.js,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-13,AD,Standar aritmatika presisi tinggi money.js,F0-1,scripts/lint-no-float-money.js,done,lint-money
+AD-14,AD,Evaluasi dua tahap SCHEDULED/RECURRING dan batas bulanan,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-15,AD,Desain ProviderAdapter PayPal vs PartnerSimulator,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-16,AD,Katalog webhook diperluas dan event UNHANDLED,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+AD-17,AD,Rujukan spesifikasi teknis kategori tipis dan Tier C,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-01,T,Titik masuk Decision Engine tanpa bypass gerbang,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-02,T,Sinkronisasi multi-level status intent vs entitas,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-03,T,Penegakan keseimbangan legs per currency dan immutability,F0-1,docs/spec/sql/prd-2-insert-tests.sql,done,sql-insert-tests
+T-04,T,Alur otomatis pembuatan intent DRAFT SUBMITTED EVALUATING,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-05,T,Kelengkapan siklus hidup INVOICE dan transisi hilang,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-06,T,Penanganan DISPUTE dan persetujuan manusia sebelum bukti,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-07,T,Arsitektur SPLIT model intent hirarki dan batas fee,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-08,T,Arsitektur RECURRING pemulihan PAST_DUE dan skema tabel,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-09,T,Edge cases DOWN_PAYMENT batas 29 hari dan void otorisasi,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-10,T,Diferensiasi eksak PARTIAL vs REFUND dan akumulasi tunggal,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-11,T,Resolusi race condition webhook vs respons sinkron,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-12,T,Semantik evaluasi Tahap B untuk transaksi masuk,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-13,T,Matriks reservasi dan pelepasan anggaran multi-kategori,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-14,T,Agen sistem dan konvensi idempotensi intent sistem,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-15,T,Spesifikasi kanonik request_hash dan approval binding,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-16,T,Penanganan kedaluwarsa persetujuan APPROVAL_EXPIRED,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-17,T,Kamus kode error terstandarisasi pemetaan HTTP dan EN ID,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-18,T,Batasan semantik dan akun buku transaksi TRANSFER p2p,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-19,T,Manajemen intent massal BULK chunking streaming 500 item,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+T-20,T,Rekonsiliasi jumlah sub-tipe Tier A 14 pasang,F0-1,server/test/unit/ci-guards-negative.test.js,done,docs-spec-addendum
+F1-01,FR,Migrasi DB maju-saja berantai checksum SHA-256 dan advisory lock,F1-1,server/test/unit/f1-1-foundation.test.js,done,commit-f1-1
+F1-02,FR,Transaksi withTx dengan retry serialization 40001 dan deadlock 40P01,F1-1,server/test/unit/f1-1-foundation.test.js,done,commit-f1-1
+F1-03,FR,TenantRepository isolasi multi-tenant dengan penegakan orgId wajib,F1-1,server/test/unit/f1-1-foundation.test.js,done,commit-f1-1
+F1-04,FR,Hierarki AppError dan Express error handler masking stack trace dan SQL,F1-1,server/test/unit/f1-1-foundation.test.js,done,commit-f1-1
+F1-05,FR,Logger Pino dengan redaksi otomatis rahasia requestId dan orgId,F1-1,server/test/unit/f1-1-foundation.test.js,done,commit-f1-1
+F1-06,FR,Endpoint healthz liveness dan readyz kesiapan DB migrasi worker,F1-1,server/test/unit/f1-1-foundation.test.js,done,commit-f1-1
+F2-01,FR,Ledger berantai-hash Ed25519 anti-tamper dengan seq bebas celah per org,F2-1,server/test/unit/f2-1-ledger.test.js,done,commit-f2-1
+F2-02,FR,Modul aritmatika uang BigInt money.js bebas float property-based 10000 iterasi,F2-2,server/test/unit/money-property.test.js,done,commit-f2-2
+CAT-PAYOUT,CAT,Universal Payouts Tier A Standard Transaction Lifecycle,F4,server/test/e2e/payout-e2e.test.js,done,commit-f4-payout
+CAT-SALE,CAT,Universal Sale Tier A Orders Capture Transaction Lifecycle,F4,server/test/e2e/sale-e2e.test.js,done,commit-f4-sale
+CAT-REFUND,CAT,Universal Refund Tier A Cumulative Tracker Transaction Lifecycle,F4,server/test/e2e/refund-e2e.test.js,done,commit-f4-refund
+CAT-VOID,CAT,Universal Void Tier A Authorization Primitive Transaction Lifecycle,F4,server/test/e2e/void-e2e.test.js,done,commit-f4-void
+CAT-PARTIAL,CAT,Universal Partial Capture Tier A Authorization Primitive Transaction Lifecycle,F4,server/test/e2e/partial-e2e.test.js,done,commit-f4-partial
+CAT-DOWN_PAYMENT,CAT,Universal Down Payment Tier A Escrow Tracking Transaction Lifecycle,F4,server/test/e2e/down_payment-e2e.test.js,done,commit-f4-dp
+CAT-INVOICE,CAT,Universal Invoicing Tier A Receivable Records Transaction Lifecycle,F4,server/test/e2e/invoice-e2e.test.js,done,commit-f4-invoice
+CAT-DISPUTE,CAT,Universal Dispute Tier A Claims Lifecycle,F4,server/test/e2e/dispute-e2e.test.js,done,commit-f4-dispute
+CAT-SCHEDULED,CAT,Universal Scheduled Tier B Delayed Execution Lifecycle,F5,server/test/e2e/scheduled-e2e.test.js,done,commit-f5-scheduled
+CAT-BULK,CAT,Universal Bulk Payout Tier B Streaming Batch Lifecycle,F5,server/test/e2e/bulk-e2e.test.js,done,commit-f5-bulk
+CAT-TRANSFER,CAT,Universal Peer to Peer Internal Transfer Tier B Lifecycle,F5,server/test/e2e/transfer-e2e.test.js,done,commit-f5-transfer
+CAT-SPLIT,CAT,Universal Multi Party Split Payments Tier B Lifecycle,F5,server/test/e2e/split-e2e.test.js,done,commit-f5-split
+CAT-RECURRING,CAT,Universal Subscriptions and Recurring Billing Tier B Lifecycle,F5,server/test/e2e/recurring-e2e.test.js,done,commit-f5-recurring
+CAT-FINANCING,CAT,Universal Supply Chain PO and Invoice Financing Tier C Lifecycle,F6,server/test/e2e/financing-e2e.test.js,done,commit-f6-financing
+CAT-DEBIT,CAT,Universal Direct Debit Authorization and Execution Tier C Lifecycle,F6,server/test/e2e/debit-e2e.test.js,done,commit-f6-debit

@@ -48,7 +48,8 @@ test('agent authentication verifies HMAC and applies disabled, revoked, and rate
   assert.deepEqual(accepted.agent, { id: 'agent-id', orgId: 'org-id' });
   assert.equal(touched, 1);
 
-  assert.equal((await invoke(request(`${generated.apiKey.slice(0, -1)}x`))).statusCode, 401);
+  const alteredKey = `${generated.apiKey.slice(0, -1)}${generated.apiKey.endsWith('x') ? 'y' : 'x'}`;
+  assert.equal((await invoke(request(alteredKey))).statusCode, 401);
   stored.agent_status = 'DISABLED';
   assert.equal((await invoke(request())).statusCode, 403);
   stored.agent_status = 'ACTIVE';

@@ -7,6 +7,7 @@ import { executeRequest } from './handlers/executeRequest.js';
 import { reconcileRequest } from './handlers/reconcileRequest.js';
 import { resetDemoDataJob } from './resetDemoData.js';
 import { sendEmailJob } from './handlers/sendEmail.js';
+import { reconcileDailyJob } from './handlers/reconcileDaily.js';
 
 export const JOB_TYPES = Object.freeze([
   'extract_document',
@@ -21,6 +22,7 @@ export const JOB_TYPES = Object.freeze([
   'expire_approvals',
   'cleanup',
   'reset_demo_data',
+  'reconcile_daily',
 ]);
 
 const handlers = new Map();
@@ -43,6 +45,7 @@ handlers.set('execute_request', executeRequest);
 handlers.set('reconcile_request', reconcileRequest);
 handlers.set('reset_demo_data', resetDemoDataJob);
 handlers.set('send_email', sendEmailJob);
+handlers.set('reconcile_daily', reconcileDailyJob);
 
 export function registerHandler(type, handler) {
   if (!JOB_TYPES.includes(type)) {

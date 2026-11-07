@@ -68,31 +68,53 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for threats, controls, and test
 
 ## 7. Built during the submission period
 
-The first project commit is dated October 30, 2026. The submission-period build includes:
-
-- Node.js/Express API, PostgreSQL schema, sessions, tenant isolation, and role-based access.
-- Mandates, deterministic payment decisions, invoice upload and extraction, injection checks, approvals, and budget controls.
-- PayPal Sandbox payout execution, idempotent recovery, webhook reconciliation, and a verifiable ledger.
-- Agent REST and stateless MCP interfaces, synthetic simulator scenarios, and the React web application.
-- Security checks, operations tooling, CI workflows, and documentation for local setup and integration.
+The project was built and expanded across structured phases (F0 through F9):
+- **15 Universal Categories (28 Sub-type pairs):** PAYOUT, SALE, REFUND, VOID, PARTIAL, DOWN_PAYMENT, INVOICE, DISPUTE, SCHEDULED, RECURRING, BULK, SPLIT, TRANSFER, FINANCING, and DEBIT.
+- **Double-Entry Ledger Architecture:** Every transaction generates strictly balanced debit/credit legs enforced by PostgreSQL DB trigger (`SUM(DEBIT) = SUM(CREDIT)` per currency). Entries are signed with Ed25519 and chained via SHA-256 tamper-evident hashes.
+- **Multi-Level Idempotency:** Tenant-scoped `Idempotency-Key` and derived PayPal request IDs (`jp_{intent_id}_{step}`) prevent duplicate executions across network interruptions or worker retries.
+- **Staged Decision Policy Engine:** Deterministic rule evaluation (Stages A/B) with monotonic AI tightening (Stage C) where AI can strictly tighten policies (REJECT / REQUIRE_APPROVAL) and is strictly forbidden from loosening decisions.
+- **Daily Reconciliation:** Background reconciliation worker (`reconcile_daily`) verifying legs, settlement records, and provider state with automated mismatch detection and freeze alerts.
+- **Comprehensive Test Suite:** 919+ automated tests across unit, integration, concurrency, chaos disruptions, security fuzzing, IDOR, AI adversarial evals, and Playwright E2E with 100% green exit code.
 
 ## 8. Testing instructions
 
-For the hosted demo, use the judge account above:
+Run the automated verification suite:
 
-1. Log in.
-2. Open **Simulator**.
-3. Select **Run legit invoice**.
-4. Select **Run attack pack**.
-5. Open **Ledger** and select **Verify**.
+```sh
+# Full test suite (919+ tests)
+npm test
 
-These scenarios use synthetic data. The simulator dry-run does not submit a payout.
+# Fast unit tests
+npm run test:unit
+
+# Architectural and security guards (Sandbox host guard, no-float money lint, insert tests, traceability)
+npm run guard
+node scripts/lint-no-float-money.js
+node scripts/check-traceability.js
+node scripts/check-insert-tests.js
+
+# Category Completion Checklist (CCC) verification
+node scripts/ccc-check.js PAYOUT
+node scripts/ccc-check.js FINANCING
+node scripts/ccc-check.js DEBIT
+
+# Automated smoke test for judge account
+node --env-file=.env scripts/judge-smoke.js
+```
+
+For manual verification on the web UI:
+1. Log in with the Judge account (`judge@jobenpay.test`).
+2. Navigate to **Transactions** (`/transactions`) to inspect transactions across all 15 categories.
+3. Review Double-Entry legs and Suspicious Activity Reports (SAR v1.1) in Transaction Detail.
+4. Open **Simulator** (`/simulator`) to run legitimate and adversarial payment flows.
+5. Open **Ledger** (`/ledger`) and click **Verify** to execute real-time hash-chain integrity verification.
 
 ## 9. What's next
 
-The current submission targets Tier A. Possible Tier B work from the product roadmap includes account recovery, TOTP, refund/dispute workflows, email notifications, CSV export, Indonesian localization, an AG Grid ledger theme, an expanded AI evaluation corpus, and additional MCP tools.
-
-Tier C roadmap items include reminders, a complete email outbox, four-eyes approval, organization deletion, fuller ADMIN/OPERATOR UI permissions, and WebAuthn. These are roadmap items, not claims about delivered functionality.
+- **Sandbox & Simulation Boundaries:** PayPal operations are strictly restricted to the PayPal Sandbox environment. Tier C categories (`FINANCING` and `DEBIT`) run via the deterministic `PartnerSimulatorProvider` with explicit `[SIMULATED]` labeling and zero external network exposure (see [docs/spec/partner-simulator-limitations.md](docs/spec/partner-simulator-limitations.md)).
+- **Internal Ledger Accounting:** As defined in PRD 1.3 §0 and Preamble A.5, escrow, loan, and clearing accounts represent internal book accounts rather than licensed banking escrow or credit facilities.
+- **Key Rotation & Disaster Recovery:** Operational runbook for AES-256-GCM and Ed25519 key rotation, point-in-time recovery, and dead-letter queue resolution is documented in [docs/OPERATIONS.md](docs/OPERATIONS.md).
+- **API Reference:** Auto-generated from canonical Zod schemas in [docs/API_REFERENCE.md](docs/API_REFERENCE.md).
 
 ## 10. License
 

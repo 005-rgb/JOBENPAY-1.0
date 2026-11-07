@@ -9,6 +9,19 @@ import BrandLoadingScreen from './components/BrandLoadingScreen.jsx';
 import { ToastProvider } from './components/primitives.jsx';
 import { useTranslation } from 'react-i18next';
 
+const TransactionsPage = lazy(() => import('./pages/TransactionsPage.jsx'));
+const TransactionDetailPage = lazy(() => import('./pages/TransactionDetailPage.jsx'));
+const NewTransactionPage = lazy(() => import('./pages/NewTransactionPage.jsx'));
+const InvoicePage = lazy(() => import('./pages/InvoicePage.jsx'));
+const Down_PaymentPage = lazy(() => import('./pages/Down_PaymentPage.jsx'));
+const RecurringPage = lazy(() => import('./pages/RecurringPage.jsx'));
+const SplitPage = lazy(() => import('./pages/SplitPage.jsx'));
+const BulkPage = lazy(() => import('./pages/BulkPage.jsx'));
+const TransferPage = lazy(() => import('./pages/TransferPage.jsx'));
+const ScheduledPage = lazy(() => import('./pages/ScheduledPage.jsx'));
+const FinancingPage = lazy(() => import('./pages/FinancingPage.jsx'));
+const DebitPage = lazy(() => import('./pages/DebitPage.jsx'));
+const DisputePage = lazy(() => import('./pages/DisputePage.jsx'));
 const ApprovalDetailPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.ApprovalDetailPage })));
 const ApprovalsPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.ApprovalsPage })));
 const AgentDetailPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.AgentDetailPage })));
@@ -65,6 +78,22 @@ function AuthenticatedApp() {
         <Routes>
           <Route element={<DashboardPage />} path="/" />
           <Route element={<DashboardPage />} path="/dashboard" />
+          <Route element={<TransactionsPage />} path="/transactions" />
+          <Route element={<NewTransactionPage />} path="/transactions/new" />
+          <Route element={<TransactionDetailPage />} path="/transactions/:id" />
+          <Route element={<InvoicePage />} path="/invoices" />
+          <Route element={<InvoicePage />} path="/invoices/:id" />
+          <Route element={<Down_PaymentPage />} path="/down-payments" />
+          <Route element={<Down_PaymentPage />} path="/down-payments/:id" />
+          <Route element={<RecurringPage />} path="/recurring" />
+          <Route element={<SplitPage />} path="/splits" />
+          <Route element={<BulkPage />} path="/bulk" />
+          <Route element={<TransferPage />} path="/transfer" />
+          <Route element={<ScheduledPage />} path="/scheduled" />
+          <Route element={<FinancingPage />} path="/financing" />
+          <Route element={<DebitPage />} path="/debit" />
+          <Route element={<DisputePage />} path="/disputes" />
+
           <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'OPERATOR', 'JUDGE']}><AgentsPage /></RequireRole>} path="/agents" />
           <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'OPERATOR', 'JUDGE']}><AgentsPage initialCreate /></RequireRole>} path="/agents/new" />
           <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'OPERATOR', 'JUDGE']}><AgentDetailPage /></RequireRole>} path="/agents/:id" />

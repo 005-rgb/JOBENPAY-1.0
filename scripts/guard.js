@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { checkTenantIsolation } from './check-tenant-isolation.js';
+import { guardCharacterization } from './guard-characterization.js';
 
 const root = process.cwd();
 const errors = [];
@@ -26,6 +28,12 @@ check(fileExists('server/src/server.js'), 'server/src/server.js is required.');
 check(fileExists('server/src/config.js'), 'server/src/config.js is required.');
 check(fileExists('.github/workflows/ci.yml'), '.github/workflows/ci.yml is required.');
 check(fileExists('THIRD_PARTY_NOTICES.md'), 'THIRD_PARTY_NOTICES.md is required.');
+
+const tenantCheck = checkTenantIsolation();
+check(tenantCheck.success, 'Multi-tenant isolation check must pass on all org_id tables.');
+
+const charCheck = guardCharacterization();
+check(charCheck.success, 'Characterization test suite must have >= 25 golden tests and be frozen.');
 
 const licenseText = fileExists('LICENSE') ? readText('LICENSE') : '';
 check(/MIT License/i.test(licenseText), 'LICENSE must be MIT.');

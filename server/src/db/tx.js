@@ -1,19 +1,4 @@
-import pool from './pool.js';
+import { withTx } from './withTx.js';
 
-export async function withTx(fn, db = pool) {
-  const client = await db.connect();
-
-  try {
-    await client.query('BEGIN');
-    const result = await fn(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
+export { withTx };
 export default withTx;

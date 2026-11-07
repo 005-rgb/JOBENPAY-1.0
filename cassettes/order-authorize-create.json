@@ -1,0 +1,49 @@
+{
+  "scenarioId": "order-authorize",
+  "step": "create",
+  "request": {
+    "method": "POST",
+    "path": "/v2/checkout/orders",
+    "headers": {
+      "content-type": "application/json",
+      "paypal-request-id": "jp_order_auth_001"
+    },
+    "body": {
+      "intent": "AUTHORIZE",
+      "purchase_units": [
+        {
+          "amount": {
+            "currency_code": "USD",
+            "value": "250.00"
+          }
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": "ORD-AUTH-2001",
+      "status": "CREATED",
+      "intent": "AUTHORIZE",
+      "links": [
+        {
+          "href": "https://www.sandbox.paypal.com/checkoutnow?token=ORD-AUTH-2001",
+          "rel": "approve",
+          "method": "GET"
+        },
+        {
+          "href": "https://api-m.sandbox.paypal.com/v2/checkout/orders/ORD-AUTH-2001/authorize",
+          "rel": "authorize",
+          "method": "POST"
+        }
+      ]
+    }
+  },
+  "recordedAt": "2026-11-06T00:00:00.000Z",
+  "sandboxFlag": true
+}
+

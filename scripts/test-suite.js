@@ -17,7 +17,13 @@ function collectTests(directory) {
     .sort();
 }
 
-const testFiles = collectTests(path.join(root, 'server', 'test'))
+const testDirectories = [
+  path.join(root, 'server', 'test'),
+  path.join(root, 'test', 'characterization'),
+];
+
+const testFiles = testDirectories
+  .flatMap((dir) => collectTests(dir))
   .map((file) => path.relative(root, file).replaceAll(path.sep, '/'))
   .filter((file) => file !== finalLedgerTest);
 

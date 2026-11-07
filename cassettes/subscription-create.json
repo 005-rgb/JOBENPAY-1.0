@@ -1,0 +1,28 @@
+{
+  "scenarioId": "subscription-create",
+  "step": "init",
+  "request": {
+    "method": "POST",
+    "path": "/v1/billing/subscriptions",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "plan_id": "P-SANDBOX-4001"
+    }
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": "I-SANDBOX-SUB-6001",
+      "status": "APPROVAL_PENDING",
+      "plan_id": "P-SANDBOX-4001"
+    }
+  },
+  "recordedAt": "2026-11-06T00:00:00.000Z",
+  "sandboxFlag": true
+}
+

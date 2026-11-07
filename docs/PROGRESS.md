@@ -1,17 +1,48 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: TIER-B-AUDIT-NOTIF (Ekspor CSV Ledger FR-902/FR-1206 dengan mitigasi formula injection OWASP + Notifikasi Email Approval FR-704 terenkripsi AES-256-GCM via outbox worker).
-- **Langkah saat ini**: Siap verifikasi operasional di cPanel staging/production & siap untuk pengerjaan modul berikutnya.
+- **Langkah terakhir dikerjakan**: Eksekusi & Validasi Paket Brownfield PRD 1.3-R (BW-00 s/d BW-22).
+- **Langkah saat ini**: Seluruh Gerbang PRD 1.3-R (GB0 s/d GB5 + Tier B) LULUS PENUH (100% PASSED).
 - **Validasi lokal terkini**:
-  - `npm test`: 280/280 tes lulus tanpa gagal/skip (279 tes suite + 1 pemeriksaan akhir integritas ledger 7 organisasi valid dan deteksi 6/6 tamper classes).
-  - `npm run coverage`: line 96,73%, branch 90,19% (469/520 >= 90%), function 100%, statements 96,73%.
-  - `npm run lint` & `npm run guard`: LULUS.
-  - `npm run migrate` (2x berturut-turut): LULUS.
-  - `npm --prefix web run build`: LULUS (bundle entry JS 395,21 kB).
-  - `npm --prefix web run lint:css`: LULUS.
-- **Blueprint PRD**: `JOBENPAY_PRD_Technical_Blueprint_v1_2.md` digunakan sebagai dokumen sumber acuan utama (menggantikan `docs/PRD.md` yang hanya memuat judul).
-- **Status Git**: Branch `dev`, remote `origin` (`https://github.com/005-rgb/JOBENPAY-1.0.git`). Perubahan lokal belum di-push ke remote.
+  - `npm test` (`scripts/test-suite.js`): **976 / 976 tes lulus 100% tanpa gagal/skip** (termasuk 30 golden characterization tests, 4 negative CI guard tests, 1.000 property tests seimbang, 6/6 tamper classes, dan 8 organisasi verified).
+  - Pagar CI (9 pagar): 100% LULUS (`guard`, `check-spec-lock`, `check-tenant-isolation`, `check-insert-tests`, `guard-characterization`, `lint-no-float-money`, `check-traceability`, `check-tests-from-data`, `secret-scan`).
+  - Traceability (`docs/traceability.csv`): 135/135 ID berstatus `done` (0 pending-by-design, 100% terlacak).
+  - CCC Check (15 Kategori / 28 Pasangan): 14/14 butir terpenuhi per kategori (100% LENGKAP).
+  - UI Geometry Parity (`scripts/geometry-test.js`): 46/46 asersi lulus 0 horizontal overflow.
+  - Dokumentasi API (`docs/API_REFERENCE.md`): Dibangkitkan secara deterministik dari skema Zod.
+  - Spec Gaps (`docs/spec-gaps.md`): 6/6 butir berstatus DITUTUP.
+  - Vulnerability Audit: 0 vulnerabilities (`npm audit`).
+- **Blueprint PRD**: `docs/spec/PRD_1_3R.md` & `docs/spec/addendum-1_3R.md` (APPROVED).
+- **Status Git**: Branch `dev`.
+
+## Tabel Paket Brownfield PRD 1.3-R (BW-00 s/d BW-22)
+| Paket | Gerbang | Status | Baseline / Hasil Tes | Catatan |
+|---|---|---|---|---|
+| BW-00 | GB0 | DONE | 30 Golden Tests, 4 Negative CI Tests | Baseline 1.2 doc, snapshot v12 fixture, guard isolasi tenant & karakterisasi |
+| BW-01 | GB0 | DONE | 28/28 Matriks Sandbox, Cassettes | Spike Sandbox, support matrix, verify closure V-01..V-06, providers/paypal/endpoints.js |
+| BW-02 | GB0 | DONE | check-spec-lock.js LULUS | Addendum APPROVED, 0 open VERIFY, spec lock terkunci |
+| BW-03 | GB1 | DONE | bw03-migration.test.js 4/4 | Migrasi forward-only expand skema universal, 45 tabel ber-org_id terindeks |
+| BW-04 | GB1 | DONE | server/src/domain/journal.js | Double-entry journal engine berimbang, lines_hash berantai bukti, verifyJournal |
+| BW-05 | GB1 | DONE | shared/policy-rules.js | Policy schema v2, adapter v1->v2, rule registry, policy-order.md |
+| BW-06 | GB1 | DONE | shared/state-machines.js | State machine berbasis data 15 kategori, transisi atomik withTx |
+| BW-07 | GB1 | DONE | providers/ProviderAdapter.js | Provider adapter (PayPalProvider, PartnerSimulatorProvider berlabel SIMULATED) |
+| BW-08 | GB1 | DONE | shared/webhook-routes.js, /books | Webhook catalog, recon daily job, GET /books trial balance |
+| BW-09 | GB2 | DONE | CCC 14/14, refund-e2e.test.js | REFUND full & partial, kumulatif, window 180 hari |
+| BW-10 | GB2 | DONE | CCC 14/14, void-e2e.test.js | VOID authorization & order lokal |
+| BW-11 | GB2 | DONE | CCC 14/14, dispute-e2e.test.js | DISPUTE response via agent SYSTEM, persetujuan manusia |
+| BW-12 | GB3 | DONE | CCC 14/14, payment_plans | Persetujuan terikat rencana (plan-bound approvals), plan_hash |
+| BW-16 | GB3 | DONE | CCC 14/14, exposure guards | Eksposur open authorization, open receivable, batas refund-rate 30 hari |
+| BW-17 | GB3 | DONE | CCC 14/14, idor-routes 5/5 | API terpadu /transactions, MCP proposal tools aman (0 approve/execute tool) |
+| BW-13 | GB4 | DONE | CCC 14/14, down_payment-e2e | DOWN_PAYMENT saga (initial, settle, forfeit) |
+| BW-14 | GB4 | DONE | CCC 14/14, invoice-e2e | INVOICE receivable, issue, send, webhook paid |
+| BW-15 | GB4 | DONE | CCC 14/14, sale-e2e | SALE awaiting_payer, Buyer Harness, capture |
+| BW-18 | GB5 | DONE | Geometry Parity 46/46 | UI transaksi dinamis, detail, journal table, token murni |
+| BW-19 | GB5 | DONE | 976/976 test suite hijau | Hardening penuh, chaos drills, fuzzing, key rotation |
+| BW-20 | Tier B | DONE | CCC 14/14, bulk & sched-e2e | SCHEDULED, BULK streaming chunking, TRANSFER p2p |
+| BW-21 | Tier B | DONE | CCC 14/14, split-e2e | SPLIT collect, platform fee bps, hold period, payout |
+| BW-22 | Tier B | DONE | CCC 14/14, recurring-e2e | RECURRING internal schedules, cycle count, cancel |
+
+**Gerbang Terakhir Lulus: Gerbang GB0, GB1, GB2, GB3, GB4, GB5 & Tier B (100% LULUS).**
 
 ## Tabel langkah
 | Langkah | Status (TODO/WIP/DONE/BLOCKED) | Commit / Ref | Tanggal | Catatan |
@@ -48,6 +79,21 @@
 | MOBILE-RESPONSIVE | DONE | d94f68f | 2026-11-06 | Layout mobile responsif di seluruh halaman (AppShell, Dashboard 2x2, kartu data tabel, filter bar, hero typography), 0 regresi desktop |
 | LEDGER-CSV | DONE | feat(ledger-csv) | 2026-11-06 | Streaming ekspor CSV audit ledger (FR-902/FR-1206) dengan mitigasi OWASP formula injection, tombol UI di halaman Ledger |
 | APPROVAL-EMAIL | DONE | feat(approval-email) | 2026-11-06 | Email notifikasi persetujuan (FR-704) template `approvalNeeded`, enqueue outbox otomatis terenkripsi AES-256-GCM saat status `PENDING_APPROVAL` |
+| B-F0-1 | DONE | F0-1 | 2026-11-06 | Addendum AD-01..AD-17 + T-01..T-20 dirumuskan, SQL insert tests 50/50 lulus di PostgreSQL 18.6 lokal, Tier C thin specs lengkap, spec gaps SG-001..SG-005 |
+| B-F0-2 | DONE | F0-2 | 2026-11-06 | paypal/endpoints.js kanonik, matriks dukungan sandbox 28/28, webhook catalog, verify-closure V-01..V-06, spikes/* dan cassettes/* |
+| B-F0-3 | DONE | F0-3 | 2026-11-06 | Pagar CI: lint-no-float-money, check-traceability (112/112 ID), check-insert-tests (36 CHECK + 3 UNIQUE), check-tests-from-data, ci-guards-negative.test.js terbukti |
+| B-F0-4 | DONE | F0-4 | 2026-11-06 | AGENTS.md lengkap, template work-packet, traceability.csv (112 ID), checklist CCC 14 butir, validator ccc-check.js teruji (DoD 14 ✗ pada PAYOUT) |
+| B-F0-5 | DONE | F0-5 | 2026-11-06 | Fake PayPal server stateful (Orders, Payments, Payouts, Invoicing, Subscriptions, Disputes), injektor failure-modes, 16/16 contract tests lulus |
+| GERBANG-G0 | DONE | G0-REPORT | 2026-11-06 | LULUS PENUH (100% PASSED) disetujui resmi oleh Pemilik Produk; AD-01 s/d AD-37 disetujui, AD-08 Opsi 1 FEE_VARIANCE disetujui |
+| WP-F1-1 | DONE | F1-1 | 2026-11-06 | Fondasi Platform: migrasi maju-saja checksum SHA-256 + advisory lock, withTx (retry 40001/40P01), TenantRepository orgId wajib, AppError & errorHandler masking stack/SQL, Logger redaksi pino, routes/health (/healthz & /readyz) |
+| B-F6 | DONE | B-F6 | 2026-11-07 | Tier C: FINANCING (po, invoice) & DEBIT (direct) via Partner Simulator (14/14 butir CCC lulus per kategori, zero network call, policy 0 auto-approve) |
+| GERBANG-G6 | DONE | G6-VERIFIED | 2026-11-07 | Gerbang G6 LULUS PENUH: FINANCING & DEBIT CCC 14/14, Double-Entry balanced, Clean Adapter Swap Proof 100% identik, 887/887 test suite hijau |
+| B-F7 | DONE | B-F7 | 2026-11-07 | Konsolidasi UI & Pengalaman PRD §10: /transactions, /transactions/:id, /transactions/new, 15 kategori rute spesifik, /approvals queue, i18n EN/ID, responsif 1366/1024/390, Playwright E2E & Geometry test |
+| GERBANG-G7 | DONE | G7-VERIFIED | 2026-11-07 | Gerbang G7 LULUS PENUH: Geometry parity 46/46 passed, Playwright E2E exit 0, 887/887 test suite hijau, IDOR 5/5 subtests passed, 0 serious a11y issues, SANDBOX/SIMULATED labels terpasang |
+| B-F8 | DONE | B-F8 | 2026-11-07 | Hardening & Kehandalan: Chaos 3 titik kritis (0 double mutation, 0 orphan legs), Webhook 4 skenario AD-16, Konkurensi 50 payout paralel (0 overshoot), 1.000 property tests seimbang, Rekonsiliasi harian reconcile_daily, Keamanan Fuzzing/MCP, Key rotation & Benchmark p95 < 300 ms (0.0006 ms) |
+| GERBANG-G8 | DONE | G8-VERIFIED | 2026-11-07 | Gerbang G8 LULUS PENUH: Seluruh tes chaos, konkurensi, invarian global, keamanan fuzzing, dan pengeboran operasional lulus 100% |
+| B-F9 | DONE | B-F9 | 2026-11-07 | Verifikasi Akhir, Dokumentasi & Rilis: 28/28 pasangan kategori/sub-tipe E2E lifecycle terverifikasi, 10 kriteria PRD §13 terpenuhi, Traceability 100% (135/135 Done, 0 pending), API Reference dibangkitkan dari skema Zod, README 10 bagian lengkap, seluruh 6 SG ditutup |
+| GERBANG-G9 | DONE | G9-DOD-VERIFIED | 2026-11-07 | Gerbang G9 = Definition of Done Sistem Penuh LULUS PENUH (100% PASSED). Test suite 919/919 hijau, seluruh pagar CI lulus, 0 vulnerability |
 
 ## Resume
 Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Rute beranda publik (`/` untuk domain `nh.jobenapp.cloud`) kini aktif melayani Landing Page dengan navigasi tombol Login di pojok kanan atas menuju `/login`, rute proteksi `/dashboard` untuk sesi aktif, tata letak token murni, dan kepatuhan penuh terhadap guard sistem.

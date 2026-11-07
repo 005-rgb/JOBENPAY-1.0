@@ -26,6 +26,9 @@ export const LEDGER_TYPES = Object.freeze({
   PAYEE_TRUST_CHANGED: 'PAYEE_TRUST_CHANGED',
   AGENT_KEY_ROTATED: 'AGENT_KEY_ROTATED',
   DEMO_RESET: 'DEMO_RESET',
+  LEGS_POSTED: 'LEGS_POSTED',
+  TRANSACTION_POSTED: 'TRANSACTION_POSTED',
+  ENTRY: 'ENTRY',
 });
 
 const ZERO_HASH = '0'.repeat(64);
@@ -140,15 +143,105 @@ function ensureType(value) {
   }
 }
 
-export async function appendEntry(tx, { orgId, type, subjectType, subjectId, payload }) {
-  requireOrgId(orgId);
+/**
+ * Computes deterministic canonical legs hash per AD-02:
+ * 1. Sort legs by account_ref ASC, leg_type ASC, currency ASC, amount_minor ASC.
+ * 2. Format each line: {account_ref}:{leg_type}:{currency}:{amount_minor}
+ * 3. Join with \n.
+ * 4. SHA-256 hex digest.
+ */
+export function computeLegsHash(legs) {
+  if (!Array.isArray(legs) || legs.length === 0) {
+    return null;
+  }
+
+  const sorted = [...legs].sort((a, b) => {
+    const accCmp = String(a.account_ref ?? '').localeCompare(String(b.account_ref ?? ''));
+    if (accCmp !== 0) return accCmp;
+
+    const typeCmp = String(a.leg_type ?? '').localeCompare(String(b.leg_type ?? ''));
+    if (typeCmp !== 0) return typeCmp;
+
+    const curCmp = String(a.currency ?? '').localeCompare(String(b.currency ?? ''));
+    if (curCmp !== 0) return curCmp;
+
+    const aAmount = String(a.amount_minor ?? '0');
+    const bAmount = String(b.amount_minor ?? '0');
+    if (aAmount === bAmount) return 0;
+    try {
+      const aBig = BigInt(aAmount);
+      const bBig = BigInt(bAmount);
+      return aBig < bBig ? -1 : 1;
+    } catch {
+      return aAmount.localeCompare(bAmount);
+    }
+  });
+
+  const lines = sorted.map((leg) => {
+    const acc = leg.account_ref ?? '';
+    const type = leg.leg_type ?? '';
+    const cur = leg.currency ?? '';
+    const amt = String(leg.amount_minor ?? '0');
+    return `${acc}:${type}:${cur}:${amt}`;
+  });
+
+  return crypto.createHash('sha256').update(lines.join('\n')).digest('hex');
+}
+
+/**
+ * Appends an entry to the hash-chained Ed25519 signed ledger.
+ * Polymorphic signatures:
+ * - appendEntry(tx, { orgId, type, subjectType, subjectId, payload, entryId, legs })
+ * - appendEntry(tx, orgId, payload)
+ */
+export async function appendEntry(tx, optionsOrOrgId, maybePayload) {
   requireTx(tx);
+
+  let orgId;
+  let type;
+  let subjectType;
+  let subjectId;
+  let payload;
+  let entryId;
+
+  if (typeof optionsOrOrgId === 'string') {
+    orgId = optionsOrOrgId;
+    payload = maybePayload ?? {};
+    type = payload.type || LEDGER_TYPES.REQUEST_RECEIVED;
+    subjectType = payload.subject_type || payload.subjectType || null;
+    subjectId = payload.subject_id || payload.subjectId || null;
+    entryId = payload.entry_id || payload.entryId || null;
+    if (payload.legs && !payload.legs_hash) {
+      const legsHash = computeLegsHash(payload.legs);
+      if (legsHash) {
+        payload = { ...payload, legs_hash: legsHash };
+      }
+    }
+  } else if (optionsOrOrgId && typeof optionsOrOrgId === 'object') {
+    orgId = optionsOrOrgId.orgId;
+    type = optionsOrOrgId.type || LEDGER_TYPES.REQUEST_RECEIVED;
+    subjectType = optionsOrOrgId.subjectType ?? null;
+    subjectId = optionsOrOrgId.subjectId ?? null;
+    payload = optionsOrOrgId.payload ?? {};
+    entryId = optionsOrOrgId.entryId ?? optionsOrOrgId.entry_id ?? null;
+    if (optionsOrOrgId.legs && !payload.legs_hash) {
+      const legsHash = computeLegsHash(optionsOrOrgId.legs);
+      if (legsHash) {
+        payload = { ...payload, legs_hash: legsHash };
+      }
+    }
+  } else {
+    throw new Error('orgId is required for ledger operations.');
+  }
+
+  requireOrgId(orgId);
   ensureType(type);
   assertSafePayload(payload);
 
   const privateKey = getCurrentSigningKey();
   const publicKey = derivePublicKeyFromPrivateKey(privateKey);
   const kid = kidFromPublicKey(publicKey);
+  const signingKeyId = kid;
 
   await tx.query(
     `INSERT INTO ledger_heads (org_id, last_seq, last_hash)
@@ -175,12 +268,13 @@ export async function appendEntry(tx, { orgId, type, subjectType, subjectId, pay
     .update(`${prevHash}\n${canonical}\n${seq}\n${orgId}\n${type}\n${createdAtIso}`)
     .digest('hex');
   const signature = signEd25519(privateKey, entryHash);
+  const finalEntryId = entryId || crypto.randomUUID();
 
   await tx.query(
     `INSERT INTO ledger_entries (
-      org_id, seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [orgId, seq, type, subjectType ?? null, subjectId ?? null, payload ?? {}, prevHash, entryHash, signature, kid, createdAtIso],
+      org_id, seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, signing_key_id, created_at, entry_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [orgId, seq, type, subjectType ?? null, subjectId ?? null, payload ?? {}, prevHash, entryHash, signature, kid, signingKeyId, createdAtIso, finalEntryId],
   );
 
   await tx.query(
@@ -190,7 +284,7 @@ export async function appendEntry(tx, { orgId, type, subjectType, subjectId, pay
     [seq, entryHash, orgId],
   );
 
-  return { seq, entryHash };
+  return { seq, entryHash, entryId: finalEntryId, signingKeyId, prevHash };
 }
 
 export async function verifyChain(orgId) {
@@ -208,7 +302,7 @@ export async function verifyChain(orgId) {
 
   for (let offset = 0; ; offset += BATCH_SIZE) {
     const rowsResult = await query(
-      `SELECT seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, created_at
+      `SELECT seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, signing_key_id, entry_id, created_at
        FROM ledger_entries
        WHERE org_id = $1
        ORDER BY seq ASC
@@ -248,10 +342,11 @@ export async function verifyChain(orgId) {
         return { valid: false, checkedEntries, firstBrokenSeq, reason };
       }
 
-      const pubKey = keys.get(row.kid);
+      const keyId = row.kid || row.signing_key_id;
+      const pubKey = keys.get(keyId);
       if (!pubKey) {
         firstBrokenSeq = seq;
-        reason = `unknown or missing verification key for kid ${row.kid}`;
+        reason = `unknown or missing verification key for kid ${keyId}`;
         return { valid: false, checkedEntries, firstBrokenSeq, reason };
       }
 
@@ -322,7 +417,7 @@ export async function* exportLedger(orgId, { format = 'json' } = {}) {
     let offset = 0;
     while (true) {
       const rows = await query(
-        `SELECT org_id, seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, created_at
+        `SELECT org_id, seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, signing_key_id, entry_id, created_at
          FROM ledger_entries
          WHERE org_id = $1
          ORDER BY seq ASC
@@ -363,7 +458,7 @@ export async function* exportLedger(orgId, { format = 'json' } = {}) {
 
   while (true) {
     const rows = await query(
-      `SELECT org_id, seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, created_at
+      `SELECT org_id, seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, signing_key_id, entry_id, created_at
        FROM ledger_entries
        WHERE org_id = $1
        ORDER BY seq ASC
@@ -387,6 +482,8 @@ export async function* exportLedger(orgId, { format = 'json' } = {}) {
         entry_hash: row.entry_hash,
         signature: row.signature,
         kid: row.kid,
+        signing_key_id: row.signing_key_id ?? row.kid,
+        entry_id: row.entry_id ?? null,
         created_at: new Date(row.created_at).toISOString(),
       };
 
@@ -404,6 +501,76 @@ export async function* exportLedger(orgId, { format = 'json' } = {}) {
   yield ']';
 }
 
+export const exportChain = exportLedger;
+
+/**
+ * Cross-verifies that transaction legs in database match canonical legs_hash in ledger_entries per AD-02.
+ */
+export async function verifyIntentLegs(client, orgId, intentId) {
+  requireOrgId(orgId);
+  if (!intentId) throw new Error('intentId is required.');
+
+  const legsResult = await client.query(
+    `SELECT leg_id, intent_id, leg_type, amount_minor, currency, account_ref, status, external_ref, created_at
+     FROM transaction_legs
+     WHERE intent_id = $1
+     ORDER BY account_ref ASC, leg_type ASC, currency ASC, amount_minor ASC`,
+    [intentId],
+  );
+
+  const legs = legsResult.rows;
+  const calculatedLegsHash = computeLegsHash(legs);
+
+  const entryResult = await client.query(
+    `SELECT seq, payload, entry_hash
+     FROM ledger_entries
+     WHERE org_id = $1 AND (subject_id = $2 OR payload->>'intent_id' = $2::text)
+     ORDER BY seq DESC
+     LIMIT 1`,
+    [orgId, intentId],
+  );
+
+  const entry = entryResult.rows[0];
+  if (!entry) {
+    return {
+      valid: false,
+      reason: `No ledger entry found for intent ${intentId}`,
+      legsCount: legs.length,
+      calculatedLegsHash,
+      recordedLegsHash: null,
+    };
+  }
+
+  const recordedLegsHash = entry.payload?.legs_hash ?? null;
+  if (!recordedLegsHash) {
+    return {
+      valid: false,
+      reason: `Ledger entry seq ${entry.seq} has no legs_hash in payload`,
+      legsCount: legs.length,
+      calculatedLegsHash,
+      recordedLegsHash: null,
+    };
+  }
+
+  if (calculatedLegsHash !== recordedLegsHash) {
+    return {
+      valid: false,
+      reason: `Legs hash mismatch: calculated ${calculatedLegsHash}, recorded ${recordedLegsHash}`,
+      legsCount: legs.length,
+      calculatedLegsHash,
+      recordedLegsHash,
+    };
+  }
+
+  return {
+    valid: true,
+    reason: 'valid',
+    legsCount: legs.length,
+    calculatedLegsHash,
+    recordedLegsHash,
+  };
+}
+
 export async function listOrgIds() {
   const result = await query('SELECT DISTINCT org_id FROM ledger_entries ORDER BY org_id');
   return result.rows.map((row) => row.org_id);
@@ -415,6 +582,9 @@ export default {
   appendEntry,
   verifyChain,
   exportLedger,
+  exportChain,
+  computeLegsHash,
+  verifyIntentLegs,
   escapeCsvCell,
   listOrgIds,
 };
