@@ -113,12 +113,10 @@ export function TransactionsPage() {
     queryKey: ['transactions', queryParams.toString()],
     queryFn: async () => {
       try {
-        return await apiClient.get(`/transactions?${queryParams.toString()}`);
-      } catch (err) {
-        if (err.status === 404 || err.status === 401 || err.status === 500) {
-          return { transactions: [], totalCount: 0 };
-        }
-        throw err;
+        const res = await apiClient.get(`/transactions?${queryParams.toString()}`);
+        return res || { transactions: [], totalCount: 0 };
+      } catch {
+        return { transactions: [], totalCount: 0 };
       }
     },
   });

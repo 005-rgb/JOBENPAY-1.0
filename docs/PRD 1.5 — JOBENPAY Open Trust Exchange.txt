@@ -1,0 +1,883 @@
+PRD 1.5 — JOBENPAY Open Trust Exchange
+Protokol Terbuka untuk Verifikasi Otorisasi Agen Lintas Platform (Presisi Tinggi, Zero-Hallucination)
+Versi: 1.0 · Status: Implementation-ready specification
+Tanggal: 7 November 2026
+Basis: PRD 1.2 (Sandbox Gatekeeper) + PRD 1.3 (Universal Transaction Engine) + PRD 1.4 (Trust Infrastructure)
+Prinsip: Setiap field, endpoint, state, dan test eksplisit. AI builder tidak perlu menebak. Tidak ada "disiratkan".
+
+0. ATURAN EMAS (NON-NEGOTIABLE)
+Protokol adalah spesifikasi publik. Setiap perubahan pada format SAR, endpoint handshake, atau revocation feed wajib memiliki versi (protocol_version) dan backward compatible minimal 12 bulan.
+
+Setiap endpoint memiliki request/response schema eksplisit (§5). Tidak ada field opsional yang tidak didokumentasikan.
+
+Setiap test case memiliki assertion eksplisit (§11). Tidak ada "test bahwa X berfungsi".
+
+Coverage 100% untuk modul protocol_service.js, handshake_service.js, dan verify_service.js. CI gagal jika < 100%.
+
+Fail-closed: jika verifikasi tidak dapat diselesaikan (registry down, revocation feed tidak tersedia), hasilnya INDETERMINATE — bukan VERIFIED.
+
+Tidak ada PII di payload protokol. Hanya hash, ID, enum, timestamp, dan tanda tangan.
+
+Kompatibel dengan AP2: format SAR dapat dipetakan ke AP2 mandate (jika AP2 tersedia), tetapi tidak bergantung padanya.
+
+1. RINGKASAN DAN FILOSOFI
+1.1 Masalah yang Diselesaikan
+PRD 1.2 dan 1.3 membangun kontrol internal yang sangat kuat: mandat, gerbang deterministik, ledger berantai-hash. PRD 1.4 menambahkan verifikasi lintas organisasi melalui SAR dan Issuer Registry.
+
+Tetapi ada celah fundamental yang belum dijawab oleh siapa pun — termasuk AP2, PayPal, dan seluruh ekosistem pembayaran AI:
+
+Ketika agen dari Perusahaan A mengirim pembayaran ke Vendor B, bagaimana Vendor B tahu bahwa pembayaran itu sah — tanpa harus memakai sistem yang sama dengan Perusahaan A?
+
+Saat ini, jawabannya adalah "saling percaya secara manual" (kontrak, email) atau "memakai platform yang sama" (lock-in). Tidak ada standar terbuka yang memungkinkan verifikasi lintas platform tanpa ketergantungan pada satu vendor.
+
+1.2 Solusi: Open Trust Exchange
+JOBENPAY Open Trust Exchange adalah protokol terbuka yang mendefinisikan:
+
+Format SAR (Signed Authorization Receipt) — artefak kriptografis yang membuktikan otorisasi transaksi.
+
+Endpoint verifikasi publik — siapa pun dapat memverifikasi SAR tanpa akun.
+
+Trust Handshake — pertukaran kriptografis singkat sebelum transaksi, memungkinkan vendor meminta bukti otorisasi terlebih dahulu.
+
+Revocation Feed — feed publik yang memungkinkan verifier mengetahui pencabutan secara real-time.
+
+Spesifikasi protokol — dokumen publik yang memungkinkan platform lain (Stripe, bank, pesaing) mengimplementasikan protokol yang sama.
+
+1.3 Filosofi
+"Kepercayaan tidak boleh menjadi milik satu perusahaan. Jika JOBENPAY ingin dipercaya oleh ekosistem, JOBENPAY harus membuat kepercayaan itu dapat diverifikasi oleh siapa pun — termasuk pesaingnya."
+
+Ini adalah lompatan dari "produk" menjadi "standar". JOBENPAY tidak lagi bersaing dengan platform lain; JOBENPAY menjadi lapisan netral yang menghubungkan semuanya.
+
+2. CAKUPAN
+2.1 Yang Termasuk
+Komponen	Deskripsi	Tier
+SAR Format v1.0	Spesifikasi JSON Schema untuk Signed Authorization Receipt	A
+Public Verification API	Endpoint untuk memverifikasi SAR tanpa akun	A
+Trust Handshake	Endpoint untuk verifikasi pra-transaksi	A
+Revocation Feed	Endpoint polling + webhook untuk pencabutan	A
+Protocol Specification	Dokumen publik (/protocol)	A
+Reference Implementation	JOBENPAY sebagai implementasi referensi	A
+Conformance Test Suite	Vektor uji untuk implementasi pihak ketiga	B
+Partner Simulator	Sistem simulasi untuk demo lintas platform	A (untuk video)
+AP2 Adapter	Mapping SAR → AP2 mandate	B
+2.2 Yang Tidak Termasuk
+Bukan sistem pembayaran baru; dana tetap diproses PayPal/bank.
+
+Bukan penyedia identitas global (tidak menggantikan OIDC/SAML).
+
+Bukan blockchain (append-only + Ed25519 cukup).
+
+Bukan arbiter hukum; SAR adalah bukti teknis, bukan putusan.
+
+Bukan jaminan bahwa vendor akan menerima pembayaran; hanya bukti otorisasi.
+
+3. SPESIFIKASI FORMAT SAR v1.0
+3.1 JSON Schema (Eksplisit)
+json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobenpay.io/schemas/sar-v1.0.json",
+  "title": "Signed Authorization Receipt v1.0",
+  "type": "object",
+  "required": [
+    "sar_version", "sar_id", "issuer", "mandate", "request",
+    "decision", "ledger", "signature"
+  ],
+  "properties": {
+    "sar_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "sar_id": {
+      "type": "string",
+      "pattern": "^sar_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "issuer": {
+      "type": "object",
+      "required": ["org_id", "issuer_key_id", "display_name"],
+      "properties": {
+        "org_id": { "type": "string", "pattern": "^org_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "issuer_key_id": { "type": "string", "pattern": "^kid_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "display_name": { "type": "string", "maxLength": 200 },
+        "legal_entity_lei": { "type": "string", "pattern": "^[A-Z0-9]{20}$" }
+      }
+    },
+    "mandate": {
+      "type": "object",
+      "required": ["mandate_id", "mandate_version", "policy_hash", "valid_from", "valid_to"],
+      "properties": {
+        "mandate_id": { "type": "string" },
+        "mandate_version": { "type": "integer", "minimum": 1 },
+        "policy_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "valid_from": { "type": "string", "format": "date-time" },
+        "valid_to": { "type": "string", "format": "date-time" }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": ["request_id", "request_hash", "category", "sub_type",
+                   "amount_minor", "currency", "payee_id_hmac"],
+      "properties": {
+        "request_id": { "type": "string" },
+        "request_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "category": {
+          "type": "string",
+          "enum": ["SALE","DOWN_PAYMENT","INVOICE","PAYOUT","REFUND","VOID",
+                   "DISPUTE","PARTIAL","SCHEDULED","RECURRING","BULK","SPLIT",
+                   "TRANSFER","FINANCING","DEBIT"]
+        },
+        "sub_type": { "type": "string" },
+        "amount_minor": { "type": "string", "pattern": "^[0-9]+$" },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "payee_id_hmac": { "type": "string", "pattern": "^hmac:[a-f0-9]{64}$" },
+        "document_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["result", "reason_codes", "policy_version", "decided_at"],
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": ["APPROVED","REJECTED","AUTO_APPROVE","REQUIRE_APPROVAL"]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 50
+        },
+        "policy_version": { "type": "string" },
+        "decided_at": { "type": "string", "format": "date-time" },
+        "approver_hmac": { "type": "string", "pattern": "^hmac:[a-f0-9]{64}$" }
+      }
+    },
+    "ledger": {
+      "type": "object",
+      "required": ["org_id", "seq", "entry_hash", "prev_hash"],
+      "properties": {
+        "org_id": { "type": "string" },
+        "seq": { "type": "integer", "minimum": 1 },
+        "entry_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "prev_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["alg", "kid", "sig"],
+      "properties": {
+        "alg": { "type": "string", "const": "Ed25519" },
+        "kid": { "type": "string" },
+        "sig": { "type": "string", "pattern": "^base64:[A-Za-z0-9+/=]+$" }
+      }
+    },
+    "composition_proof": {
+      "type": "object",
+      "description": "Opsional, untuk mandat komposit (PRD 1.4)",
+      "properties": {
+        "lineage": { "type": "array" },
+        "lineage_root_hash": { "type": "string" },
+        "threshold_signatures": { "type": "array" }
+      }
+    }
+  },
+  "additionalProperties": false
+}
+3.2 Canonicalization
+Aturan: SAR ditandatangani atas canonical JSON (RFC 8785 — JSON Canonicalization Scheme).
+
+Kunci diurutkan leksikografis.
+
+Tanpa spasi.
+
+Angka direpresentasikan sebagai string (untuk amount_minor).
+
+undefined dibuang.
+
+Unicode dinormalisasi NFC.
+
+Implementasi referensi: canonicalize(sar) di shared/canonical.js (sudah ada di PRD 1.2 D4).
+
+3.3 Signing
+Algoritma: Ed25519 (RFC 8032).
+
+Prosedur:
+
+Ambil SAR tanpa field signature.
+
+Canonicalize → string C.
+
+Hitung hash = SHA-256(C).
+
+Tanda tangani hash dengan private key issuer → sig.
+
+Tambahkan signature: { alg: "Ed25519", kid, sig: base64(sig) }.
+
+Verifikasi:
+
+Ambil SAR, hapus signature.
+
+Canonicalize → C.
+
+Hitung hash = SHA-256(C).
+
+Verifikasi sig terhadap hash dengan public key issuer (dari registry).
+
+Jika valid → signature_valid: true.
+
+3.4 Contoh SAR Lengkap
+json
+{
+  "sar_version": "1.0",
+  "sar_id": "sar_01HX4Z8K9M2N3P4Q5R6S7T8V9W",
+  "issuer": {
+    "org_id": "org_01HX4Z8K9M2N3P4Q5R6S7T8V9W",
+    "issuer_key_id": "kid_01HX4Z8K9M2N3P4Q5R6S7T8V9W",
+    "display_name": "Acme Corp",
+    "legal_entity_lei": "5493001KJTIIGC8Y1R12"
+  },
+  "mandate": {
+    "mandate_id": "mnd_01HX...",
+    "mandate_version": 3,
+    "policy_hash": "sha256:a3f5...",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-12-01T00:00:00Z"
+  },
+  "request": {
+    "request_id": "req_01HX...",
+    "request_hash": "sha256:b7e2...",
+    "category": "PAYOUT",
+    "sub_type": "standard",
+    "amount_minor": "45000",
+    "currency": "USD",
+    "payee_id_hmac": "hmac:c4d1...",
+    "document_sha256": "sha256:e8f3..."
+  },
+  "decision": {
+    "result": "APPROVED",
+    "reason_codes": ["PAYEE_TRUSTED"],
+    "policy_version": "pol_12",
+    "decided_at": "2026-11-06T12:34:56Z",
+    "approver_hmac": "hmac:f2a9..."
+  },
+  "ledger": {
+    "org_id": "org_01HX...",
+    "seq": 1042,
+    "entry_hash": "sha256:9b1c...",
+    "prev_hash": "sha256:7d4e..."
+  },
+  "signature": {
+    "alg": "Ed25519",
+    "kid": "kid_01HX...",
+    "sig": "base64:MEUCIQD..."
+  }
+}
+4. SKEMA DATA
+4.1 Tabel Baru
+sql
+-- 4.1.1 Protocol Versions (untuk versioning)
+CREATE TABLE protocol_versions (
+  version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  protocol_version TEXT NOT NULL UNIQUE,
+  schema_json JSONB NOT NULL,
+  released_at TIMESTAMPTZ NOT NULL,
+  deprecated_at TIMESTAMPTZ,
+  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','DEPRECATED','RETIRED')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_protocol_versions_status ON protocol_versions(status);
+
+-- 4.1.2 Public Proofs (link publik untuk verifikasi)
+CREATE TABLE public_proofs (
+  proof_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sar_id TEXT NOT NULL,
+  org_id UUID NOT NULL REFERENCES organizations(org_id),
+  sar_json JSONB NOT NULL,
+  proof_url TEXT NOT NULL UNIQUE,
+  created_by UUID NOT NULL REFERENCES users(user_id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  access_count INT NOT NULL DEFAULT 0,
+  revoked_at TIMESTAMPTZ,
+  CHECK (expires_at > created_at)
+);
+
+CREATE INDEX idx_public_proofs_sar ON public_proofs(sar_id);
+CREATE INDEX idx_public_proofs_org ON public_proofs(org_id);
+CREATE INDEX idx_public_proofs_url ON public_proofs(proof_url);
+CREATE INDEX idx_public_proofs_expires ON public_proofs(expires_at) WHERE revoked_at IS NULL;
+
+-- 4.1.3 Trust Handshakes (pra-transaksi)
+CREATE TABLE trust_handshakes (
+  handshake_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  requester_org_id UUID NOT NULL REFERENCES organizations(org_id),
+  target_org_id UUID NOT NULL REFERENCES organizations(org_id),
+  agent_id UUID NOT NULL,
+  request_intent JSONB NOT NULL,  -- {category, amount_minor, currency, payee_hmac}
+  handshake_nonce TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN (
+    'PENDING','VERIFIED','DENIED','EXPIRED','INDETERMINATE'
+  )),
+  response_json JSONB,
+  issued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  responded_at TIMESTAMPTZ,
+  CHECK (expires_at > issued_at)
+);
+
+CREATE INDEX idx_trust_handshakes_requester ON trust_handshakes(requester_org_id);
+CREATE INDEX idx_trust_handshakes_target ON trust_handshakes(target_org_id);
+CREATE INDEX idx_trust_handshakes_nonce ON trust_handshakes(handshake_nonce);
+CREATE INDEX idx_trust_handshakes_status ON trust_handshakes(status);
+
+-- 4.1.4 Conformance Vectors (untuk implementasi pihak ketiga)
+CREATE TABLE conformance_vectors (
+  vector_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vector_name TEXT NOT NULL UNIQUE,
+  sar_json JSONB NOT NULL,
+  expected_result TEXT NOT NULL CHECK (expected_result IN ('VALID','INVALID','INDETERMINATE')),
+  expected_reason TEXT,
+  category TEXT NOT NULL CHECK (category IN (
+    'SCHEMA','SIGNATURE','REVOCATION','HASH','EXPIRY','COMPOSITION'
+  )),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_conformance_vectors_category ON conformance_vectors(category);
+
+-- 4.1.5 Partner Systems (untuk demo lintas platform)
+CREATE TABLE partner_systems (
+  partner_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_name TEXT NOT NULL,
+  partner_type TEXT NOT NULL CHECK (partner_type IN ('SIMULATED','REAL')),
+  base_url TEXT NOT NULL,
+  public_key_jwk JSONB,
+  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','SUSPENDED','REVOKED')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+5. API CONTRACTS (EKSPLISIT)
+5.1 Public Verification API
+5.1.1 POST /v1/verify/receipt
+Request:
+
+json
+{
+  "sar": { /* SAR object */ },
+  "mode": "online"  // "online" | "offline"
+}
+Response 200 (VERIFIED):
+
+json
+{
+  "valid": true,
+  "status": "VERIFIED",
+  "sar_id": "sar_01HX...",
+  "issuer": {
+    "org_id": "org_01HX...",
+    "display_name": "Acme Corp",
+    "legal_entity_lei": "5493001KJTIIGC8Y1R12"
+  },
+  "checks": [
+    { "name": "schema", "result": "PASS" },
+    { "name": "signature", "result": "PASS" },
+    { "name": "issuer_key_active", "result": "PASS" },
+    { "name": "mandate_active", "result": "PASS" },
+    { "name": "request_hash", "result": "PASS" },
+    { "name": "policy_hash", "result": "PASS" }
+  ],
+  "verified_at": "2026-11-07T10:00:00Z",
+  "warnings": []
+}
+Response 200 (INVALID):
+
+json
+{
+  "valid": false,
+  "status": "INVALID",
+  "sar_id": "sar_01HX...",
+  "checks": [
+    { "name": "schema", "result": "PASS" },
+    { "name": "signature", "result": "FAIL", "reason": "SIGNATURE_INVALID" }
+  ],
+  "verified_at": "2026-11-07T10:00:00Z"
+}
+Response 200 (INDETERMINATE):
+
+json
+{
+  "valid": false,
+  "status": "INDETERMINATE",
+  "sar_id": "sar_01HX...",
+  "checks": [
+    { "name": "schema", "result": "PASS" },
+    { "name": "signature", "result": "PASS" },
+    { "name": "revocation", "result": "INDETERMINATE", "reason": "REVOCATION_UNAVAILABLE" }
+  ],
+  "verified_at": "2026-11-07T10:00:00Z"
+}
+Status enum: VERIFIED, INVALID, INDETERMINATE.
+
+Aturan fail-closed:
+
+Jika registry tidak tersedia → INDETERMINATE (bukan VERIFIED).
+
+Jika revocation feed tidak tersedia dan mode online → INDETERMINATE.
+
+Jika mode offline dan revocation snapshot disediakan → verifikasi berdasarkan snapshot.
+
+5.1.2 GET /v1/verify/receipt/{sar_id}
+Response 200: Sama dengan POST (jika SAR publik).
+Response 404: Jika SAR tidak ditemukan atau tidak publik.
+
+5.1.3 POST /v1/verify/batch
+Request:
+
+json
+{
+  "receipts": [ /* array of SAR objects, max 100 */ ]
+}
+Response 200:
+
+json
+{
+  "results": [
+    { "sar_id": "sar_01HX...", "valid": true, "status": "VERIFIED" },
+    { "sar_id": "sar_02HY...", "valid": false, "status": "INVALID", "reason": "SIGNATURE_INVALID" }
+  ]
+}
+5.2 Trust Handshake API
+5.2.1 POST /v1/handshake/initiate
+Request:
+
+json
+{
+  "requester_org_id": "org_01HX...",
+  "target_org_id": "org_02HY...",
+  "agent_id": "agt_01HZ...",
+  "request_intent": {
+    "category": "PAYOUT",
+    "amount_minor": "45000",
+    "currency": "USD",
+    "payee_id_hmac": "hmac:c4d1..."
+  }
+}
+Response 201:
+
+json
+{
+  "handshake_id": "hs_01HX...",
+  "handshake_nonce": "nonce_abc123...",
+  "expires_at": "2026-11-07T10:05:00Z",
+  "status": "PENDING"
+}
+Aturan:
+
+handshake_nonce adalah string acak 32 byte (base64url).
+
+expires_at = issued_at + 5 menit.
+
+Hanya satu handshake aktif per (requester_org_id, target_org_id, agent_id).
+
+5.2.2 POST /v1/handshake/{handshake_id}/respond
+Request (dari target):
+
+json
+{
+  "handshake_nonce": "nonce_abc123...",
+  "verdict": "VERIFIED",  // "VERIFIED" | "DENIED" | "INDETERMINATE"
+  "sar": { /* SAR object, jika VERIFIED */ },
+  "signature": {
+    "alg": "Ed25519",
+    "kid": "kid_02HY...",
+    "sig": "base64:..."
+  }
+}
+Response 200:
+
+json
+{
+  "handshake_id": "hs_01HX...",
+  "status": "VERIFIED",
+  "verified_at": "2026-11-07T10:02:00Z"
+}
+Aturan:
+
+signature adalah tanda tangan target atas handshake_nonce + verdict + sar_hash.
+
+sar_hash = SHA-256(canonicalJson(sar)).
+
+Jika verdict VERIFIED, sar wajib ada.
+
+Jika verdict DENIED, sar opsional (alasan di sar.decision.reason_codes).
+
+Jika verdict INDETERMINATE, sar opsional.
+
+5.2.3 GET /v1/handshake/{handshake_id}
+Response 200:
+
+json
+{
+  "handshake_id": "hs_01HX...",
+  "status": "VERIFIED",
+  "requester_org_id": "org_01HX...",
+  "target_org_id": "org_02HY...",
+  "issued_at": "2026-11-07T10:00:00Z",
+  "responded_at": "2026-11-07T10:02:00Z",
+  "expires_at": "2026-11-07T10:05:00Z"
+}
+5.3 Revocation Feed API
+5.3.1 GET /v1/revocations
+Query params:
+
+since (cursor, optional): cursor untuk paginasi.
+
+limit (int, optional, default 100, max 1000).
+
+Response 200:
+
+json
+{
+  "events": [
+    {
+      "event_id": "evt_01HX...",
+      "type": "mandate.revoked",
+      "org_id": "org_01HX...",
+      "subject_id": "mnd_01HY...",
+      "revoked_at": "2026-11-07T10:00:00Z",
+      "effective_at": "2026-11-07T10:00:00Z",
+      "signature": { "alg": "Ed25519", "kid": "kid_01HX...", "sig": "base64:..." }
+    }
+  ],
+  "next_cursor": "cursor_xyz...",
+  "has_more": true
+}
+Event types:
+
+mandate.revoked
+
+issuer_key.revoked
+
+request.cancelled
+
+org.frozen
+
+5.3.2 POST /v1/revocations/subscribe
+Request (terautentikasi):
+
+json
+{
+  "url": "https://partner.example.com/webhook",
+  "events": ["mandate.revoked", "issuer_key.revoked"]
+}
+Response 201:
+
+json
+{
+  "subscription_id": "sub_01HX...",
+  "secret": "whsec_abc123..."  // HMAC secret untuk verifikasi webhook
+}
+Aturan:
+
+secret ditampilkan sekali (disimpan sebagai hash).
+
+Webhook dikirim dengan header X-Jobenpay-Signature: HMAC-SHA256(secret, body).
+
+Retry 3x dengan exponential backoff.
+
+5.4 Protocol Specification API
+5.4.1 GET /protocol
+Response 200: Halaman HTML yang menampilkan spesifikasi protokol (format SAR, endpoint, revocation feed).
+
+5.4.2 GET /v1/protocol/versions
+Response 200:
+
+json
+{
+  "versions": [
+    {
+      "protocol_version": "1.0",
+      "released_at": "2026-11-07T00:00:00Z",
+      "deprecated_at": null,
+      "status": "ACTIVE",
+      "schema_url": "https://jobenpay.io/schemas/sar-v1.0.json"
+    }
+  ]
+}
+5.4.3 GET /v1/protocol/conformance/vectors
+Response 200:
+
+json
+{
+  "vectors": [
+    {
+      "vector_name": "valid_payout",
+      "vector_id": "vec_01HX...",
+      "category": "SIGNATURE",
+      "expected_result": "VALID",
+      "sar_url": "https://jobenpay.io/vectors/valid_payout.json"
+    },
+    {
+      "vector_name": "invalid_signature",
+      "vector_id": "vec_02HY...",
+      "category": "SIGNATURE",
+      "expected_result": "INVALID",
+      "expected_reason": "SIGNATURE_INVALID",
+      "sar_url": "https://jobenpay.io/vectors/invalid_signature.json"
+    }
+  ]
+}
+6. STATE MACHINE
+6.1 Trust Handshake State Machine
+text
+PENDING → VERIFIED
+PENDING → DENIED
+PENDING → INDETERMINATE
+PENDING → EXPIRED (jika expires_at < now())
+Transisi legal:
+
+Dari	Ke	Trigger
+PENDING	VERIFIED	Target respond dengan verdict VERIFIED + SAR valid
+PENDING	DENIED	Target respond dengan verdict DENIED
+PENDING	INDETERMINATE	Target respond dengan verdict INDETERMINATE
+PENDING	EXPIRED	Job expire_handshakes (setiap 1 menit)
+Aturan:
+
+Setelah VERIFIED/DENIED/INDETERMINATE, handshake tidak dapat diubah.
+
+EXPIRED hanya terjadi jika tidak ada respons dalam 5 menit.
+
+6.2 Public Proof State Machine
+text
+ACTIVE → REVOKED
+ACTIVE → EXPIRED (jika expires_at < now())
+Transisi legal:
+
+Dari	Ke	Trigger
+ACTIVE	REVOKED	OWNER/ADMIN klik "Revoke proof"
+ACTIVE	EXPIRED	Job expire_proofs (setiap 1 jam)
+Aturan:
+
+Proof yang di-revoke tidak dapat diakses (404).
+
+Proof yang expired tidak dapat diakses (404).
+
+7. LEDGER RULES
+Setiap event protokol menulis entri ledger:
+
+Event	Ledger Type	Payload
+Proof created	PROOF_CREATED	{proof_id, sar_id}
+Proof revoked	PROOF_REVOKED	{proof_id, reason}
+Handshake initiated	HANDSHAKE_INITIATED	{handshake_id, requester_org, target_org}
+Handshake verified	HANDSHAKE_VERIFIED	{handshake_id, sar_id}
+Handshake denied	HANDSHAKE_DENIED	{handshake_id, reason}
+Revocation published	REVOCATION_PUBLISHED	{event_id, type, subject_id}
+Aturan: Payload ledger tidak boleh memuat PII (nama, email, identifier). Hanya ID, hash, enum, timestamp.
+
+8. UI SCREENS
+8.1 Halaman Publik
+Rute	Isi
+/proof/:proof_id	Halaman verifikasi publik: status VERIFIED/INVALID/INDETERMINATE, checks table, issuer info, timestamp
+/protocol	Spesifikasi protokol (HTML): format SAR, endpoint, revocation feed, conformance vectors
+/protocol/versions	Daftar versi protokol
+/protocol/conformance	Halaman conformance test: upload SAR → hasil verifikasi
+8.2 Halaman Tenant (Terautentikasi)
+Rute	Isi
+/settings/protocol	Aktifkan/nonaktifkan Open Trust Exchange, konfigurasi expiry proof (default 30 hari)
+/proofs	Daftar proof yang dibuat (filter: ACTIVE/REVOKED/EXPIRED)
+/handshakes	Daftar handshake (filter: PENDING/VERIFIED/DENIED/INDETERMINATE/EXPIRED)
+/protocol/subscriptions	Kelola webhook subscriber untuk revocation feed
+8.3 Komponen UI
+Status pill baru: VERIFIED (success), INVALID (error), INDETERMINATE (warning), PENDING (neutral), EXPIRED (neutral).
+
+Checks table di halaman proof: kolom check_name, result, reason.
+
+Copy button untuk proof URL dan handshake nonce.
+
+QR code (opsional) untuk proof URL.
+
+Semua mengikuti design token PRD 1.2 §12.2. Tidak ada nilai literal.
+
+9. INTEGRASI DENGAN PRD 1.2, 1.3, 1.4
+Komponen	Perubahan
+signed_receipts (PRD 1.3)	Tambah field protocol_version (default "1.0")
+issuer_keys (PRD 1.4)	Tidak berubah; public key dipublikasikan di registry
+revocation_feed (PRD 1.4)	Tidak berubah; endpoint publik ditambahkan
+Decision Engine (PRD 1.2)	Tidak berubah; SAR diterbitkan setelah APPROVED
+Ledger (PRD 1.2)	Tambah tipe entri baru (§7)
+10. CONFORMANCE TEST SUITE
+10.1 Vektor Uji Wajib
+#	Nama	Kategori	Expected	Alasan
+1	valid_payout	SIGNATURE	VALID	—
+2	valid_down_payment	SIGNATURE	VALID	—
+3	invalid_signature	SIGNATURE	INVALID	SIGNATURE_INVALID
+4	invalid_schema	SCHEMA	INVALID	SCHEMA_INVALID
+5	expired_mandate	EXPIRY	INVALID	MANDATE_EXPIRED
+6	revoked_issuer_key	REVOCATION	INVALID	ISSUER_KEY_REVOKED
+7	revoked_mandate	REVOCATION	INVALID	MANDATE_REVOKED
+8	hash_mismatch_request	HASH	INVALID	REQUEST_HASH_MISMATCH
+9	hash_mismatch_policy	HASH	INVALID	POLICY_HASH_MISMATCH
+10	registry_unavailable	REVOCATION	INDETERMINATE	REGISTRY_UNAVAILABLE
+Total: 10 vektor (5 VALID/INVALID + 5 INVALID/INDETERMINATE).
+
+10.2 Conformance Test Runner
+File: scripts/conformance-runner.js
+
+Fungsi:
+
+Unduh semua vektor dari /v1/protocol/conformance/vectors.
+
+Untuk setiap vektor, panggil POST /v1/verify/receipt.
+
+Bandingkan hasil dengan expected_result.
+
+Output: {passed: N, failed: M, errors: []}.
+
+Exit code: 0 jika semua lulus, 1 jika ada yang gagal.
+
+Test: test_conformance_runner_all_pass — runner lulus 10/10.
+
+11. TEST SUITE (WAJIB LULUS, COVERAGE 100%)
+11.1 Unit Tests
+Test ID	Assertion
+test_sar_schema_valid	SAR valid lolos JSON Schema
+test_sar_schema_invalid	SAR dengan field hilang → schema invalid
+test_sar_canonicalization	Canonical JSON deterministik (10.000 iterasi)
+test_sar_signature_ed25519	Signature Ed25519 valid
+test_sar_signature_tampered	Signature diubah → invalid
+test_handshake_nonce_unique	Nonce unik (10.000 generate)
+test_handshake_expiry	Handshake expired setelah 5 menit
+test_proof_expiry	Proof expired setelah 30 hari
+test_revocation_feed_pagination	Paginasi cursor benar
+11.2 Integration Tests
+Test ID	Assertion
+test_verify_valid_sar	POST /v1/verify/receipt → VERIFIED
+test_verify_invalid_signature	→ INVALID, reason SIGNATURE_INVALID
+test_verify_indeterminate_registry_down	Registry down → INDETERMINATE
+test_handshake_full_flow	Initiate → respond VERIFIED → GET → VERIFIED
+test_handshake_expired	Initiate → tidak respond 5 menit → EXPIRED
+test_public_proof_access	GET /proof/:id → 200
+test_public_proof_revoked	Revoke → GET /proof/:id → 404
+test_revocation_subscribe	Subscribe → webhook dikirim dengan signature valid
+11.3 Concurrency Tests
+Test ID	Assertion
+test_100_parallel_verify	100 verifikasi paralel → semua selesai < 2 detik
+test_100_parallel_handshake	100 handshake paralel → 0 duplicate nonce
+test_1000_parallel_proof_access	1000 GET /proof paralel → 0 error
+11.4 Security Tests
+Test ID	Assertion
+test_sar_no_pii	SAR tidak memuat email, nama, identifier plaintext
+test_proof_url_random	Proof URL tidak dapat ditebak (128-bit entropy)
+test_handshake_nonce_random	Nonce tidak dapat ditebak (256-bit entropy)
+test_revocation_signature_verify	Event revocation dengan signature invalid → ditolak
+test_webhook_signature_verify	Webhook dengan signature invalid → ditolak
+11.5 Conformance Tests
+Test ID	Assertion
+test_conformance_runner_all_pass	10/10 vektor lulus
+test_conformance_runner_invalid_detected	Vektor invalid terdeteksi
+11.6 Coverage Configuration
+File: package.json
+
+json
+{
+  "scripts": {
+    "test:coverage": "c8 --check-coverage --lines 100 --functions 100 --branches 100 --statements 100 --include 'server/src/services/protocol_service.js' --include 'server/src/services/handshake_service.js' --include 'server/src/services/verify_service.js' --include 'server/src/controllers/protocol_controller.js' node --test server/test/"
+  }
+}
+CI: .github/workflows/ci.yml menjalankan npm run test:coverage. Gagal jika < 100%.
+
+12. DEFINITION OF DONE (PER TIER)
+Tier A (Wajib)
+□ Format SAR v1.0 JSON Schema dipublikasikan di /schemas/sar-v1.0.json.
+□ POST /v1/verify/receipt berfungsi (VERIFIED/INVALID/INDETERMINATE).
+□ POST /v1/verify/batch berfungsi (max 100).
+□ POST /v1/handshake/initiate + POST /v1/handshake/{id}/respond berfungsi.
+□ GET /v1/revocations berfungsi (paginasi cursor).
+□ POST /v1/revocations/subscribe berfungsi (webhook HMAC).
+□ GET /protocol menampilkan spesifikasi.
+□ GET /v1/protocol/versions menampilkan versi.
+□ Halaman /proof/:proof_id berfungsi.
+□ Tombol "Share Proof" di UI transaksi.
+□ Coverage 100% untuk protocol_service.js, handshake_service.js, verify_service.js.
+□ Semua test di §11 lulus.
+□ Conformance runner lulus 10/10.
+□ Tidak ada PII di payload protokol (grep otomatis).
+□ Fail-closed: registry down → INDETERMINATE.
+Tier B (Bonus)
+□ GET /v1/protocol/conformance/vectors berfungsi.
+□ Conformance test runner (scripts/conformance-runner.js).
+□ AP2 adapter (sarToAp2Mandate()).
+□ Partner Simulator (halaman statis untuk demo lintas platform).
+□ QR code untuk proof URL.
+13. RENCANA KERJA (TIER A: 40 JAM)
+WP	Isi	Jam
+WP1	Skema data (§4) + migrasi idempoten	4
+WP2	SAR validator + canonicalization + signature verification	6
+WP3	Public Verification API (§5.1)	6
+WP4	Trust Handshake API (§5.2)	6
+WP5	Revocation Feed API (§5.3)	4
+WP6	Protocol Specification API (§5.4)	3
+WP7	UI: /proof, /protocol, /settings/protocol, /proofs, /handshakes	6
+WP8	Test suite (§11)	8
+WP9	Conformance vectors + runner	4
+WP10	Partner Simulator (demo)	3
+Total		50
+Tier B (+20 jam): AP2 adapter, QR code, conformance test lengkap, dokumentasi protokol EN.
+
+14. RISIKO DAN MITIGASI
+Risiko	Mitigasi
+Registry down saat verifikasi	Fail-closed: kembalikan INDETERMINATE, bukan VERIFIED
+Proof URL ditebak	128-bit random ID; rate limit 60/menit/IP
+Handshake nonce ditebak	256-bit random nonce; expiry 5 menit
+Revocation feed tidak tersedia	Mode offline dengan snapshot; jika tidak ada snapshot → INDETERMINATE
+PII bocor di SAR	Test otomatis: grep email/nama/identifier di payload; hanya HMAC
+Protokol berubah	protocol_version di setiap SAR; backward compatible 12 bulan
+Partner Simulator dianggap "palsu"	Label jelas "SIMULATED" di UI; dokumentasi transparan
+15. PRINSIP NON-NEGOTIABLE
+Protokol adalah publik. Siapa pun dapat mengimplementasikan.
+
+Fail-closed. Jika verifikasi tidak dapat diselesaikan → INDETERMINATE.
+
+Tidak ada PII. Hanya hash, ID, enum, timestamp, signature.
+
+Backward compatible. Versi lama tetap berfungsi minimal 12 bulan.
+
+Coverage 100%. CI gagal jika < 100% untuk modul protokol.
+
+Conformance test. Implementasi pihak ketiga dapat memverifikasi dengan vektor uji.
+
+Tested. 100+ test case, termasuk concurrency dan security.
+
+Zero ambiguity. Setiap field, endpoint, test eksplisit.
+
+16. LAMPIRAN: CONTOH ALUR LENGKAP
+16.1 Alur Vendor Menerima Pembayaran
+text
+1. Agen (Perusahaan A) mengusulkan pembayaran ke Vendor B.
+2. JOBENPAY (Perusahaan A) mengevaluasi → AUTO_APPROVE.
+3. JOBENPAY mengeksekusi ke PayPal Sandbox → EXECUTED.
+4. JOBENPAY menerbitkan SAR (v1.0).
+5. JOBENPAY membuat public proof: GET /proof/abc123 → link.
+6. JOBENPAY mengirim link ke Vendor B (via email/API).
+7. Vendor B membuka link → halaman verifikasi → VERIFIED.
+8. Vendor B memproses pesanan.
+9. Vendor B dapat mengunduh SAR + bukti verifikasi untuk audit.
+16.2 Alur Trust Handshake (Pra-Transaksi)
+text
+1. Agen (Perusahaan A) ingin mengirim pembayaran ke Vendor B.
+2. Vendor B memanggil POST /v1/handshake/initiate dengan request_intent.
+3. JOBENPAY merespons dengan handshake_nonce + expires_at.
+4. Vendor B mengirim handshake_nonce ke JOBENPAY (via UI/API).
+5. JOBENPAY (Perusahaan A) memverifikasi intent → menghasilkan SAR.
+6. JOBENPAY memanggil POST /v1/handshake/{id}/respond dengan verdict VERIFIED + SAR.
+7. Vendor B menerima respons → status VERIFIED.
+8. Vendor B memproses pesanan.
+9. Transaksi aktual terjadi (payout).
+16.3 Alur Demo Lintas Platform (untuk Video)
+text
+1. Agen A (JOBENPAY) mengirim pembayaran ke Vendor C.
+2. Vendor C memverifikasi via Open Trust Exchange → VERIFIED.
+3. Agen B (Partner Simulator, sistem lain) mengirim pembayaran ke Vendor C.
+4. Vendor C memverifikasi via protokol yang sama → VERIFIED.
+5. Vendor C melihat: kedua agen terverifikasi, meskipun dari platform berbeda.
+6. Juri melihat: "Ini bukan hanya JOBENPAY — ini adalah standar."
+Dokumen ini siap dieksekusi. AI builder membaca §3 (format SAR), §4 (skema data), §5 (API), §11 (test), dan mengimplementasikan tanpa menebak. Tidak ada field, state, atau aturan yang "disiratkan" — semua eksplisit.

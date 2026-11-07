@@ -85,15 +85,14 @@ export function PartialPage({ partialId = null }) {
     queryKey: ['partials-list'],
     queryFn: async () => {
       try {
-        return await apiClient.get('/transactions?category=PARTIAL&limit=50');
+        const res = await apiClient.get('/transactions?category=PARTIAL&limit=50');
+        return res || { transactions: [] };
       } catch {
         try {
-          return await apiClient.get('/partials');
-        } catch (err2) {
-          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
-            return { transactions: [], partials: [] };
-          }
-          throw err2;
+          const res = await apiClient.get('/partials');
+          return res || { transactions: [] };
+        } catch {
+          return { transactions: [], partials: [] };
         }
       }
     },

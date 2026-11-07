@@ -1,0 +1,442 @@
+Berdasarkan tangkapan layar, menu **Organization** dan **Members** masih menampilkan halaman "Coming soon". Untuk melengkapi ini sesuai standar sistem enterprise (seperti PayPal Business atau Stripe), kita perlu membuat **ADENDUM-01 untuk PRD 1.4** (karena PRD 1.4 adalah fondasi dari Trust & Identity Infrastructure).
+
+Berikut adalah **PRD Adendum — Organization & Member Management (UI & API Completion)** dengan spesifikasi presisi tinggi, siap eksekusi, dan bebas halusinasi.
+
+---
+
+# ADENDUM-01 (PRD 1.4) — Organization & Member Management
+## UI & API Completion for Identity & Tenant Layer
+
+**Versi:** 1.0 · **Status:** Implementation-ready, Zero-Hallucination
+**Tanggal:** 7 November 2026
+**Basis:** PRD 1.2 (Tenant Model), PRD 1.4 (Identity), PRD 8.0 (Enterprise SSO/SCIM)
+**Target:** Mengganti halaman "Coming soon" pada menu `/organization` dan `/members` dengan modul CRUD lengkap, aman, dan backend-configurable.
+
+---
+
+## 0. ATURAN EMAS (NON-NEGOTIABLE)
+
+1. **Backend-Configurable & Real-Time.** Semua data profil organisasi dan daftar anggota diambil dari database. Tidak ada *hardcode*.
+2. **RBAC Enforcement (Strict).** Hanya `OWNER` dan `ADMIN` yang dapat mengakses halaman ini. `VIEWER`, `OPERATOR`, `APPROVER` tidak boleh melihat menu ini di sidebar.
+3. **Step-Up Authentication.** Perubahan sensitif (mengubah email billing, menghapus anggota, mengubah role menjadi ADMIN) **wajib** meminta password/TOTP ulang (SCA).
+4. **Immutable Audit Log.** Setiap perubahan profil org atau perubahan role anggota **wajib** menulis entri ke `compliance_audit_events` (PRD 3.0).
+5. **Coverage 100%** untuk `organization_service.js` dan `member_service.js`.
+6. **Zero Ambiguity.** Setiap *field*, *endpoint*, dan *test* eksplisit.
+
+---
+
+## 1. SKEMA DATA (Eksplisit)
+
+**File:** `server/migrations/045_org_members.sql`
+
+```sql
+BEGIN;
+
+-- 1.1 Extend Organizations Table (Jika belum lengkap)
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS legal_name TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS display_name TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS logo_url TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS website_url TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS support_email TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS billing_email TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS tax_id_enc TEXT; -- Terenkripsi
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS address JSONB DEFAULT '{}'; -- {street, city, state, postal_code, country}
+
+-- 1.2 Extend Memberships Table
+ALTER TABLE memberships ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SUSPENDED', 'INVITED'));
+ALTER TABLE memberships ADD COLUMN IF NOT EXISTS invited_by UUID REFERENCES users(user_id);
+ALTER TABLE memberships ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+ALTER TABLE memberships ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT now();
+
+-- 1.3 Invitations Table (Untuk undangan yang belum diterima)
+CREATE TABLE IF NOT EXISTS invitations (
+  invitation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES organizations(org_id),
+  email TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER')),
+  token_hash TEXT NOT NULL UNIQUE,
+  invited_by UUID NOT NULL REFERENCES users(user_id),
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED')),
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(org_id, email)
+);
+
+CREATE INDEX idx_invitations_org ON invitations(org_id);
+CREATE INDEX idx_invitations_token ON invitations(token_hash);
+
+COMMIT;
+```
+
+---
+
+## 2. API CONTRACTS
+
+### 2.1 Organization Endpoints
+
+| Method | Path | Auth | Fungsi |
+|---|---|---|---|
+| GET | `/api/v1/org/profile` | Session (OWNER/ADMIN) | Ambil profil organisasi |
+| PATCH | `/api/v1/org/profile` | Session + SCA (jika ubah billing email) | Update profil |
+| POST | `/api/v1/org/logo` | Session + SCA | Upload logo (multipart) |
+
+**PATCH `/api/v1/org/profile` (Request):**
+```json
+{
+  "display_name": "Acme Corp",
+  "legal_name": "Acme Corporation LLC",
+  "website_url": "https://acme.com",
+  "support_email": "support@acme.com",
+  "billing_email": "billing@acme.com",
+  "tax_id": "12.345.678.9-012.000",
+  "address": {
+    "street": "Jl. Sudirman No. 1",
+    "city": "Jakarta",
+    "state": "DKI Jakarta",
+    "postal_code": "10220",
+    "country": "ID"
+  },
+  "step_up_grant_id": "uuid" 
+}
+```
+
+### 2.2 Member Endpoints
+
+| Method | Path | Auth | Fungsi |
+|---|---|---|---|
+| GET | `/api/v1/members` | Session (OWNER/ADMIN) | Daftar anggota aktif |
+| POST | `/api/v1/members/invite` | Session + SCA | Undang anggota baru |
+| PATCH | `/api/v1/members/:id/role` | Session + SCA | Ubah role anggota |
+| DELETE | `/api/v1/members/:id` | Session + SCA | Hapus anggota |
+| GET | `/api/v1/members/invitations` | Session (OWNER/ADMIN) | Daftar undangan pending |
+| DELETE | `/api/v1/members/invitations/:id` | Session | Revoke undangan |
+
+**POST `/api/v1/members/invite` (Request):**
+```json
+{
+  "email": "newuser@acme.com",
+  "role": "OPERATOR",
+  "step_up_grant_id": "uuid"
+}
+```
+
+**GET `/api/v1/members` (Response):**
+```json
+{
+  "members": [
+    {
+      "user_id": "uuid",
+      "email": "owner@acme.com",
+      "display_name": "John Doe",
+      "role": "OWNER",
+      "status": "ACTIVE",
+      "last_login_at": "2026-11-07T10:00:00Z",
+      "joined_at": "2026-10-01T09:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+## 3. SERVICE LAYER
+
+### 3.1 Organization Service
+
+```javascript
+// server/src/services/organization_service.js
+// @ts-check
+import { pool } from '../db/pool.js';
+import { AppError } from '../lib/errors.js';
+import { encrypt } from '../lib/crypto.js';
+import { appendLedgerEntry } from './ledger.js';
+import { validateStepUp } from './sca_service.js';
+
+export async function getOrgProfile(orgId) {
+  const result = await pool.query(
+    `SELECT org_id, display_name, legal_name, logo_url, website_url, 
+            support_email, billing_email, address, created_at, updated_at
+     FROM organizations WHERE org_id = $1`,
+    [orgId]
+  );
+  if (result.rows.length === 0) throw new AppError('ORG_NOT_FOUND', 404);
+  return result.rows[0];
+}
+
+export async function updateOrgProfile(orgId, userId, body) {
+  // Cek step-up jika mengubah billing_email
+  if (body.billing_email) {
+    await validateStepUp(userId, 'UPDATE_BILLING_EMAIL', body.step_up_grant_id);
+  }
+
+  const taxIdEnc = body.tax_id ? encrypt(body.tax_id, `organizations:tax_id_enc:${orgId}`) : null;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const result = await client.query(
+      `UPDATE organizations 
+       SET display_name = COALESCE($1, display_name),
+           legal_name = COALESCE($2, legal_name),
+           website_url = COALESCE($3, website_url),
+           support_email = COALESCE($4, support_email),
+           billing_email = COALESCE($5, billing_email),
+           tax_id_enc = COALESCE($6, tax_id_enc),
+           address = COALESCE($7, address),
+           updated_at = now()
+       WHERE org_id = $8 RETURNING *`,
+      [body.display_name, body.legal_name, body.website_url, body.support_email, 
+       body.billing_email, taxIdEnc, JSON.stringify(body.address), orgId]
+    );
+
+    // Audit Log
+    await appendLedgerEntry(client, {
+      orgId, type: 'ORG_PROFILE_UPDATED', subjectType: 'ORG', subjectId: orgId,
+      payload: { actor: userId, fields_changed: Object.keys(body) }
+    });
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+```
+
+### 3.2 Member Service
+
+```javascript
+// server/src/services/member_service.js
+// @ts-check
+import { pool } from '../db/pool.js';
+import crypto from 'node:crypto';
+import { AppError } from '../lib/errors.js';
+import { appendLedgerEntry } from './ledger.js';
+import { sendInviteEmail } from './email_service.js';
+
+export async function listMembers(orgId) {
+  const result = await pool.query(
+    `SELECT u.user_id, u.email, u.display_name, m.role, m.status, 
+            m.last_login_at, m.joined_at
+     FROM memberships m JOIN users u ON u.user_id = m.user_id
+     WHERE m.org_id = $1 ORDER BY m.joined_at ASC`,
+    [orgId]
+  );
+  return result.rows;
+}
+
+export async function inviteMember(orgId, inviterId, email, role) {
+  if (role === 'OWNER') throw new AppError('CANNOT_INVITE_OWNER', 403);
+  
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 hari
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Cek apakah email sudah menjadi member
+    const existing = await client.query(
+      `SELECT 1 FROM memberships m JOIN users u ON u.user_id = m.user_id 
+       WHERE m.org_id = $1 AND u.email = $2`, [orgId, email]
+    );
+    if (existing.rows.length > 0) throw new AppError('ALREADY_MEMBER', 409);
+
+    // Insert invitation
+    const inv = await client.query(
+      `INSERT INTO invitations (org_id, email, role, token_hash, invited_by, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING invitation_id`,
+      [orgId, email, role, tokenHash, inviterId, expiresAt]
+    );
+
+    // Audit Log
+    await appendLedgerEntry(client, {
+      orgId, type: 'MEMBER_INVITED', subjectType: 'INVITATION', subjectId: inv.rows[0].invitation_id,
+      payload: { actor: inviterId, email, role }
+    });
+
+    await client.query('COMMIT');
+    
+    // Kirim email (async)
+    const inviteUrl = `${process.env.PUBLIC_BASE_URL}/accept-invite?token=${token}`;
+    await sendInviteEmail(email, inviteUrl);
+    
+    return { invitation_id: inv.rows[0].invitation_id, status: 'PENDING' };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateMemberRole(orgId, targetUserId, newRole, actorId) {
+  if (newRole === 'OWNER') throw new AppError('CANNOT_PROMOTE_TO_OWNER', 403);
+  
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const current = await client.query(
+      `SELECT role FROM memberships WHERE org_id = $1 AND user_id = $2 FOR UPDATE`,
+      [orgId, targetUserId]
+    );
+    if (current.rows.length === 0) throw new AppError('MEMBER_NOT_FOUND', 404);
+    if (current.rows[0].role === 'OWNER') throw new AppError('CANNOT_CHANGE_OWNER_ROLE', 403);
+
+    await client.query(
+      `UPDATE memberships SET role = $1 WHERE org_id = $2 AND user_id = $3`,
+      [newRole, orgId, targetUserId]
+    );
+
+    await appendLedgerEntry(client, {
+      orgId, type: 'MEMBER_ROLE_UPDATED', subjectType: 'USER', subjectId: targetUserId,
+      payload: { actor: actorId, old_role: current.rows[0].role, new_role: newRole }
+    });
+
+    await client.query('COMMIT');
+    return { user_id: targetUserId, role: newRole };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+```
+
+---
+
+## 4. UI SPECIFICATIONS (Replace "Coming soon")
+
+### 4.1 Organization Page (`/organization`)
+Menggunakan layout form dua kolom standar PRD 1.2 §12.4.
+
+**Section 1: Profil Organisasi**
+- **Logo**: Drag & drop area (max 2MB, PNG/SVG). Preview.
+- **Display Name**: Input text (required).
+- **Legal Name**: Input text.
+- **Website URL**: Input URL.
+- **Support Email**: Input email.
+- **Billing Email**: Input email + ikon gembok (memerlukan step-up).
+
+**Section 2: Alamat & Pajak**
+- **Tax ID**: Input text (masked).
+- **Address**: Text area atau field terpisah (Street, City, State, Postal Code, Country dropdown).
+- **Country**: Dropdown (diambil dari API `/api/v1/org/profile`).
+
+**Action Button**: "Save Changes" (outline primary).
+
+### 4.2 Members Page (`/members`)
+Menggunakan layout tabel pola Activity (PRD 1.2 §12.4).
+
+**Header Actions:**
+- Tombol **"Invite Member"** (primary black).
+- Search bar.
+- Filter by Role (Owner, Admin, Approver, Operator, Viewer).
+
+**Table Columns:**
+1. **Name** (dengan avatar inisial + email di bawah).
+2. **Role** (Status pill dropdown: OWNER, ADMIN, APPROVER, OPERATOR, VIEWER).
+3. **Status** (ACTIVE, SUSPENDED, INVITED).
+4. **Last Login** (Relative time: "2 hours ago", "Never").
+5. **Joined At** (Date).
+6. **Actions** (Kebab menu: "Change Role", "Remove Member" — warna merah).
+
+**Pending Invitations Section (di bawah tabel):**
+- Tabel terpisah atau tab: "Pending Invitations".
+- Kolom: Email, Role, Invited By, Expires At, Actions (Resend, Revoke).
+
+---
+
+## 5. TEST SUITE (100% COVERAGE)
+
+### 5.1 Organization Tests
+| Test ID | Assertion |
+|---|---|
+| `test_get_org_profile` | GET `/api/v1/org/profile` return data valid |
+| `test_update_org_profile` | PATCH update display_name, address |
+| `test_update_billing_email_requires_sca` | PATCH billing_email tanpa grant → 403 |
+| `test_update_billing_email_with_sca` | PATCH dengan grant → 200 |
+| `test_org_profile_audit_log` | Setiap update menulis `ORG_PROFILE_UPDATED` |
+| `test_org_profile_rbac` | Viewer akses GET → 403 |
+
+### 5.2 Member Tests
+| Test ID | Assertion |
+|---|---|
+| `test_list_members` | GET `/api/v1/members` return list |
+| `test_invite_member_success` | POST invite → 201, email sent |
+| `test_invite_existing_member` | POST invite email yg sudah ada → 409 |
+| `test_invite_owner_role_fails` | Invite dengan role OWNER → 403 |
+| `test_change_member_role` | PATCH role → 200 |
+| `test_cannot_change_owner_role` | PATCH role OWNER → 403 |
+| `test_remove_member` | DELETE member → 204 |
+| `test_cannot_remove_owner` | DELETE owner → 403 |
+
+---
+
+## 6. PROMPT UNTUK AI BUILDER (ZERO-HALLUCINATION)
+
+### 6.1 Preamble (`replit.md`)
+```markdown
+# ATURAN ADENDUM-01 (Organization & Members)
+
+Kamu mengganti halaman "Coming soon" dengan modul CRUD lengkap.
+- Baca HANYA dokumen ADENDUM-01 ini.
+- RBAC: Hanya OWNER & ADMIN yang bisa akses.
+- Step-up (SCA) wajib untuk ubah billing email & hapus member.
+- Audit log wajib (appendLedgerEntry).
+- Frontend: Gunakan design system PRD 1.2 §12.4 (Tabel pola Activity, Form label mengambang).
+- Coverage 100% untuk organization_service.js dan member_service.js.
+```
+
+### 6.2 Prompt Pembuka
+```markdown
+# PROMPT PEMBUKA — ADENDUM-01
+
+Baca file `docs/ADENDUM-01_Org_Members.md` bagian:
+- §1 (Skema Data)
+- §2 (API Contracts)
+- §3 (Service Layer)
+- §4 (UI Specifications)
+
+## Tugas: Implementasi Organization & Members
+
+### WP1 — Migrasi Database
+File: `server/migrations/045_org_members.sql`
+
+### WP2 — Service Layer
+File: `server/src/services/organization_service.js`
+File: `server/src/services/member_service.js`
+
+### WP3 — API Routes
+File: `server/src/routes/organization.js`
+File: `server/src/routes/members.js`
+
+### WP4 — Frontend Pages
+File: `web/src/pages/organization/Profile.jsx` (Ganti "Coming soon")
+File: `web/src/pages/members/List.jsx` (Ganti "Coming soon")
+
+### WP5 — Test Suite
+File: `server/test/unit/org_members.test.js` (15 test case sesuai §5)
+
+## DEFINITION OF DONE
+- [ ] Halaman `/organization` dan `/members` berfungsi penuh (bukan "Coming soon").
+- [ ] Form profile dapat save dan data tersimpan di DB.
+- [ ] Invite member mengirim email + muncul di tabel pending.
+- [ ] Change role dan remove member berfungsi.
+- [ ] SCA (Step-up) berfungsi untuk billing email & remove member.
+- [ ] Audit log tercatat setiap perubahan.
+- [ ] Semua test di §5 lulus.
+- [ ] Coverage 100% untuk 2 service baru.
+```
+
+---
+
+**Dokumen ini selesai.** Dengan Adendum ini, AI Builder dapat langsung mengganti status "Coming soon" pada halaman `Organization` dan `Members` menjadi modul yang fully functional, aman, dan sesuai standar enterprise.

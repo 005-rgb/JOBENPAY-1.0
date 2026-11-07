@@ -84,15 +84,14 @@ export function RefundPage({ refundId = null }) {
     queryKey: ['refunds-list'],
     queryFn: async () => {
       try {
-        return await apiClient.get('/transactions?category=REFUND&limit=50');
+        const res = await apiClient.get('/transactions?category=REFUND&limit=50');
+        return res || { transactions: [] };
       } catch {
         try {
-          return await apiClient.get('/refunds');
-        } catch (err2) {
-          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
-            return { transactions: [], refunds: [] };
-          }
-          throw err2;
+          const res = await apiClient.get('/refunds');
+          return res || { transactions: [] };
+        } catch {
+          return { transactions: [], refunds: [] };
         }
       }
     },

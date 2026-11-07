@@ -3,6 +3,7 @@ const TEMPLATES = Object.freeze({
   AGENT_DISABLED: 'The payment agent is disabled.',
   MANDATE_INACTIVE: 'No active mandate applies to this agent.',
   MANDATE_EXPIRED: 'The mandate is outside its validity period.',
+  VLEI_INACTIVE: 'The organization legal identity (vLEI) is inactive or expired.',
   ACTION_NOT_ALLOWED: 'This action is not allowed by the mandate.',
   CURRENCY_NOT_ALLOWED: 'The request currency does not match the mandate.',
   VALIDATION_FAILED: 'The payment amount is invalid.',
@@ -30,7 +31,7 @@ const TEMPLATES = Object.freeze({
 });
 
 const PRIORITY = [
-  'ORG_FROZEN', 'AGENT_DISABLED', 'MANDATE_INACTIVE', 'MANDATE_EXPIRED', 'ACTION_NOT_ALLOWED',
+  'ORG_FROZEN', 'AGENT_DISABLED', 'MANDATE_INACTIVE', 'MANDATE_EXPIRED', 'VLEI_INACTIVE', 'ACTION_NOT_ALLOWED',
   'CURRENCY_NOT_ALLOWED', 'VALIDATION_FAILED', 'CAP_EXCEEDED', 'NOT_FOUND', 'PAYEE_BLOCKED',
   'PAYEE_NOT_ALLOWED', 'TARGET_INVALID', 'OUTSIDE_TIME_WINDOW', 'VELOCITY_EXCEEDED',
   'DUPLICATE_SUSPECTED', 'INVOICE_REQUIRED', 'INVOICE_MISMATCH_AMOUNT', 'BUDGET_EXCEEDED',
@@ -58,6 +59,7 @@ export const TEMPLATES_ID = Object.freeze({
   AGENT_DISABLED: 'Agen pembayaran dinonaktifkan.',
   MANDATE_INACTIVE: 'Tidak ada mandat aktif untuk agen ini.',
   MANDATE_EXPIRED: 'Mandat berada di luar masa berlaku.',
+  VLEI_INACTIVE: 'Identitas hukum organisasi (vLEI) tidak aktif atau telah kedaluwarsa.',
   ACTION_NOT_ALLOWED: 'Aksi ini tidak diizinkan oleh mandat.',
   CURRENCY_NOT_ALLOWED: 'Mata uang permintaan tidak sesuai dengan mandat.',
   VALIDATION_FAILED: 'Jumlah pembayaran tidak valid.',

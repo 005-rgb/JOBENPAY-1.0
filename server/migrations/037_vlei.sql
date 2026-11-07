@@ -3,7 +3,7 @@
 -- Idempotent schema migration for organizational legal identity and SAR extension
 
 CREATE TABLE IF NOT EXISTS org_legal_identity (
-  identity_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  identity_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
   org_id UUID NOT NULL REFERENCES organizations(id),
   lei CHAR(20) NOT NULL,
   legal_name TEXT NOT NULL,
@@ -23,7 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_org_legal_identity_status ON org_legal_identity(s
 CREATE INDEX IF NOT EXISTS idx_org_legal_identity_org ON org_legal_identity(org_id);
 
 CREATE TABLE IF NOT EXISTS signed_receipts (
-  receipt_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  receipt_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
   org_id UUID NOT NULL REFERENCES organizations(id),
   intent_id UUID REFERENCES transaction_intents(intent_id),
   sar_payload JSONB NOT NULL,

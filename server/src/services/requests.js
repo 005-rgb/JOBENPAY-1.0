@@ -281,9 +281,32 @@ async function loadContext(tx, input) {
       String(input.amountMinor), input.currency, row.invoice_number ?? null, row.policy?.schedule?.timezone || 'UTC'],
   );
   const h = history.rows[0] || {};
+
+  const vleiRes = await tx.query(
+    `SELECT identity_id, lei, legal_name, jurisdiction, vlei_issuer, verified_at, expires_at, status
+     FROM org_legal_identity WHERE org_id = $1 LIMIT 1`,
+    [input.orgId],
+  );
+  let vlei = null;
+  if (vleiRes.rowCount > 0) {
+    const vr = vleiRes.rows[0];
+    const isExpired = new Date(vr.expires_at).getTime() <= Date.now();
+    vlei = {
+      identity_id: vr.identity_id,
+      lei: vr.lei,
+      legal_name: vr.legal_name,
+      jurisdiction: vr.jurisdiction,
+      vlei_issuer: vr.vlei_issuer,
+      verified_at: new Date(vr.verified_at).toISOString(),
+      expires_at: new Date(vr.expires_at).toISOString(),
+      status: isExpired ? 'EXPIRED' : vr.status,
+    };
+  }
+
   return {
     org: row,
     agent: { id: row.agent_id, status: row.agent_status },
+    vlei,
     mandate: row.mandate_id ? { id: row.mandate_id, status: row.mandate_status } : null,
     version: row.mandate_id ? row : null,
     policy: row.policy,

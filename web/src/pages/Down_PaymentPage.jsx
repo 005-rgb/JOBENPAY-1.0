@@ -75,16 +75,14 @@ export function Down_PaymentPage({ downPaymentId = null }) {
     queryKey: ['down-payments-list'],
     queryFn: async () => {
       try {
-        return await apiClient.get('/down-payments');
+        const res = await apiClient.get('/down-payments');
+        return res || { downPayments: [] };
       } catch {
         try {
           const res = await apiClient.get('/transactions?category=DOWN_PAYMENT&limit=50');
           return { downPayments: res?.transactions || [] };
-        } catch (err2) {
-          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
-            return { downPayments: [] };
-          }
-          throw err2;
+        } catch {
+          return { downPayments: [] };
         }
       }
     },

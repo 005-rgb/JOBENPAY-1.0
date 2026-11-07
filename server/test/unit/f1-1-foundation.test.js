@@ -331,7 +331,7 @@ test('F1-1: checkMigrationStatus detects checksum mismatch and missing tables', 
           const rows = [];
           for (const file of files) {
             const content = await fs.readFile(path.join(migrationDir, file), 'utf8');
-            const checksum = crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+            const checksum = crypto.createHash('sha256').update(content.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
             rows.push({ filename: file, checksum });
           }
           return { rowCount: rows.length, rows };

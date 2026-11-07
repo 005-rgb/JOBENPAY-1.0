@@ -17,6 +17,22 @@ export function ruleA3MandateActive({ mandate, version, now = new Date() }) {
   return pass();
 }
 
+export function ruleA3bVlei(ctx = {}) {
+  const { org, vlei, policy } = ctx;
+  const requiresVlei = policy?.requireVlei || org?.require_vlei;
+  if (requiresVlei) {
+    if (!vlei || vlei.status !== 'ACTIVE') {
+      return fail('VLEI_INACTIVE', 'Active organization legal identity (vLEI) is required.');
+    }
+  }
+  if (vlei && vlei.identity_id) {
+    if (vlei.status !== 'ACTIVE') {
+      return fail('VLEI_INACTIVE', 'Organization legal identity (vLEI) is inactive or expired.');
+    }
+  }
+  return pass();
+}
+
 export function ruleA4ActionAllowed({ action, policy }) {
   if (action !== 'PAYOUT') return fail('ACTION_NOT_ALLOWED', 'Only PAYOUT is enabled in Tier A.');
   if (!policy) return pass('Mandate policy is unavailable because A3 already failed.');
@@ -111,6 +127,7 @@ export const RULES_A = Object.freeze([
   ['A1', ruleA1OrgFrozen],
   ['A2', ruleA2AgentActive],
   ['A3', ruleA3MandateActive],
+  ['A3b', ruleA3bVlei],
   ['A4', ruleA4ActionAllowed],
   ['A5', ruleA5CurrencyAllowed],
   ['A6', ruleA6Cap],

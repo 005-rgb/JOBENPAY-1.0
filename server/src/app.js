@@ -608,7 +608,7 @@ export function createApp() {
   const api = express.Router();
 
   api.use('/agent/v1', agentAuth);
-  api.use('/trust', createTrustRouter({ requireSession, requireRole }));
+  api.use('/trust', createTrustRouter({ requireSession, requireRole, requireCsrf }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,

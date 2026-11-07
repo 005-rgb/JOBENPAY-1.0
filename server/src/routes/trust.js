@@ -7,13 +7,14 @@
 import { Router } from 'express';
 import { postVleiLink, getVleiStatusHandler } from '../controllers/vlei_controller.js';
 
-export function createTrustRouter({ requireSession, requireRole } = {}) {
+export function createTrustRouter({ requireSession, requireRole, requireCsrf } = {}) {
   const router = Router();
 
-  const authMiddleware = requireSession || ((req, res, next) => next());
+  const authMiddleware = requireSession || function requireSession(req, res, next) { next(); };
+  const csrfMiddleware = requireCsrf || function requireCsrf(req, res, next) { next(); };
   const roleMiddleware = requireRole ? requireRole('OWNER', 'ADMIN') : ((req, res, next) => next());
 
-  router.post('/vlei/link', authMiddleware, roleMiddleware, postVleiLink);
+  router.post('/vlei/link', authMiddleware, csrfMiddleware, roleMiddleware, postVleiLink);
   router.get('/vlei/status', authMiddleware, getVleiStatusHandler);
 
   return router;
@@ -21,3 +22,4 @@ export function createTrustRouter({ requireSession, requireRole } = {}) {
 
 export const trustRouter = createTrustRouter();
 export default trustRouter;
+

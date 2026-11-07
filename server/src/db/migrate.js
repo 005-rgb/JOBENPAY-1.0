@@ -65,10 +65,15 @@ export async function runMigrations(connectionString = env.DATABASE_URL) {
       if (appliedMap.has(file)) {
         const storedChecksum = appliedMap.get(file);
         if (storedChecksum && storedChecksum !== checksum) {
-          throw new Error(
-            `MIGRATION_CHECKSUM_MISMATCH: Migration file '${file}' has been altered after execution. ` +
-            `Expected checksum ${storedChecksum}, got ${checksum}. Modifying applied migrations is strictly forbidden!`
-          );
+          const rawChecksum = crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
+          if (storedChecksum === rawChecksum) {
+            await client.query('UPDATE schema_migrations SET checksum = $1 WHERE filename = $2', [checksum, file]);
+          } else {
+            throw new Error(
+              `MIGRATION_CHECKSUM_MISMATCH: Migration file '${file}' has been altered after execution. ` +
+              `Expected checksum ${storedChecksum}, got ${checksum}. Modifying applied migrations is strictly forbidden!`
+            );
+          }
         } else if (!storedChecksum) {
           // Backfill checksum untuk migrasi lama
           await client.query('UPDATE schema_migrations SET checksum = $1 WHERE filename = $2', [checksum, file]);
@@ -126,7 +131,10 @@ export async function checkMigrationStatus(client) {
         const checksum = computeChecksum(sql);
         const stored = appliedMap.get(file);
         if (stored && stored !== checksum) {
-          return { upToDate: false, pendingCount, error: `Checksum mismatch on ${file}` };
+          const rawChecksum = crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
+          if (stored !== rawChecksum) {
+            return { upToDate: false, pendingCount, error: `Checksum mismatch on ${file}` };
+          }
         }
       }
     }

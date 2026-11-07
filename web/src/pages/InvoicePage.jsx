@@ -77,16 +77,14 @@ export function InvoicePage({ invoiceId = null }) {
     queryKey: ['invoices-list'],
     queryFn: async () => {
       try {
-        return await apiClient.get('/invoices');
+        const res = await apiClient.get('/invoices');
+        return res || { invoices: [] };
       } catch {
         try {
           const res = await apiClient.get('/transactions?category=INVOICE&limit=50');
           return { invoices: res?.transactions || [] };
-        } catch (err2) {
-          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
-            return { invoices: [] };
-          }
-          throw err2;
+        } catch {
+          return { invoices: [] };
         }
       }
     },

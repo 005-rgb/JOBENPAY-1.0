@@ -85,15 +85,14 @@ export function PayoutPage({ payoutId = null }) {
     queryKey: ['payouts-list'],
     queryFn: async () => {
       try {
-        return await apiClient.get('/transactions?category=PAYOUT&limit=50');
+        const res = await apiClient.get('/transactions?category=PAYOUT&limit=50');
+        return res || { transactions: [] };
       } catch {
         try {
-          return await apiClient.get('/payouts');
-        } catch (err2) {
-          if (err2.status === 404 || err2.status === 401 || err2.status === 500) {
-            return { transactions: [], payouts: [] };
-          }
-          throw err2;
+          const res = await apiClient.get('/payouts');
+          return res || { transactions: [] };
+        } catch {
+          return { transactions: [], payouts: [] };
         }
       }
     },

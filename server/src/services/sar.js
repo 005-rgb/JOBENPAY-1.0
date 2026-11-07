@@ -6,6 +6,7 @@
 
 import crypto from 'node:crypto';
 import { canonicalJson } from '../../../shared/canonical.js';
+import { getVleiStatus } from './vlei_service.js';
 
 export const SAR_VERSION = '1.1';
 
@@ -20,6 +21,7 @@ export function generateSar({
   executions = [],
   mandateVersion = null,
   actor = null,
+  vlei = null,
 }) {
   const intentId = intent.intent_id ?? intent.id;
   const category = intent.category ?? 'PAYOUT';
@@ -75,11 +77,22 @@ export function generateSar({
     actor: actor ? { kind: actor.kind, id: actor.id } : null,
   };
 
+  if (vlei && vlei.status === 'ACTIVE') {
+    sarPayload.legal_entity_lei = vlei.lei;
+    sarPayload.vlei_verified = true;
+  }
+
   const sarHash = computeSarHash(sarPayload);
   return {
     ...sarPayload,
     sar_hash: sarHash,
   };
+}
+
+export async function buildSarWithVlei(params) {
+  const orgId = params.orgId || params.intent?.org_id;
+  const vlei = orgId ? await getVleiStatus(orgId) : null;
+  return generateSar({ ...params, vlei });
 }
 
 export function verifySar(sar) {
