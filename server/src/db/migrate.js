@@ -22,7 +22,7 @@ const migrationDir = path.resolve(process.cwd(), 'server/migrations');
 export const MIGRATION_LOCK_KEY = 20261030;
 
 function computeChecksum(content) {
-  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+  return crypto.createHash('sha256').update(content.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
 }
 
 export async function runMigrations(connectionString = env.DATABASE_URL) {

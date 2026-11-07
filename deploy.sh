@@ -451,11 +451,12 @@ else
     log WARN "Konfigurasi runtime mendeteksi kendala: $runtime_err"
   fi
   log INFO "Menjalankan migrasi skema database..."
-  if (cd "$APP_DIR" && "$NODE_BIN" --env-file-if-exists=.env server/scripts/migrate.js >"$BACKUP_DIR/migration.log" 2>&1); then
+  if (cd "$APP_DIR" && UV_THREADPOOL_SIZE=1 NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=256 --v8-pool-size=1" "$NODE_BIN" server/scripts/migrate.js >"$BACKUP_DIR/migration.log" 2>&1); then
     log INFO "Migrasi skema database berhasil diterapkan."
   else
     migration_err="$(cat "$BACKUP_DIR/migration.log" 2>/dev/null || true)"
-    fail "Migrasi skema database gagal: $migration_err. Periksa DATABASE_URL di .env."
+    [ -z "$migration_err" ] || log ERROR "Log kegagalan migrasi skema: $migration_err"
+    fail "Migrasi skema database gagal. Periksa DATABASE_URL di .env."
   fi
 
   touch "$APP_DIR/tmp/restart.txt"

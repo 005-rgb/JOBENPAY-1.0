@@ -392,6 +392,7 @@ export function DashboardPage() {
     },
   ];
   const quickLinks = [
+    ['transactions', '/transactions'],
     ['agents', '/agents'],
     ['mandates', '/mandates'],
     ['proposePayout', '/simulator', 'proposePayoutShort'],
@@ -489,6 +490,8 @@ export function DashboardPage() {
 
 function QuickIcon({ name }) {
   const icons = {
+    transactions: CircleDollarSign,
+    newTransaction: Plus,
     agents: Users,
     mandates: FileCheck,
     proposePayout: CircleDollarSign,

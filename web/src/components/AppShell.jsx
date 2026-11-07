@@ -45,6 +45,7 @@ const navigation = [
     title: 'activity',
     icon: Activity,
     children: [
+      { title: 'transactions', path: '/transactions' },
       { title: 'requests', path: '/requests' },
       { title: 'approvals', path: '/approvals' },
       { title: 'ledger', path: '/ledger' },
@@ -57,8 +58,17 @@ const navigation = [
     icon: Wallet,
     children: [
       { title: 'payees', path: '/payees' },
+      { title: 'invoices', path: '/invoices' },
+      { title: 'downPayments', path: '/down-payments' },
+      { title: 'recurring', path: '/recurring' },
+      { title: 'splits', path: '/splits' },
+      { title: 'bulk', path: '/bulk' },
+      { title: 'transfer', path: '/transfer' },
+      { title: 'scheduled', path: '/scheduled' },
+      { title: 'financing', path: '/financing' },
+      { title: 'debit', path: '/debit' },
       { title: 'documents', path: '/documents' },
-      { title: 'disputes', path: '/disputes', comingSoon: true },
+      { title: 'disputes', path: '/disputes' },
     ],
   },
   {
@@ -85,6 +95,7 @@ const navigation = [
 ];
 
 const creationActions = [
+  ['newTransaction', '/transactions/new'],
   ['newAgent', '/agents/new'],
   ['newMandate', '/mandates/new'],
   ['newPayee', '/payees/new'],
@@ -95,6 +106,17 @@ const creationActions = [
 
 const routeTitles = [
   ['/dashboard', 'pageTitle'],
+  ['/transactions/new', 'newTransaction'],
+  ['/transactions', 'transactions'],
+  ['/invoices', 'invoices'],
+  ['/down-payments', 'downPayments'],
+  ['/recurring', 'recurring'],
+  ['/splits', 'splits'],
+  ['/bulk', 'bulk'],
+  ['/transfer', 'transfer'],
+  ['/scheduled', 'scheduled'],
+  ['/financing', 'financing'],
+  ['/debit', 'debit'],
   ['/agents', 'agents'],
   ['/mandates', 'mandates'],
   ['/payees', 'payees'],
