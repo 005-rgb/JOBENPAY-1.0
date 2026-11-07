@@ -12,6 +12,8 @@ import { useTranslation } from 'react-i18next';
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage.jsx'));
 const TransactionDetailPage = lazy(() => import('./pages/TransactionDetailPage.jsx'));
 const NewTransactionPage = lazy(() => import('./pages/NewTransactionPage.jsx'));
+const PayoutPage = lazy(() => import('./pages/PayoutPage.jsx'));
+const SalePage = lazy(() => import('./pages/SalePage.jsx'));
 const InvoicePage = lazy(() => import('./pages/InvoicePage.jsx'));
 const Down_PaymentPage = lazy(() => import('./pages/Down_PaymentPage.jsx'));
 const RecurringPage = lazy(() => import('./pages/RecurringPage.jsx'));
@@ -22,6 +24,9 @@ const ScheduledPage = lazy(() => import('./pages/ScheduledPage.jsx'));
 const FinancingPage = lazy(() => import('./pages/FinancingPage.jsx'));
 const DebitPage = lazy(() => import('./pages/DebitPage.jsx'));
 const DisputePage = lazy(() => import('./pages/DisputePage.jsx'));
+const RefundPage = lazy(() => import('./pages/RefundPage.jsx'));
+const VoidPage = lazy(() => import('./pages/VoidPage.jsx'));
+const PartialPage = lazy(() => import('./pages/PartialPage.jsx'));
 const ApprovalDetailPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.ApprovalDetailPage })));
 const ApprovalsPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.ApprovalsPage })));
 const AgentDetailPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.AgentDetailPage })));
@@ -81,6 +86,10 @@ function AuthenticatedApp() {
           <Route element={<TransactionsPage />} path="/transactions" />
           <Route element={<NewTransactionPage />} path="/transactions/new" />
           <Route element={<TransactionDetailPage />} path="/transactions/:id" />
+          <Route element={<PayoutPage />} path="/payouts" />
+          <Route element={<PayoutPage />} path="/payouts/:id" />
+          <Route element={<SalePage />} path="/sales" />
+          <Route element={<SalePage />} path="/sales/:id" />
           <Route element={<InvoicePage />} path="/invoices" />
           <Route element={<InvoicePage />} path="/invoices/:id" />
           <Route element={<Down_PaymentPage />} path="/down-payments" />
@@ -89,10 +98,17 @@ function AuthenticatedApp() {
           <Route element={<SplitPage />} path="/splits" />
           <Route element={<BulkPage />} path="/bulk" />
           <Route element={<TransferPage />} path="/transfer" />
+          <Route element={<TransferPage />} path="/transfers" />
           <Route element={<ScheduledPage />} path="/scheduled" />
           <Route element={<FinancingPage />} path="/financing" />
           <Route element={<DebitPage />} path="/debit" />
           <Route element={<DisputePage />} path="/disputes" />
+          <Route element={<RefundPage />} path="/refunds" />
+          <Route element={<RefundPage />} path="/refunds/:id" />
+          <Route element={<VoidPage />} path="/voids" />
+          <Route element={<VoidPage />} path="/voids/:id" />
+          <Route element={<PartialPage />} path="/partials" />
+          <Route element={<PartialPage />} path="/partials/:id" />
 
           <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'OPERATOR', 'JUDGE']}><AgentsPage /></RequireRole>} path="/agents" />
           <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'OPERATOR', 'JUDGE']}><AgentsPage initialCreate /></RequireRole>} path="/agents/new" />

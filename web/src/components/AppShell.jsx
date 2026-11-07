@@ -57,7 +57,8 @@ const navigation = [
     title: 'payGetPaid',
     icon: Wallet,
     children: [
-      { title: 'payees', path: '/payees' },
+      { title: 'payouts', path: '/payouts' },
+      { title: 'sales', path: '/sales' },
       { title: 'invoices', path: '/invoices' },
       { title: 'downPayments', path: '/down-payments' },
       { title: 'recurring', path: '/recurring' },
@@ -67,8 +68,12 @@ const navigation = [
       { title: 'scheduled', path: '/scheduled' },
       { title: 'financing', path: '/financing' },
       { title: 'debit', path: '/debit' },
-      { title: 'documents', path: '/documents' },
+      { title: 'refunds', path: '/refunds' },
+      { title: 'voids', path: '/voids' },
+      { title: 'partials', path: '/partials' },
       { title: 'disputes', path: '/disputes' },
+      { title: 'payees', path: '/payees' },
+      { title: 'documents', path: '/documents' },
     ],
   },
   {
