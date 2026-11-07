@@ -71,5 +71,12 @@ export const ERROR_CODES = {
   INTENT_AMOUNT_EXCEEDED: { httpStatus: 422, message: 'Transaction amount exceeds intent mandate cap.' },
   INTENT_VENDOR_MISMATCH: { httpStatus: 422, message: 'Transaction vendor does not match intent mandate categories.' },
   INTENT_INVALID: { httpStatus: 400, message: 'Intent payload is invalid.' },
+  CONTRACT_NOT_FOUND: { httpStatus: 404, message: 'PACT contract not found.' },
+  ESCROW_NOT_FOUND: { httpStatus: 404, message: 'Escrow account not found.' },
+  VERIFIER_INACTIVE: { httpStatus: 400, message: 'Verifier is inactive or not found.' },
+  VERIFIER_NOT_FOUND: { httpStatus: 404, message: 'Verifier not found.' },
+  CHALLENGE_WINDOW_EXPIRED: { httpStatus: 400, message: 'Challenge window has expired.' },
+  INVALID_VERDICT: { httpStatus: 400, message: 'Invalid verification verdict.' },
+  ESCROW_UNBALANCED: { httpStatus: 422, message: 'Escrow balance violation.' },
   INTERNAL: { httpStatus: 500, message: 'Internal server error.' },
 };

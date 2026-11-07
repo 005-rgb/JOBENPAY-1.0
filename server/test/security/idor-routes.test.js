@@ -64,6 +64,7 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['POST /intents', 'Creates bounded intent mandate for current authenticated organization'],
   ['POST /intents/:intent_id/revoke', 'Revokes intent mandate for current authenticated organization'],
   ['GET /intents/:intent_id', 'Retrieves intent mandate for current authenticated organization'],
+  ['POST /pact/contracts', 'Creates a new PACT contract within current session tenant'],
   ['GET /agent/v1/ping', 'Agent API authentication probe returning pong for active key'],
   ['POST /agent/v1/requests', 'Submits payment request bound to authenticated agent'],
   ['POST /agent/v1/payout-requests', 'Alias for /agent/v1/requests bound to authenticated agent'],
@@ -466,6 +467,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
             else if (targetPath.startsWith('/agents/')) targetPath = targetPath.replace(':id', orgB.agent.id);
             else if (targetPath.startsWith('/payees/')) targetPath = targetPath.replace(':id', orgB.payee.id);
             else if (targetPath.startsWith('/agent/v1/requests/')) targetPath = targetPath.replace(':id', orgB.requestPending.id);
+            else if (targetPath.startsWith('/pact/contracts/')) targetPath = targetPath.replace(':id', crypto.randomUUID());
           }
 
           // Choose appropriate auth and payload
@@ -717,6 +719,12 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'PATCH /payees/:id',
         'POST /payees/:id/trust',
         'GET /agent/v1/requests/:id',
+        'GET /pact/contracts/:id',
+        'POST /pact/contracts/:id/fund',
+        'POST /pact/contracts/:id/deliver',
+        'POST /pact/contracts/:id/verify',
+        'POST /pact/contracts/:id/settle',
+        'POST /pact/contracts/:id/dispute',
 
         // List / tenant singletons tested in 1.3 & 1.4
         'GET /requests',
