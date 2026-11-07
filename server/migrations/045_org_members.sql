@@ -22,7 +22,7 @@ ALTER TABLE memberships ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT n
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_memberships_status'
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_memberships_status' AND conrelid = 'memberships'::regclass
   ) THEN
     ALTER TABLE memberships ADD CONSTRAINT chk_memberships_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'INVITED'));
   END IF;
@@ -39,17 +39,17 @@ ALTER TABLE invitations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'P
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_invitations_status'
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_invitations_status' AND conrelid = 'invitations'::regclass
   ) THEN
     ALTER TABLE invitations ADD CONSTRAINT chk_invitations_status CHECK (status IN ('PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED'));
   END IF;
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_invitations_role'
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_invitations_role' AND conrelid = 'invitations'::regclass
   ) THEN
     ALTER TABLE invitations ADD CONSTRAINT chk_invitations_role CHECK (role IN ('ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER'));
   END IF;
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'uq_invitations_org_email'
+    SELECT 1 FROM pg_constraint WHERE conname = 'uq_invitations_org_email' AND conrelid = 'invitations'::regclass
   ) THEN
     ALTER TABLE invitations ADD CONSTRAINT uq_invitations_org_email UNIQUE(org_id, email);
   END IF;

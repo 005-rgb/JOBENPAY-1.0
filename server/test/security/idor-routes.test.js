@@ -72,6 +72,22 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['POST /agent/v1/refund-requests', 'Submits refund request (Tier B stub)'],
   ['POST /agent/v1/dispute-accept-requests', 'Submits dispute accept request (Tier B stub)'],
   ['POST /mcp', 'Stateless Model Context Protocol endpoint authenticated via agent key'],
+  ['PATCH /org/profile', 'Updates organization profile within active session tenant'],
+  ['POST /org/logo', 'Uploads organization logo within active session tenant'],
+  ['POST /members/invite', 'Invites a new member into active session tenant'],
+  ['POST /proofs', 'Creates a new signed receipt proof within active session tenant'],
+  ['POST /v1/verify/receipt', 'Public SAR verification endpoint without tenant authentication'],
+  ['GET /v1/verify/receipt/:sar_id', 'Public SAR receipt retrieval by ID without tenant authentication'],
+  ['POST /v1/verify/batch', 'Public batch SAR verification endpoint'],
+  ['POST /v1/handshake/initiate', 'Public cross-tenant handshake initiation endpoint'],
+  ['POST /v1/handshake/:handshake_id/respond', 'Public cross-tenant handshake response endpoint'],
+  ['GET /v1/handshake/:handshake_id', 'Public cross-tenant handshake status endpoint'],
+  ['GET /v1/revocations', 'Public cursor-paginated revocation feed endpoint'],
+  ['POST /v1/revocations/subscribe', 'Public revocation webhook subscription endpoint'],
+  ['GET /v1/protocol/versions', 'Public supported protocol versions endpoint'],
+  ['GET /v1/protocol/conformance/vectors', 'Public conformance test vectors endpoint'],
+  ['GET /protocol', 'Public HTML specification page'],
+  ['GET /proof/:proof_id', 'Public proof view endpoint serving HTML or JSON'],
   ['GET /{*path}', 'Catch-all static file and single-page application router fallback'],
 ]);
 
@@ -439,7 +455,10 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
       const snapshotBefore = await snapshotOrg(pool, orgB.orgId);
       const allRoutes = collectRoutes(app.router.stack);
       const parameterizedRoutes = allRoutes.filter((r) => (
-        /:[a-zA-Z0-9_]+/.test(r.path) && r.path !== '/webhooks/paypal/:webhookToken'
+        /:[a-zA-Z0-9_]+/.test(r.path) &&
+        r.path !== '/webhooks/paypal/:webhookToken' &&
+        !r.path.startsWith('/v1/') &&
+        !r.path.startsWith('/proof/')
       ));
 
       assert.ok(parameterizedRoutes.length >= 20, `Expected >= 20 parameterized routes, found ${parameterizedRoutes.length}`);
@@ -458,6 +477,9 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
           if (targetPath.includes(':intent_id')) {
             targetPath = targetPath.replace(':intent_id', crypto.randomUUID());
           }
+          if (targetPath.includes(':proof_id')) {
+            targetPath = targetPath.replace(':proof_id', crypto.randomUUID());
+          }
           if (targetPath.includes(':id')) {
             if (targetPath.startsWith('/requests/')) targetPath = targetPath.replace(':id', orgB.requestPending.id);
             else if (targetPath.startsWith('/approvals/')) targetPath = targetPath.replace(':id', orgB.approval.id);
@@ -468,6 +490,8 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
             else if (targetPath.startsWith('/payees/')) targetPath = targetPath.replace(':id', orgB.payee.id);
             else if (targetPath.startsWith('/agent/v1/requests/')) targetPath = targetPath.replace(':id', orgB.requestPending.id);
             else if (targetPath.startsWith('/pact/contracts/')) targetPath = targetPath.replace(':id', crypto.randomUUID());
+            else if (targetPath.startsWith('/members/invitations/')) targetPath = targetPath.replace(':id', crypto.randomUUID());
+            else if (targetPath.startsWith('/members/')) targetPath = targetPath.replace(':id', orgB.user.id);
           }
 
           // Choose appropriate auth and payload
@@ -490,6 +514,8 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
               reqBody = JSON.stringify({ displayName: 'Hacked Payee' });
             } else if (targetPath.startsWith('/agents/')) {
               reqBody = JSON.stringify({ name: 'Hacked Agent' });
+            } else if (targetPath.includes('/members/') && targetPath.endsWith('/role')) {
+              reqBody = JSON.stringify({ role: 'OPERATOR' });
             } else {
               reqBody = JSON.stringify({ name: 'Cross-tenant payload' });
             }
@@ -725,6 +751,10 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'POST /pact/contracts/:id/verify',
         'POST /pact/contracts/:id/settle',
         'POST /pact/contracts/:id/dispute',
+        'PATCH /members/:id/role',
+        'DELETE /members/:id',
+        'DELETE /members/invitations/:id',
+        'DELETE /proofs/:proof_id',
 
         // List / tenant singletons tested in 1.3 & 1.4
         'GET /requests',
@@ -744,6 +774,10 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'GET /paypal/connection',
         'GET /developer/info',
         'GET /org',
+        'GET /org/profile',
+        'GET /members',
+        'GET /members/invitations',
+        'GET /proofs',
         'GET /agent/v1/budget',
       ]);
 

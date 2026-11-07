@@ -37,6 +37,12 @@ import { createIntentsRouter } from './routes/intents.js';
 import { createPactRouter } from './routes/pact.js';
 import { createOrganizationRouter } from './routes/organization.js';
 import { createMembersRouter } from './routes/members.js';
+import {
+  createPublicProtocolRouter,
+  createTenantProofsRouter,
+  getProtocolHtml,
+  getProofHandler,
+} from './routes/protocol.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
 import { decrypt, encrypt, hashPassword, hmacSha256, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
@@ -620,8 +626,9 @@ export function createApp() {
   api.use('/trust', createTrustRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createIntentsRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createPactRouter({ requireSession, requireRole, requireCsrf }));
-  api.use('/org', createOrganizationRouter({ requireSession, requireRole, requireCsrf }));
-  api.use('/members', createMembersRouter({ requireSession, requireRole, requireCsrf }));
+  api.use(createOrganizationRouter({ requireSession, requireRole, requireCsrf }));
+  api.use(createMembersRouter({ requireSession, requireRole, requireCsrf }));
+  api.use(createTenantProofsRouter({ requireSession, requireRole, requireCsrf }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,
@@ -2225,6 +2232,11 @@ export function createApp() {
     errorHandler(err, _req, res, next);
   });
 
+  app.use('/schemas', express.static(path.resolve(process.cwd(), 'public/schemas')));
+  app.use('/vectors', express.static(path.resolve(process.cwd(), 'public/vectors')));
+  app.use(createPublicProtocolRouter());
+  app.get('/protocol', getProtocolHtml);
+  app.get('/proof/:proof_id', getProofHandler);
   app.use('/api/v1', api);
   if (existsSync(WEB_INDEX_FILE)) {
     app.use(express.static(WEB_BUILD_DIRECTORY, {

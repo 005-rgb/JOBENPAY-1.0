@@ -68,6 +68,25 @@ export function TransactionDetailPage() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'legs' | 'sar' | 'reconciliation'
+  const [proofUrl, setProofUrl] = useState(null);
+  const [sharing, setSharing] = useState(false);
+
+  const handleShareProof = async () => {
+    try {
+      setSharing(true);
+      const payload = {
+        sar_id: sar?.sar_id || `sar_${id.replace(/-/g, '').slice(0, 26)}`,
+        sar_json: sar || intent,
+        expires_in_days: 30,
+      };
+      const res = await apiClient.post('/proofs', payload);
+      setProofUrl(res.proof_url);
+    } catch (err) {
+      alert(`Failed to share proof: ${err.message}`);
+    } finally {
+      setSharing(false);
+    }
+  };
   const [showStepUp, setShowStepUp] = useState(false);
   const [pendingChoice, setPendingChoice] = useState('');
   const [decisionComment, setDecisionComment] = useState('');
@@ -456,12 +475,37 @@ export function TransactionDetailPage() {
       {/* Tab 3: SAR Audit Record */}
       {activeTab === 'sar' && (
         <div className={styles.formCard} style={{ maxWidth: '100%' }} data-testid="sar-audit-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
-            <FileCheck size={18} />
-            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Structured Audit Record (SAR v1.1)</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileCheck size={18} />
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Structured Audit Record (SAR v1.0)</h2>
+            </div>
+            <button
+              className={styles.primaryButton}
+              onClick={handleShareProof}
+              disabled={sharing}
+              style={{ fontSize: '13px', padding: '6px 12px' }}
+            >
+              {sharing ? 'Creating Proof...' : 'Share Proof (Open Trust Exchange)'}
+            </button>
           </div>
 
-          <div className={styles.calculationCard} style={{ margin: 0 }}>
+          {proofUrl && (
+            <div style={{ margin: '12px 0', padding: '12px', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid #38bdf8', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '13px', color: '#f8fafc' }}>
+                Public Proof Link: <a href={proofUrl} target="_blank" rel="noreferrer" style={{ color: '#38bdf8', textDecoration: 'underline' }}>{proofUrl}</a>
+              </div>
+              <button
+                className={styles.secondaryButton}
+                onClick={() => { navigator.clipboard.writeText(proofUrl); alert('Proof URL copied!'); }}
+                style={{ fontSize: '12px', padding: '4px 8px' }}
+              >
+                <Copy size={14} /> Copy
+              </button>
+            </div>
+          )}
+
+          <div className={styles.calculationCard} style={{ margin: 0, marginTop: '12px' }}>
             <pre className={styles.mono} style={{ margin: 0, fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
               {JSON.stringify(sar || intent, null, 2)}
             </pre>

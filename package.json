@@ -32,6 +32,7 @@
     "test:coverage": "npm run test:coverage:vlei && npm run test:coverage:intent && npm run test:coverage:pact",
     "test:unit": "node --env-file-if-exists=.env --import=./server/test/setup.js --test \"server/test/unit/**/*.test.js\"",
     "test:contract": "node --test \"tests/contract/**/*.test.js\"",
+    "test:conformance": "node scripts/conformance-runner.js",
     "validate:static": "node scripts/validate/static.js",
     "validate:schema": "node scripts/validate/schema.js",
     "validate:ledger": "node scripts/validate/ledger-crosscheck.js",

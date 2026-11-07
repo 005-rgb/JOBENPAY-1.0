@@ -34,7 +34,7 @@ export function createMembersRouter({ requireSession, requireRole, requireCsrf }
   const roleMiddleware = requireRole ? requireRole('OWNER', 'ADMIN') : ((req, res, next) => next());
 
   // GET /api/v1/members
-  router.get('/', authMiddleware, roleMiddleware, async (req, res, next) => {
+  router.get('/members', authMiddleware, roleMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const members = await listMembers(orgId);
@@ -45,7 +45,7 @@ export function createMembersRouter({ requireSession, requireRole, requireCsrf }
   });
 
   // GET /api/v1/members/invitations
-  router.get('/invitations', authMiddleware, roleMiddleware, async (req, res, next) => {
+  router.get('/members/invitations', authMiddleware, roleMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const invitations = await listInvitations(orgId);
@@ -56,7 +56,7 @@ export function createMembersRouter({ requireSession, requireRole, requireCsrf }
   });
 
   // POST /api/v1/members/invite
-  router.post('/invite', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
+  router.post('/members/invite', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const userId = resolveUserId(req);
@@ -70,7 +70,7 @@ export function createMembersRouter({ requireSession, requireRole, requireCsrf }
   });
 
   // PATCH /api/v1/members/:id/role
-  router.patch('/:id/role', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
+  router.patch('/members/:id/role', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const userId = resolveUserId(req);
@@ -84,7 +84,7 @@ export function createMembersRouter({ requireSession, requireRole, requireCsrf }
   });
 
   // DELETE /api/v1/members/:id
-  router.delete('/:id', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
+  router.delete('/members/:id', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const userId = resolveUserId(req);
@@ -97,7 +97,7 @@ export function createMembersRouter({ requireSession, requireRole, requireCsrf }
   });
 
   // DELETE /api/v1/members/invitations/:id
-  router.delete('/invitations/:id', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
+  router.delete('/members/invitations/:id', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const userId = resolveUserId(req);

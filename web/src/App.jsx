@@ -55,6 +55,9 @@ const RequestDetailPage = lazy(() => import('./pages/F04Pages.jsx').then((pages)
 const RequestsPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.RequestsPage })));
 const SecurityPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.SecurityPage })));
 const SimulatorPage = lazy(() => import('./pages/F05Pages.jsx').then((pages) => ({ default: pages.SimulatorPage })));
+const ProofsPage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.ProofsPage })));
+const HandshakesPage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.HandshakesPage })));
+const ProtocolConformancePage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.ProtocolConformancePage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -132,6 +135,9 @@ function AuthenticatedApp() {
           <Route element={<PayeeDetailPage />} path="/payees/:id" />
           <Route element={<PaypalSettingsPage />} path="/settings/paypal" />
           <Route element={<SecurityPage />} path="/settings/security" />
+          <Route element={<ProofsPage />} path="/proofs" />
+          <Route element={<HandshakesPage />} path="/handshakes" />
+          <Route element={<ProtocolConformancePage />} path="/protocol/conformance" />
           <Route element={<ComingSoonPage />} path="*" />
         </Routes>
       </Suspense>
@@ -191,6 +197,7 @@ function AppRoutes() {
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><VerifyEmailPage /></Suspense>} path="/verify-email" />
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><TermsPage /></Suspense>} path="/terms" />
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><PrivacyPage /></Suspense>} path="/privacy" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><ProtocolConformancePage /></Suspense>} path="/protocol/conformance" />
       <Route
         element={(
           <RequireAuth>

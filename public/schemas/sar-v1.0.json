@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobenpay.io/schemas/sar-v1.0.json",
+  "title": "Signed Authorization Receipt v1.0",
+  "type": "object",
+  "required": [
+    "sar_version", "sar_id", "issuer", "mandate", "request",
+    "decision", "ledger", "signature"
+  ],
+  "properties": {
+    "sar_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "sar_id": {
+      "type": "string",
+      "pattern": "^sar_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "issuer": {
+      "type": "object",
+      "required": ["org_id", "issuer_key_id", "display_name"],
+      "properties": {
+        "org_id": { "type": "string", "pattern": "^org_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "issuer_key_id": { "type": "string", "pattern": "^kid_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "display_name": { "type": "string", "maxLength": 200 },
+        "legal_entity_lei": { "type": "string", "pattern": "^[A-Z0-9]{20}$" }
+      }
+    },
+    "mandate": {
+      "type": "object",
+      "required": ["mandate_id", "mandate_version", "policy_hash", "valid_from", "valid_to"],
+      "properties": {
+        "mandate_id": { "type": "string" },
+        "mandate_version": { "type": "integer", "minimum": 1 },
+        "policy_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "valid_from": { "type": "string", "format": "date-time" },
+        "valid_to": { "type": "string", "format": "date-time" }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": ["request_id", "request_hash", "category", "sub_type",
+                   "amount_minor", "currency", "payee_id_hmac"],
+      "properties": {
+        "request_id": { "type": "string" },
+        "request_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "category": {
+          "type": "string",
+          "enum": ["SALE","DOWN_PAYMENT","INVOICE","PAYOUT","REFUND","VOID",
+                   "DISPUTE","PARTIAL","SCHEDULED","RECURRING","BULK","SPLIT",
+                   "TRANSFER","FINANCING","DEBIT"]
+        },
+        "sub_type": { "type": "string" },
+        "amount_minor": { "type": "string", "pattern": "^[0-9]+$" },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "payee_id_hmac": { "type": "string", "pattern": "^hmac:[a-f0-9]{64}$" },
+        "document_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["result", "reason_codes", "policy_version", "decided_at"],
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": ["APPROVED","REJECTED","AUTO_APPROVE","REQUIRE_APPROVAL"]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 50
+        },
+        "policy_version": { "type": "string" },
+        "decided_at": { "type": "string", "format": "date-time" },
+        "approver_hmac": { "type": "string", "pattern": "^hmac:[a-f0-9]{64}$" }
+      }
+    },
+    "ledger": {
+      "type": "object",
+      "required": ["org_id", "seq", "entry_hash", "prev_hash"],
+      "properties": {
+        "org_id": { "type": "string" },
+        "seq": { "type": "integer", "minimum": 1 },
+        "entry_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "prev_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["alg", "kid", "sig"],
+      "properties": {
+        "alg": { "type": "string", "const": "Ed25519" },
+        "kid": { "type": "string" },
+        "sig": { "type": "string", "pattern": "^base64:[A-Za-z0-9+/=]+$" }
+      }
+    },
+    "composition_proof": {
+      "type": "object",
+      "description": "Opsional, untuk mandat komposit (PRD 1.4)",
+      "properties": {
+        "lineage": { "type": "array" },
+        "lineage_root_hash": { "type": "string" },
+        "threshold_signatures": { "type": "array" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

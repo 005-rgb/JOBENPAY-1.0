@@ -27,7 +27,7 @@ export function createOrganizationRouter({ requireSession, requireRole, requireC
   const roleMiddleware = requireRole ? requireRole('OWNER', 'ADMIN') : ((req, res, next) => next());
 
   // GET /api/v1/org/profile
-  router.get('/profile', authMiddleware, roleMiddleware, async (req, res, next) => {
+  router.get('/org/profile', authMiddleware, roleMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const profile = await getOrgProfile(orgId);
@@ -38,7 +38,7 @@ export function createOrganizationRouter({ requireSession, requireRole, requireC
   });
 
   // PATCH /api/v1/org/profile
-  router.patch('/profile', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
+  router.patch('/org/profile', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const userId = resolveUserId(req);
@@ -52,7 +52,7 @@ export function createOrganizationRouter({ requireSession, requireRole, requireC
   });
 
   // POST /api/v1/org/logo
-  router.post('/logo', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
+  router.post('/org/logo', authMiddleware, csrfMiddleware, roleMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const userId = resolveUserId(req);
