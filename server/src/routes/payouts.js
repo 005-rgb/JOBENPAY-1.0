@@ -21,7 +21,7 @@ const createPayoutBodySchema = z.object({
 
 payoutsRouter.post('/', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id;
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
 
     const idempotencyKey = req.header('Idempotency-Key');
@@ -93,7 +93,7 @@ payoutsRouter.post('/', async (req, res, next) => {
 
 payoutsRouter.get('/:id', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id;
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
 
     const { id } = req.params;

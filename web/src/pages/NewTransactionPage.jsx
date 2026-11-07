@@ -145,7 +145,7 @@ export function NewTransactionPage() {
   // Fetch registered payees
   const { data: payeesData } = useQuery({
     queryKey: ['payees'],
-    queryFn: async () => apiClient.get('/api/v1/payees'),
+    queryFn: async () => apiClient.get('/payees'),
   });
 
   const payees = payeesData?.payees || [];
@@ -159,7 +159,7 @@ export function NewTransactionPage() {
 
   const createMutation = useMutation({
     mutationFn: async (payload) => {
-      return apiClient.post('/api/v1/transactions', payload, {
+      return apiClient.post('/transactions', payload, {
         headers: {
           'Idempotency-Key': idempotencyKey,
         },

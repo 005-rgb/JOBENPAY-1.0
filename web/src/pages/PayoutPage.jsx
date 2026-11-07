@@ -68,7 +68,7 @@ export function PayoutPage({ payoutId = null }) {
     queryKey: ['payout', effectiveId],
     queryFn: async () => {
       if (!effectiveId) return null;
-      return apiClient.get(`/api/v1/payouts/${effectiveId}`);
+      return apiClient.get(`/payouts/${effectiveId}`);
     },
     enabled: Boolean(effectiveId),
   });
@@ -84,7 +84,7 @@ export function PayoutPage({ payoutId = null }) {
   } = useQuery({
     queryKey: ['payouts-list'],
     queryFn: async () => {
-      return apiClient.get('/api/v1/transactions?category=PAYOUT&limit=50');
+      return apiClient.get('/transactions?category=PAYOUT&limit=50');
     },
     enabled: !effectiveId,
   });

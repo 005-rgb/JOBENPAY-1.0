@@ -48,7 +48,7 @@ export function TransferPage({ transferId = null }) {
     queryKey: ['transfer', transferId],
     queryFn: async () => {
       if (!transferId) return null;
-      return apiClient.get(`/api/v1/transfer/${transferId}`);
+      return apiClient.get(`/transfer/${transferId}`);
     },
     enabled: Boolean(transferId),
   });

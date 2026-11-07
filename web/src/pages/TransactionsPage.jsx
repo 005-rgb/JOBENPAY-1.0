@@ -112,7 +112,7 @@ export function TransactionsPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['transactions', queryParams.toString()],
     queryFn: async () => {
-      return apiClient.get(`/api/v1/transactions?${queryParams.toString()}`);
+      return apiClient.get(`/transactions?${queryParams.toString()}`);
     },
   });
 

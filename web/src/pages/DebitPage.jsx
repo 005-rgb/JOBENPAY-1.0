@@ -51,7 +51,7 @@ export function DebitPage({ debitId = null }) {
     queryKey: ['debit', debitId],
     queryFn: async () => {
       if (!debitId) return null;
-      return apiClient.get(`/api/v1/debit/${debitId}`);
+      return apiClient.get(`/debit/${debitId}`);
     },
     enabled: Boolean(debitId),
   });

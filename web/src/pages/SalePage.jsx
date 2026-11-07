@@ -68,7 +68,7 @@ export function SalePage({ saleId = null }) {
     queryKey: ['sale', effectiveId],
     queryFn: async () => {
       if (!effectiveId) return null;
-      return apiClient.get(`/api/v1/sales/${effectiveId}`);
+      return apiClient.get(`/sales/${effectiveId}`);
     },
     enabled: Boolean(effectiveId),
   });
@@ -84,7 +84,7 @@ export function SalePage({ saleId = null }) {
   } = useQuery({
     queryKey: ['sales-list'],
     queryFn: async () => {
-      return apiClient.get('/api/v1/transactions?category=SALE&limit=50');
+      return apiClient.get('/transactions?category=SALE&limit=50');
     },
     enabled: !effectiveId,
   });

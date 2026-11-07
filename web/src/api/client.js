@@ -23,9 +23,11 @@ async function request(path, { method = 'GET', body, headers = {}, stepUpGrant }
   }
   if (stepUpGrant) requestHeaders.set('x-step-up-grant', stepUpGrant);
 
+  const cleanPath = path.startsWith('/api/v1') ? path : `/api/v1${path.startsWith('/') ? path : `/${path}`}`;
+
   let response;
   try {
-    response = await fetch(`/api/v1${path}`, {
+    response = await fetch(cleanPath, {
       method: upperMethod,
       credentials: 'same-origin',
       headers: requestHeaders,
@@ -56,7 +58,8 @@ export const apiClient = {
   delete: (path, body, options = {}) => request(path, { ...options, method: 'DELETE', body }),
   upload: (path, file, onProgress) => new Promise((resolve, reject) => {
     const xhr = new globalThis.XMLHttpRequest();
-    xhr.open('POST', `/api/v1${path}`);
+    const cleanPath = path.startsWith('/api/v1') ? path : `/api/v1${path.startsWith('/') ? path : `/${path}`}`;
+    xhr.open('POST', cleanPath);
     xhr.withCredentials = true;
     if (csrfToken) xhr.setRequestHeader('x-csrf-token', csrfToken);
     xhr.upload.addEventListener('progress', (event) => {

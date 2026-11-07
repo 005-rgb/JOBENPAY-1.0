@@ -51,7 +51,7 @@ export function FinancingPage({ financingId = null }) {
     queryKey: ['financing', financingId],
     queryFn: async () => {
       if (!financingId) return null;
-      return apiClient.get(`/api/v1/financing/${financingId}`);
+      return apiClient.get(`/financing/${financingId}`);
     },
     enabled: Boolean(financingId),
   });

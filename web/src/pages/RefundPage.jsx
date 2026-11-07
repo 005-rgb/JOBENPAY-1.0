@@ -67,7 +67,7 @@ export function RefundPage({ refundId = null }) {
     queryKey: ['refund', effectiveId],
     queryFn: async () => {
       if (!effectiveId) return null;
-      return apiClient.get(`/api/v1/refunds/${effectiveId}`);
+      return apiClient.get(`/refunds/${effectiveId}`);
     },
     enabled: Boolean(effectiveId),
   });
@@ -83,7 +83,7 @@ export function RefundPage({ refundId = null }) {
   } = useQuery({
     queryKey: ['refunds-list'],
     queryFn: async () => {
-      return apiClient.get('/api/v1/transactions?category=REFUND&limit=50');
+      return apiClient.get('/transactions?category=REFUND&limit=50');
     },
     enabled: !effectiveId,
   });

@@ -47,7 +47,7 @@ export function SplitPage({ splitId = null }) {
     queryKey: ['split', splitId],
     queryFn: async () => {
       if (!splitId) return null;
-      return apiClient.get(`/api/v1/split/${splitId}`);
+      return apiClient.get(`/split/${splitId}`);
     },
     enabled: Boolean(splitId),
   });

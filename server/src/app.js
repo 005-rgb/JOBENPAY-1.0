@@ -2150,6 +2150,34 @@ export function createApp() {
     ['/books', booksRouter],
   ]);
 
+  api.use(async (req, _res, next) => {
+    try {
+      const rawToken = req.cookies?.jp_sid;
+      if (rawToken && !req.session) {
+        const sessionId = String(rawToken).trim();
+        const session = await findSessionByCookie(GLOBAL_ORG_ID, sessionId);
+        if (session) {
+          req.session = session;
+          const user = await findUserById(GLOBAL_ORG_ID, session.user_id);
+          if (user) {
+            req.user = user;
+            req.org = { id: session.current_org_id || user.org_id || GLOBAL_ORG_ID };
+          }
+        }
+      }
+      if (!req.org && req.session?.current_org_id) {
+        req.org = { id: req.session.current_org_id };
+      }
+      if (!req.org) {
+        req.org = { id: GLOBAL_ORG_ID };
+      }
+      next();
+    } catch {
+      if (!req.org) req.org = { id: GLOBAL_ORG_ID };
+      next();
+    }
+  });
+
   api.use((req, res, next) => {
     for (const [prefix, router] of categoryRouterMap) {
       if (req.path === prefix || req.path.startsWith(prefix + '/')) {

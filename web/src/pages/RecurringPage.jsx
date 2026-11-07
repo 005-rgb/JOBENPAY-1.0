@@ -50,7 +50,7 @@ export function RecurringPage({ recurringId = null }) {
     queryKey: ['recurring', recurringId],
     queryFn: async () => {
       if (!recurringId) return null;
-      return apiClient.get(`/api/v1/recurring/${recurringId}`);
+      return apiClient.get(`/recurring/${recurringId}`);
     },
     enabled: Boolean(recurringId),
   });

@@ -76,14 +76,14 @@ export function TransactionDetailPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['transaction', id],
     queryFn: async () => {
-      return apiClient.get(`/api/v1/transactions/${id}`);
+      return apiClient.get(`/transactions/${id}`);
     },
     enabled: Boolean(id),
   });
 
   const decideMutation = useMutation({
     mutationFn: async ({ choice, grantId }) => {
-      return apiClient.post(`/api/v1/transactions/${id}/decision`, {
+      return apiClient.post(`/transactions/${id}/decision`, {
         decision: choice,
         comment: decisionComment,
         stepUpGrantId: grantId,

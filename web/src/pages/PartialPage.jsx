@@ -68,7 +68,7 @@ export function PartialPage({ partialId = null }) {
     queryKey: ['partial', effectiveId],
     queryFn: async () => {
       if (!effectiveId) return null;
-      return apiClient.get(`/api/v1/partials/${effectiveId}`);
+      return apiClient.get(`/partials/${effectiveId}`);
     },
     enabled: Boolean(effectiveId),
   });
@@ -84,7 +84,7 @@ export function PartialPage({ partialId = null }) {
   } = useQuery({
     queryKey: ['partials-list'],
     queryFn: async () => {
-      return apiClient.get('/api/v1/transactions?category=PARTIAL&limit=50');
+      return apiClient.get('/transactions?category=PARTIAL&limit=50');
     },
     enabled: !effectiveId,
   });

@@ -73,20 +73,20 @@ export function Down_PaymentPage({ downPaymentId = null }) {
   // 1. Fetch list of down payments when on /down-payments
   const listQuery = useQuery({
     queryKey: ['down-payments-list'],
-    queryFn: async () => apiClient.get('/api/v1/down-payments'),
+    queryFn: async () => apiClient.get('/down-payments'),
     enabled: !effectiveId,
   });
 
   // 2. Fetch specific down payment when effectiveId is present
   const detailQuery = useQuery({
     queryKey: ['down-payment-detail', effectiveId],
-    queryFn: async () => apiClient.get(`/api/v1/down-payments/${effectiveId}`),
+    queryFn: async () => apiClient.get(`/down-payments/${effectiveId}`),
     enabled: Boolean(effectiveId),
   });
 
   // Settle Down Payment mutation
   const settleMutation = useMutation({
-    mutationFn: async (dpId) => apiClient.post(`/api/v1/down-payments/${dpId}/settle`),
+    mutationFn: async (dpId) => apiClient.post(`/down-payments/${dpId}/settle`),
     onSuccess: async () => {
       setActionSuccess('Down payment successfully settled!');
       setActionError('');

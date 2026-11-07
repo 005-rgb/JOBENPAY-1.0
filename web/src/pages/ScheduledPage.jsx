@@ -41,7 +41,7 @@ export function ScheduledPage({ scheduleId = null }) {
   } = useQuery({
     queryKey: ['scheduled'],
     queryFn: async () => {
-      const res = await apiClient.get('/api/v1/scheduled');
+      const res = await apiClient.get('/scheduled');
       return res?.scheduled || [];
     },
   });
@@ -54,7 +54,7 @@ export function ScheduledPage({ scheduleId = null }) {
     setActionError('');
     setActionSuccess('');
     try {
-      await apiClient.post(`/api/v1/scheduled/${id}/cancel`);
+      await apiClient.post(`/scheduled/${id}/cancel`);
       setActionSuccess('Scheduled transaction successfully cancelled.');
       await refetch();
     } catch (err) {

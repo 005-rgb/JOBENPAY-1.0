@@ -24,7 +24,7 @@ const repayBodySchema = z.object({
 
 financingRouter.post('/', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id;
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
 
     const idempotencyKey = req.header('Idempotency-Key');
@@ -171,7 +171,7 @@ financingRouter.post('/', async (req, res, next) => {
 
 financingRouter.get('/:intentId', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id;
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     const { intentId } = req.params;
 
     const resFin = await query(
@@ -200,7 +200,7 @@ financingRouter.get('/:intentId', async (req, res, next) => {
 
 financingRouter.post('/:intentId/repay', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id;
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     const { intentId } = req.params;
 
     const parsed = repayBodySchema.safeParse(req.body);

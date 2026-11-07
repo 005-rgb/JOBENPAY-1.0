@@ -40,7 +40,7 @@ export function BulkPage({ batchId = null }) {
     queryKey: ['bulk', batchId],
     queryFn: async () => {
       if (!batchId) return null;
-      return apiClient.get(`/api/v1/bulk/${batchId}`);
+      return apiClient.get(`/bulk/${batchId}`);
     },
     enabled: Boolean(batchId),
   });

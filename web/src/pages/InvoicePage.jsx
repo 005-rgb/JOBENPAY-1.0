@@ -75,20 +75,20 @@ export function InvoicePage({ invoiceId = null }) {
   // 1. Fetch list of invoices when on /invoices without an id
   const listQuery = useQuery({
     queryKey: ['invoices-list'],
-    queryFn: async () => apiClient.get('/api/v1/invoices'),
+    queryFn: async () => apiClient.get('/invoices'),
     enabled: !effectiveId,
   });
 
   // 2. Fetch specific invoice when effectiveId is present
   const detailQuery = useQuery({
     queryKey: ['invoice-detail', effectiveId],
-    queryFn: async () => apiClient.get(`/api/v1/invoices/${effectiveId}`),
+    queryFn: async () => apiClient.get(`/invoices/${effectiveId}`),
     enabled: Boolean(effectiveId),
   });
 
   // Send Invoice mutation
   const sendMutation = useMutation({
-    mutationFn: async (invId) => apiClient.post(`/api/v1/invoices/${invId}/send`),
+    mutationFn: async (invId) => apiClient.post(`/invoices/${invId}/send`),
     onSuccess: async () => {
       setActionSuccess('Invoice successfully sent to recipient!');
       setActionError('');
@@ -102,7 +102,7 @@ export function InvoicePage({ invoiceId = null }) {
 
   // Pay Invoice mutation
   const payMutation = useMutation({
-    mutationFn: async (invId) => apiClient.post(`/api/v1/invoices/${invId}/pay`),
+    mutationFn: async (invId) => apiClient.post(`/invoices/${invId}/pay`),
     onSuccess: async () => {
       setActionSuccess('Invoice marked as PAID!');
       setActionError('');

@@ -41,7 +41,7 @@ export function DisputePage({ disputeId = null }) {
     queryKey: ['dispute', disputeId],
     queryFn: async () => {
       if (!disputeId) return null;
-      return apiClient.get(`/api/v1/disputes/${disputeId}`);
+      return apiClient.get(`/disputes/${disputeId}`);
     },
     enabled: Boolean(disputeId),
   });
