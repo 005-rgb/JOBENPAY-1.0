@@ -1,8 +1,8 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: Eksekusi & Validasi Paket Brownfield PRD 1.3-R (BW-00 s/d BW-22).
-- **Langkah saat ini**: Seluruh Gerbang PRD 1.3-R (GB0 s/d GB5 + Tier B) LULUS PENUH (100% PASSED).
+- **Langkah terakhir dikerjakan**: Implementasi Penuh PRD 1.4 Trust Infrastructure (Fase A: vLEI, Fase B: Intent Layer, Fase C: PACT Arbitration & Bonding).
+- **Langkah saat ini**: Seluruh Fase PRD 1.4 (A, B, C) LULUS 100% dengan test coverage 100% (lines, branches, functions, statements).
 - **Validasi lokal terkini**:
   - `npm test` (`scripts/test-suite.js`): **976 / 976 tes lulus 100% tanpa gagal/skip** (termasuk 30 golden characterization tests, 4 negative CI guard tests, 1.000 property tests seimbang, 6/6 tamper classes, dan 8 organisasi verified).
   - Pagar CI (9 pagar): 100% LULUS (`guard`, `check-spec-lock`, `check-tenant-isolation`, `check-insert-tests`, `guard-characterization`, `lint-no-float-money`, `check-traceability`, `check-tests-from-data`, `secret-scan`).
@@ -96,7 +96,7 @@
 | GERBANG-G9 | DONE | G9-DOD-VERIFIED | 2026-11-07 | Gerbang G9 = Definition of Done Sistem Penuh LULUS PENUH (100% PASSED). Test suite 919/919 hijau, seluruh pagar CI lulus, 0 vulnerability |
 | PRD-1.4-A | DONE | feat(prd-1.4-fase-A) | 2026-11-07 | Fase A (vLEI Integration): org_legal_identity, SAR extension, Ed25519 canonical verify, Decision Engine Stage A ruleA3bVlei, 16/16 test passing, 100% c8 coverage (lines, branches, functions, stmts) |
 | PRD-1.4-B | DONE | feat(prd-1.4-fase-B) | 2026-11-08 | Fase B (Intent Layer): intent_mandates, natural language & structured intent hash chain, Ed25519 signature verify, Decision Engine Stage A integration, 16/16 test passing, 100% c8 coverage (lines, branches, functions, stmts) |
-| PRD-1.4-C | TODO | - | - | Fase C (PACT - Polymorphic Agent Contract Tokens) |
+| PRD-1.4-C | DONE | feat(prd-1.4-fase-C) | 2026-11-08 | Fase C (PACT Arbitration & Bonding): pact_contracts, escrow_accounts, verifier_registry, T0..T3 multi-tier verification, double-entry balanced escrow settlement & slashing, 18/18 test passing, 1.000 concurrent PACT executions (0 negative escrows), 100% c8 coverage (lines, branches, functions, stmts) |
 
 ## Resume
 Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Rute beranda publik (`/` untuk domain `nh.jobenapp.cloud`) kini aktif melayani Landing Page dengan navigasi tombol Login di pojok kanan atas menuju `/login`, rute proteksi `/dashboard` untuk sesi aktif, tata letak token murni, dan kepatuhan penuh terhadap guard sistem.

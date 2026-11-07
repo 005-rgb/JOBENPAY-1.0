@@ -31,7 +31,7 @@ function runQuery(sql, params, client) {
  */
 export async function checkEscrowBalance(contractId, dbClient = null) {
   if (!contractId || !isValidUuid(contractId)) {
-    throw new AppError('Invalid or missing contractId', 404, 'ESCROW_NOT_FOUND');
+    throw new AppError('ESCROW_NOT_FOUND', 404, 'Invalid or missing contractId');
   }
 
   const result = await runQuery(
@@ -45,13 +45,13 @@ export async function checkEscrowBalance(contractId, dbClient = null) {
   );
 
   if (result.rows.length === 0) {
-    throw new AppError(`Escrow not found for contract ${contractId}`, 404, 'ESCROW_NOT_FOUND');
+    throw new AppError('ESCROW_NOT_FOUND', 404, `Escrow not found for contract ${contractId}`);
   }
 
   const row = result.rows[0];
-  const held = BigInt(row.held_minor || 0);
-  const released = BigInt(row.released_minor || 0);
-  const slashed = BigInt(row.slashed_minor || 0);
+  const held = BigInt(row.held_minor);
+  const released = BigInt(row.released_minor);
+  const slashed = BigInt(row.slashed_minor);
   const balanced = held === (released + slashed);
 
   return {

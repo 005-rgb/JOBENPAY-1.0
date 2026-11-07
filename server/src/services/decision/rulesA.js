@@ -36,12 +36,13 @@ export function ruleA3bVlei(ctx = {}) {
 export function ruleA3cIntentMandate(ctx = {}) {
   const { mandate, version, policy, intentCheck, intentMandateId, transaction, request } = ctx;
   const isIntentCheckEnabled =
-    mandate?.ai?.intentCheck === true ||
-    mandate?.ai?.intent_check === true ||
-    version?.policy?.ai?.intentCheck === true ||
-    version?.policy?.ai?.intent_check === true ||
-    policy?.ai?.intentCheck === true ||
-    policy?.ai?.intent_check === true;
+    mandate?.require_intent_mandate === true ||
+    mandate?.requireIntentMandate === true ||
+    version?.policy?.require_intent_mandate === true ||
+    version?.policy?.requireIntentMandate === true ||
+    policy?.require_intent_mandate === true ||
+    policy?.requireIntentMandate === true ||
+    Boolean(intentMandateId || transaction?.intent_mandate_id || transaction?.intentMandateId || request?.intent_mandate_id || request?.intentMandateId || ctx.intent_mandate_id);
 
   if (isIntentCheckEnabled) {
     const id =

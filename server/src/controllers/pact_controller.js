@@ -18,9 +18,9 @@ import {
 } from '../services/pact_service.js';
 
 function resolveOrgId(req) {
-  const orgId = req.org?.id || req.session?.current_org_id || req.user?.org_id;
+  const orgId = req.org?.id ?? req.session?.current_org_id ?? req.user?.org_id;
   if (!orgId) {
-    throw new AppError('Organization context required', 401, 'UNAUTHENTICATED');
+    throw new AppError('UNAUTHENTICATED', 401, 'Organization context required');
   }
   return orgId;
 }
@@ -41,7 +41,7 @@ export async function postContract(req, res, next) {
 export async function postFund(req, res, next) {
   try {
     const orgId = resolveOrgId(req);
-    const contractId = req.params.id || req.params.contract_id;
+    const contractId = req.params.id;
     const result = await fundEscrow(contractId, orgId);
     return res.status(200).json(result);
   } catch (error) {
@@ -52,7 +52,7 @@ export async function postFund(req, res, next) {
 export async function postDeliver(req, res, next) {
   try {
     const orgId = resolveOrgId(req);
-    const contractId = req.params.id || req.params.contract_id;
+    const contractId = req.params.id;
     const result = await deliverWork(contractId, orgId, req.body?.work_attestation);
     return res.status(200).json(result);
   } catch (error) {
@@ -62,7 +62,7 @@ export async function postDeliver(req, res, next) {
 
 export async function postVerify(req, res, next) {
   try {
-    const contractId = req.params.id || req.params.contract_id;
+    const contractId = req.params.id;
     const { verifier_id, verdict, attestation } = req.body || {};
     const result = await verifyWork(contractId, verifier_id, verdict, attestation);
     return res.status(200).json(result);
@@ -74,7 +74,7 @@ export async function postVerify(req, res, next) {
 export async function postSettle(req, res, next) {
   try {
     const orgId = resolveOrgId(req);
-    const contractId = req.params.id || req.params.contract_id;
+    const contractId = req.params.id;
     const result = await settleEscrow(contractId, orgId);
     return res.status(200).json(result);
   } catch (error) {
@@ -85,7 +85,7 @@ export async function postSettle(req, res, next) {
 export async function postDispute(req, res, next) {
   try {
     const orgId = resolveOrgId(req);
-    const contractId = req.params.id || req.params.contract_id;
+    const contractId = req.params.id;
     const result = await disputeContract(contractId, req.body?.fraud_proof, orgId);
     return res.status(200).json(result);
   } catch (error) {
@@ -96,7 +96,7 @@ export async function postDispute(req, res, next) {
 export async function getContractHandler(req, res, next) {
   try {
     const orgId = resolveOrgId(req);
-    const contractId = req.params.id || req.params.contract_id;
+    const contractId = req.params.id;
     const contract = await getContract(contractId, orgId);
     return res.status(200).json(contract);
   } catch (error) {

@@ -35,7 +35,7 @@ function runQuery(sql, params, client) {
  */
 export async function createContract(orgId, body, dbClient = null) {
   if (!orgId || !isValidUuid(orgId)) {
-    throw new AppError('orgId is required and must be a valid UUID', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'orgId is required and must be a valid UUID');
   }
 
   const {
@@ -50,28 +50,28 @@ export async function createContract(orgId, body, dbClient = null) {
   } = body || {};
 
   if (!buyer_intent_id || !isValidUuid(buyer_intent_id)) {
-    throw new AppError('buyer_intent_id must be a valid UUID', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'buyer_intent_id must be a valid UUID');
   }
   if (!seller_org_id || !isValidUuid(seller_org_id)) {
-    throw new AppError('seller_org_id must be a valid UUID', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'seller_org_id must be a valid UUID');
   }
   if (!task_spec_hash || typeof task_spec_hash !== 'string') {
-    throw new AppError('task_spec_hash is required', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'task_spec_hash is required');
   }
   if (price_minor === undefined || price_minor === null || BigInt(price_minor) <= 0n) {
-    throw new AppError('price_minor must be a positive integer', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'price_minor must be a positive integer');
   }
   if (!currency || typeof currency !== 'string' || currency.trim().length !== 3) {
-    throw new AppError('currency must be a 3-character ISO code', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'currency must be a 3-character ISO code');
   }
   if (!verification_tier || !VALID_TIERS.has(verification_tier)) {
-    throw new AppError(`verification_tier must be one of: ${[...VALID_TIERS].join(', ')}`, 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, `verification_tier must be one of: ${[...VALID_TIERS].join(', ')}`);
   }
   if (seller_bond_minor === undefined || seller_bond_minor === null || BigInt(seller_bond_minor) <= 0n) {
-    throw new AppError('seller_bond_minor must be a positive integer', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'seller_bond_minor must be a positive integer');
   }
   if (!challenge_window_seconds || Number(challenge_window_seconds) <= 0) {
-    throw new AppError('challenge_window_seconds must be a positive integer', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'challenge_window_seconds must be a positive integer');
   }
 
   const sql = `
@@ -104,10 +104,10 @@ export async function createContract(orgId, body, dbClient = null) {
     buyer_intent_id: row.buyer_intent_id,
     seller_org_id: row.seller_org_id,
     task_spec_hash: row.task_spec_hash,
-    price_minor: Number(row.price_minor),
+    price_minor: Number(row.price_minor), // allow-number-serialization
     currency: row.currency,
     verification_tier: row.verification_tier,
-    seller_bond_minor: Number(row.seller_bond_minor),
+    seller_bond_minor: Number(row.seller_bond_minor), // allow-number-serialization
     challenge_window_seconds: row.challenge_window_seconds,
     status: row.status,
     created_at: row.created_at,
@@ -121,26 +121,26 @@ export async function createContract(orgId, body, dbClient = null) {
  */
 export async function fundEscrow(contractId, orgId, dbClient = null) {
   if (!contractId || !isValidUuid(contractId)) {
-    throw new AppError('Invalid or missing contractId', 404, 'CONTRACT_NOT_FOUND');
+    throw new AppError('CONTRACT_NOT_FOUND', 404, 'Invalid or missing contractId');
   }
 
-  const exec = async (client) => {
+  return withTx(async (client) => {
     const cRes = await client.query(
       `SELECT * FROM pact_contracts WHERE contract_id = $1 FOR UPDATE`,
       [contractId],
     );
 
     if (cRes.rows.length === 0) {
-      throw new AppError(`Contract ${contractId} not found`, 404, 'CONTRACT_NOT_FOUND');
+      throw new AppError('CONTRACT_NOT_FOUND', 404, `Contract ${contractId} not found`);
     }
 
     const contract = cRes.rows[0];
     if (orgId && contract.org_id !== orgId) {
-      throw new AppError('Cross-tenant access forbidden', 403, 'FORBIDDEN');
+      throw new AppError('FORBIDDEN', 403, 'Cross-tenant access forbidden');
     }
 
     if (contract.status !== 'PROPOSED' && contract.status !== 'AGREED') {
-      throw new AppError(`Cannot fund contract in status ${contract.status}`, 409, 'ILLEGAL_TRANSITION');
+      throw new AppError('ILLEGAL_TRANSITION', 409, `Cannot fund contract in status ${contract.status}`);
     }
 
     // 1. Update contract status to IN_PROGRESS
@@ -192,43 +192,38 @@ export async function fundEscrow(contractId, orgId, dbClient = null) {
 
     return {
       escrow_id: escrow.escrow_id,
-      held_minor: Number(escrow.held_minor),
+      held_minor: Number(escrow.held_minor), // allow-number-serialization
       status: escrow.status,
     };
-  };
-
-  if (dbClient) {
-    return exec(dbClient);
-  }
-  return withTx(exec);
+  }, dbClient);
 }
 
 /**
  * Delivers work for a contract in progress.
  * Transitions: IN_PROGRESS -> DELIVERED.
  */
-export async function deliverWork(contractId, orgId, workAttestation = {}, dbClient = null) {
+export async function deliverWork(contractId, orgId, workAttestation = null, dbClient = null) {
   if (!contractId || !isValidUuid(contractId)) {
-    throw new AppError('Invalid or missing contractId', 404, 'CONTRACT_NOT_FOUND');
+    throw new AppError('CONTRACT_NOT_FOUND', 404, 'Invalid or missing contractId');
   }
 
-  const exec = async (client) => {
+  return withTx(async (client) => {
     const cRes = await client.query(
       `SELECT * FROM pact_contracts WHERE contract_id = $1 FOR UPDATE`,
       [contractId],
     );
 
     if (cRes.rows.length === 0) {
-      throw new AppError(`Contract ${contractId} not found`, 404, 'CONTRACT_NOT_FOUND');
+      throw new AppError('CONTRACT_NOT_FOUND', 404, `Contract ${contractId} not found`);
     }
 
     const contract = cRes.rows[0];
     if (orgId && contract.seller_org_id !== orgId && contract.org_id !== orgId) {
-      throw new AppError('Cross-tenant access forbidden', 403, 'FORBIDDEN');
+      throw new AppError('FORBIDDEN', 403, 'Cross-tenant access forbidden');
     }
 
     if (contract.status !== 'IN_PROGRESS') {
-      throw new AppError(`Cannot deliver contract in status ${contract.status}`, 409, 'ILLEGAL_TRANSITION');
+      throw new AppError('ILLEGAL_TRANSITION', 409, `Cannot deliver contract in status ${contract.status}`);
     }
 
     await client.query(
@@ -237,12 +232,7 @@ export async function deliverWork(contractId, orgId, workAttestation = {}, dbCli
     );
 
     return { status: 'DELIVERED' };
-  };
-
-  if (dbClient) {
-    return exec(dbClient);
-  }
-  return withTx(exec);
+  }, dbClient);
 }
 
 /**
@@ -251,37 +241,37 @@ export async function deliverWork(contractId, orgId, workAttestation = {}, dbCli
  */
 export async function verifyWork(contractId, verifierId, verdict, attestation = {}, dbClient = null) {
   if (!contractId || !isValidUuid(contractId)) {
-    throw new AppError('Invalid or missing contractId', 404, 'CONTRACT_NOT_FOUND');
+    throw new AppError('CONTRACT_NOT_FOUND', 404, 'Invalid or missing contractId');
   }
 
-  const exec = async (client) => {
+  return withTx(async (client) => {
     const cRes = await client.query(
       `SELECT * FROM pact_contracts WHERE contract_id = $1 FOR UPDATE`,
       [contractId],
     );
 
     if (cRes.rows.length === 0) {
-      throw new AppError(`Contract ${contractId} not found`, 404, 'CONTRACT_NOT_FOUND');
+      throw new AppError('CONTRACT_NOT_FOUND', 404, `Contract ${contractId} not found`);
     }
 
     const contract = cRes.rows[0];
     if (contract.status !== 'DELIVERED') {
-      throw new AppError(`Cannot verify contract in status ${contract.status}`, 409, 'ILLEGAL_TRANSITION');
+      throw new AppError('ILLEGAL_TRANSITION', 409, `Cannot verify contract in status ${contract.status}`);
     }
 
     if (verifierId) {
       if (!isValidUuid(verifierId)) {
-        throw new AppError('Invalid verifierId', 404, 'VERIFIER_NOT_FOUND');
+        throw new AppError('VERIFIER_NOT_FOUND', 404, 'Invalid verifierId');
       }
       const vRes = await client.query(
         `SELECT * FROM verifier_registry WHERE verifier_id = $1`,
         [verifierId],
       );
       if (vRes.rows.length === 0) {
-        throw new AppError(`Verifier ${verifierId} not found`, 404, 'VERIFIER_NOT_FOUND');
+        throw new AppError('VERIFIER_NOT_FOUND', 404, `Verifier ${verifierId} not found`);
       }
       if (vRes.rows[0].status !== 'ACTIVE') {
-        throw new AppError(`Verifier ${verifierId} is not ACTIVE`, 400, 'VERIFIER_INACTIVE');
+        throw new AppError('VERIFIER_INACTIVE', 400, `Verifier ${verifierId} is not ACTIVE`);
       }
     }
 
@@ -292,7 +282,7 @@ export async function verifyWork(contractId, verifierId, verdict, attestation = 
     } else if (normVerdict === 'FAIL') {
       nextStatus = 'DISPUTED';
     } else {
-      throw new AppError(`Invalid verdict '${verdict}'. Expected 'PASS' or 'FAIL'.`, 400, 'INVALID_VERDICT');
+      throw new AppError('INVALID_VERDICT', 400, `Invalid verdict '${verdict}'. Expected 'PASS' or 'FAIL'.`);
     }
 
     await client.query(
@@ -301,12 +291,7 @@ export async function verifyWork(contractId, verifierId, verdict, attestation = 
     );
 
     return { status: nextStatus };
-  };
-
-  if (dbClient) {
-    return exec(dbClient);
-  }
-  return withTx(exec);
+  }, dbClient);
 }
 
 /**
@@ -316,26 +301,26 @@ export async function verifyWork(contractId, verifierId, verdict, attestation = 
  */
 export async function settleEscrow(contractId, orgId = null, dbClient = null) {
   if (!contractId || !isValidUuid(contractId)) {
-    throw new AppError('Invalid or missing contractId', 404, 'CONTRACT_NOT_FOUND');
+    throw new AppError('CONTRACT_NOT_FOUND', 404, 'Invalid or missing contractId');
   }
 
-  const exec = async (client) => {
+  return withTx(async (client) => {
     const cRes = await client.query(
       `SELECT * FROM pact_contracts WHERE contract_id = $1 FOR UPDATE`,
       [contractId],
     );
 
     if (cRes.rows.length === 0) {
-      throw new AppError(`Contract ${contractId} not found`, 404, 'CONTRACT_NOT_FOUND');
+      throw new AppError('CONTRACT_NOT_FOUND', 404, `Contract ${contractId} not found`);
     }
 
     const contract = cRes.rows[0];
     if (orgId && contract.org_id !== orgId && contract.seller_org_id !== orgId) {
-      throw new AppError('Cross-tenant access forbidden', 403, 'FORBIDDEN');
+      throw new AppError('FORBIDDEN', 403, 'Cross-tenant access forbidden');
     }
 
     if (contract.status !== 'VERIFIED') {
-      throw new AppError(`Cannot settle contract in status ${contract.status}`, 409, 'ILLEGAL_TRANSITION');
+      throw new AppError('ILLEGAL_TRANSITION', 409, `Cannot settle contract in status ${contract.status}`);
     }
 
     const escRes = await client.query(
@@ -344,7 +329,7 @@ export async function settleEscrow(contractId, orgId = null, dbClient = null) {
     );
 
     if (escRes.rows.length === 0) {
-      throw new AppError(`Escrow account not found for contract ${contractId}`, 404, 'ESCROW_NOT_FOUND');
+      throw new AppError('ESCROW_NOT_FOUND', 404, `Escrow account not found for contract ${contractId}`);
     }
 
     const escrow = escRes.rows[0];
@@ -396,12 +381,7 @@ export async function settleEscrow(contractId, orgId = null, dbClient = null) {
     });
 
     return { status: 'SETTLED' };
-  };
-
-  if (dbClient) {
-    return exec(dbClient);
-  }
-  return withTx(exec);
+  }, dbClient);
 }
 
 /**
@@ -411,32 +391,32 @@ export async function settleEscrow(contractId, orgId = null, dbClient = null) {
  */
 export async function disputeContract(contractId, fraudProof = {}, orgId = null, dbClient = null) {
   if (!contractId || !isValidUuid(contractId)) {
-    throw new AppError('Invalid or missing contractId', 404, 'CONTRACT_NOT_FOUND');
+    throw new AppError('CONTRACT_NOT_FOUND', 404, 'Invalid or missing contractId');
   }
 
-  const exec = async (client) => {
+  return withTx(async (client) => {
     const cRes = await client.query(
       `SELECT * FROM pact_contracts WHERE contract_id = $1 FOR UPDATE`,
       [contractId],
     );
 
     if (cRes.rows.length === 0) {
-      throw new AppError(`Contract ${contractId} not found`, 404, 'CONTRACT_NOT_FOUND');
+      throw new AppError('CONTRACT_NOT_FOUND', 404, `Contract ${contractId} not found`);
     }
 
     const contract = cRes.rows[0];
     if (orgId && contract.org_id !== orgId && contract.seller_org_id !== orgId) {
-      throw new AppError('Cross-tenant access forbidden', 403, 'FORBIDDEN');
+      throw new AppError('FORBIDDEN', 403, 'Cross-tenant access forbidden');
     }
 
     if (contract.status !== 'DELIVERED' && contract.status !== 'DISPUTED') {
-      throw new AppError(`Cannot dispute contract in status ${contract.status}`, 409, 'ILLEGAL_TRANSITION');
+      throw new AppError('ILLEGAL_TRANSITION', 409, `Cannot dispute contract in status ${contract.status}`);
     }
 
     // Check challenge window
     const elapsedSeconds = (Date.now() - new Date(contract.created_at).getTime()) / 1000;
     if (contract.challenge_window_seconds > 0 && elapsedSeconds > contract.challenge_window_seconds) {
-      throw new AppError('Challenge window has expired', 400, 'CHALLENGE_WINDOW_EXPIRED');
+      throw new AppError('CHALLENGE_WINDOW_EXPIRED', 400, 'Challenge window has expired');
     }
 
     // Fraud proof validation check
@@ -458,7 +438,7 @@ export async function disputeContract(contractId, fraudProof = {}, orgId = null,
     );
 
     if (escRes.rows.length === 0) {
-      throw new AppError(`Escrow account not found for contract ${contractId}`, 404, 'ESCROW_NOT_FOUND');
+      throw new AppError('ESCROW_NOT_FOUND', 404, `Escrow account not found for contract ${contractId}`);
     }
 
     const escrow = escRes.rows[0];
@@ -480,7 +460,7 @@ export async function disputeContract(contractId, fraudProof = {}, orgId = null,
       `UPDATE pact_contracts
        SET status = 'SLASHED', dispute_proof = $2, dispute_verdict = 'SLASHED'
        WHERE contract_id = $1`,
-      [contractId, JSON.stringify(fraudProof || {})],
+      [contractId, JSON.stringify(fraudProof)],
     );
 
     // 3. Post double-entry balanced ledger entry
@@ -529,12 +509,7 @@ export async function disputeContract(contractId, fraudProof = {}, orgId = null,
       slashed_minor: Number(slashed),
       released_minor: Number(released),
     };
-  };
-
-  if (dbClient) {
-    return exec(dbClient);
-  }
-  return withTx(exec);
+  }, dbClient);
 }
 
 /**
@@ -542,15 +517,15 @@ export async function disputeContract(contractId, fraudProof = {}, orgId = null,
  */
 export async function registerVerifier(orgId, body, dbClient = null) {
   if (!orgId || !isValidUuid(orgId)) {
-    throw new AppError('orgId is required and must be a valid UUID', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'orgId is required and must be a valid UUID');
   }
 
   const { verification_tier, attestation_jwks_uri, status = 'ACTIVE' } = body || {};
   if (!verification_tier || !VALID_TIERS.has(verification_tier)) {
-    throw new AppError(`verification_tier must be one of: ${[...VALID_TIERS].join(', ')}`, 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, `verification_tier must be one of: ${[...VALID_TIERS].join(', ')}`);
   }
   if (!attestation_jwks_uri || typeof attestation_jwks_uri !== 'string') {
-    throw new AppError('attestation_jwks_uri is required', 400, 'VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED', 400, 'attestation_jwks_uri is required');
   }
 
   const sql = `
@@ -567,18 +542,18 @@ export async function registerVerifier(orgId, body, dbClient = null) {
  */
 export async function getContract(contractId, orgId = null, dbClient = null) {
   if (!contractId || !isValidUuid(contractId)) {
-    throw new AppError('Invalid or missing contractId', 404, 'CONTRACT_NOT_FOUND');
+    throw new AppError('CONTRACT_NOT_FOUND', 404, 'Invalid or missing contractId');
   }
 
   const sql = `SELECT * FROM pact_contracts WHERE contract_id = $1`;
   const result = await runQuery(sql, [contractId], dbClient);
   if (result.rows.length === 0) {
-    throw new AppError(`Contract ${contractId} not found`, 404, 'CONTRACT_NOT_FOUND');
+    throw new AppError('CONTRACT_NOT_FOUND', 404, `Contract ${contractId} not found`);
   }
 
   const contract = result.rows[0];
   if (orgId && contract.org_id !== orgId && contract.seller_org_id !== orgId) {
-    throw new AppError('Cross-tenant access forbidden', 403, 'FORBIDDEN');
+    throw new AppError('FORBIDDEN', 403, 'Cross-tenant access forbidden');
   }
 
   return contract;
