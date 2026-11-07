@@ -75,7 +75,14 @@ export function InvoicePage({ invoiceId = null }) {
   // 1. Fetch list of invoices when on /invoices without an id
   const listQuery = useQuery({
     queryKey: ['invoices-list'],
-    queryFn: async () => apiClient.get('/invoices'),
+    queryFn: async () => {
+      try {
+        return await apiClient.get('/invoices');
+      } catch {
+        const res = await apiClient.get('/transactions?category=INVOICE&limit=50');
+        return { invoices: res?.transactions || [] };
+      }
+    },
     enabled: !effectiveId,
   });
 

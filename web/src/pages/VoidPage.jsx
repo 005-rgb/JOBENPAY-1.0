@@ -83,7 +83,11 @@ export function VoidPage({ voidId = null }) {
   } = useQuery({
     queryKey: ['voids-list'],
     queryFn: async () => {
-      return apiClient.get('/transactions?category=VOID&limit=50');
+      try {
+        return await apiClient.get('/transactions?category=VOID&limit=50');
+      } catch {
+        return apiClient.get('/voids');
+      }
     },
     enabled: !effectiveId,
   });

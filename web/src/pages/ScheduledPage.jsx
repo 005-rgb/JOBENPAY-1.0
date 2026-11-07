@@ -41,8 +41,13 @@ export function ScheduledPage({ scheduleId = null }) {
   } = useQuery({
     queryKey: ['scheduled'],
     queryFn: async () => {
-      const res = await apiClient.get('/scheduled');
-      return res?.scheduled || [];
+      try {
+        const res = await apiClient.get('/scheduled');
+        return res?.scheduled || res?.transactions || [];
+      } catch {
+        const res = await apiClient.get('/transactions?category=SCHEDULED&limit=50');
+        return res?.transactions || [];
+      }
     },
   });
 

@@ -181,7 +181,7 @@ invoicesRouter.get('/', async (req, res, next) => {
 
 invoicesRouter.post('/:id/send', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     const { id } = req.params;
     await query(`
       UPDATE invoice_records SET status = 'SENT'
@@ -195,7 +195,7 @@ invoicesRouter.post('/:id/send', async (req, res, next) => {
 
 invoicesRouter.post('/:id/pay', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     const { id } = req.params;
     await query(`
       UPDATE invoice_records SET status = 'PAID'

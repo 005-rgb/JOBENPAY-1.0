@@ -83,7 +83,11 @@ export function RefundPage({ refundId = null }) {
   } = useQuery({
     queryKey: ['refunds-list'],
     queryFn: async () => {
-      return apiClient.get('/transactions?category=REFUND&limit=50');
+      try {
+        return await apiClient.get('/transactions?category=REFUND&limit=50');
+      } catch {
+        return apiClient.get('/refunds');
+      }
     },
     enabled: !effectiveId,
   });

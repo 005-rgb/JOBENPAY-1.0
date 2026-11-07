@@ -200,7 +200,7 @@ downPaymentsRouter.get('/', async (req, res, next) => {
 
 downPaymentsRouter.post('/:id/settle', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     const { id } = req.params;
     await query(`
       UPDATE down_payment_accounts SET status = 'SETTLED'

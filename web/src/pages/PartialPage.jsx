@@ -84,7 +84,11 @@ export function PartialPage({ partialId = null }) {
   } = useQuery({
     queryKey: ['partials-list'],
     queryFn: async () => {
-      return apiClient.get('/transactions?category=PARTIAL&limit=50');
+      try {
+        return await apiClient.get('/transactions?category=PARTIAL&limit=50');
+      } catch {
+        return apiClient.get('/partials');
+      }
     },
     enabled: !effectiveId,
   });

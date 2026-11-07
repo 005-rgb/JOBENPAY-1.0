@@ -84,7 +84,11 @@ export function PayoutPage({ payoutId = null }) {
   } = useQuery({
     queryKey: ['payouts-list'],
     queryFn: async () => {
-      return apiClient.get('/transactions?category=PAYOUT&limit=50');
+      try {
+        return await apiClient.get('/transactions?category=PAYOUT&limit=50');
+      } catch {
+        return apiClient.get('/payouts');
+      }
     },
     enabled: !effectiveId,
   });

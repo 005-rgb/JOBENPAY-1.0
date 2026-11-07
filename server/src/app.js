@@ -2133,17 +2133,27 @@ export function createApp() {
   const categoryRouterMap = new Map([
     ['/transactions', transactionsRouter],
     ['/payouts', payoutsRouter],
+    ['/payout', payoutsRouter],
     ['/sales', salesRouter],
+    ['/sale', salesRouter],
     ['/refunds', refundsRouter],
+    ['/refund', refundsRouter],
     ['/voids', voidsRouter],
+    ['/void', voidsRouter],
     ['/partials', partialsRouter],
+    ['/partial', partialsRouter],
     ['/down-payments', downPaymentsRouter],
+    ['/down-payment', downPaymentsRouter],
     ['/invoices', invoicesRouter],
+    ['/invoice', invoicesRouter],
     ['/disputes', disputesRouter],
+    ['/dispute', disputesRouter],
     ['/scheduled', scheduledRouter],
     ['/bulk', bulkRouter],
     ['/transfer', transferRouter],
+    ['/transfers', transferRouter],
     ['/splits', splitRouter],
+    ['/split', splitRouter],
     ['/recurring', recurringRouter],
     ['/financing', financingRouter],
     ['/debit', debitRouter],
@@ -2178,21 +2188,9 @@ export function createApp() {
     }
   });
 
-  api.use((req, res, next) => {
-    for (const [prefix, router] of categoryRouterMap) {
-      if (req.path === prefix || req.path.startsWith(prefix + '/')) {
-        const originalUrl = req.url;
-        const originalOriginalUrl = req.originalUrl;
-        req.url = req.url.slice(prefix.length) || '/';
-        return router(req, res, (err) => {
-          req.url = originalUrl;
-          req.originalUrl = originalOriginalUrl;
-          next(err);
-        });
-      }
-    }
-    next();
-  });
+  for (const [prefix, router] of categoryRouterMap) {
+    api.use(prefix, router);
+  }
 
   api.use((err, _req, res, next) => {
     errorHandler(err, _req, res, next);

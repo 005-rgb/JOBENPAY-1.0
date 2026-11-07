@@ -73,7 +73,14 @@ export function Down_PaymentPage({ downPaymentId = null }) {
   // 1. Fetch list of down payments when on /down-payments
   const listQuery = useQuery({
     queryKey: ['down-payments-list'],
-    queryFn: async () => apiClient.get('/down-payments'),
+    queryFn: async () => {
+      try {
+        return await apiClient.get('/down-payments');
+      } catch {
+        const res = await apiClient.get('/transactions?category=DOWN_PAYMENT&limit=50');
+        return { downPayments: res?.transactions || [] };
+      }
+    },
     enabled: !effectiveId,
   });
 

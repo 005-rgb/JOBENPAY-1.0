@@ -84,7 +84,11 @@ export function SalePage({ saleId = null }) {
   } = useQuery({
     queryKey: ['sales-list'],
     queryFn: async () => {
-      return apiClient.get('/transactions?category=SALE&limit=50');
+      try {
+        return await apiClient.get('/transactions?category=SALE&limit=50');
+      } catch {
+        return apiClient.get('/sales');
+      }
     },
     enabled: !effectiveId,
   });
