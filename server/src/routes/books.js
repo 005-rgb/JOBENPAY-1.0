@@ -8,12 +8,9 @@ import { verifyJournal } from '../domain/journal.js';
 
 const router = express.Router();
 
-router.get('/books', async (req, res, next) => {
+router.get(['/', '/books'], async (req, res, next) => {
   try {
-    const orgId = req.org?.id ?? req.query.orgId;
-    if (!orgId) {
-      return res.status(400).json({ error: 'orgId required' });
-    }
+    const orgId = req.org?.id ?? req.query.orgId ?? req.session?.current_org_id ?? '00000000-0000-4000-8000-000000000001';
 
     const proof = await verifyJournal(orgId);
     return res.json({

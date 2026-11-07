@@ -177,6 +177,34 @@ debitRouter.post('/authorizations/:authId/revoke', async (req, res, next) => {
   }
 });
 
+debitRouter.get('/', async (req, res, next) => {
+  try {
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const result = await query(
+      `SELECT i.*, e.auth_id, e.status as execution_status, e.provider
+       FROM transaction_intents i
+       LEFT JOIN debit_execution_records e ON e.intent_id = i.intent_id AND e.org_id = i.org_id
+       WHERE i.org_id = $1 AND i.category = 'DEBIT'
+       ORDER BY i.created_at DESC LIMIT 100`,
+      [orgId]
+    );
+
+    const rows = result.rows.map(r => ({
+      ...r,
+      amount_minor: r.amount_minor?.toString(),
+    }));
+
+    res.json({
+      success: true,
+      provider: 'simulated',
+      debits: rows,
+      transactions: rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 debitRouter.get('/:intentId', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';

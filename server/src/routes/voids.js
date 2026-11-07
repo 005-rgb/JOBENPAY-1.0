@@ -105,6 +105,31 @@ voidsRouter.post('/', async (req, res, next) => {
   }
 });
 
+voidsRouter.get('/', async (req, res, next) => {
+  try {
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
+
+    const result = await query(
+      `SELECT ti.*, COALESCE(p.display_name, p.identifier_masked, 'Counterparty') AS counterparty_name
+       FROM transaction_intents ti
+       LEFT JOIN payees p ON p.id = ti.counterparty_id AND p.org_id = ti.org_id
+       WHERE ti.org_id = $1 AND ti.category = 'VOID'
+       ORDER BY ti.created_at DESC LIMIT 100`,
+      [orgId]
+    );
+
+    const rows = result.rows.map(r => ({ ...r, amount_minor: r.amount_minor?.toString() }));
+    res.json({
+      success: true,
+      voids: rows,
+      transactions: rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 voidsRouter.get('/:id', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';

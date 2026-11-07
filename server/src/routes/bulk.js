@@ -203,7 +203,7 @@ bulkRouter.get('/:id', async (req, res, next) => {
 
 bulkRouter.get('/', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const orgId = req.org?.id || req.session?.current_org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     const result = await query(`
       SELECT bb.*, ti.created_at
       FROM bulk_batches bb

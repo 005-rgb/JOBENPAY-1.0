@@ -169,6 +169,36 @@ financingRouter.post('/', async (req, res, next) => {
   }
 });
 
+financingRouter.get('/', async (req, res, next) => {
+  try {
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const result = await query(
+      `SELECT i.*, f.facility_type, f.principal_amount_minor, f.interest_bps,
+              f.admin_fee_minor, f.tenor_months, f.repaid_amount_minor, f.status as facility_status
+       FROM transaction_intents i
+       LEFT JOIN financing_records f ON f.intent_id = i.intent_id AND f.org_id = i.org_id
+       WHERE i.org_id = $1 AND i.category = 'FINANCING'
+       ORDER BY i.created_at DESC LIMIT 100`,
+      [orgId]
+    );
+
+    const rows = result.rows.map(r => ({
+      ...r,
+      amount_minor: r.amount_minor?.toString(),
+      principal_amount_minor: r.principal_amount_minor?.toString(),
+    }));
+
+    res.json({
+      success: true,
+      provider: 'simulated',
+      facilities: rows,
+      transactions: rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 financingRouter.get('/:intentId', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';

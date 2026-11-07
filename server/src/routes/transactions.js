@@ -63,7 +63,7 @@ transactionsRouter.get('/', async (req, res, next) => {
     if (search && typeof search === 'string' && search.trim()) {
       conditions.push(`(
         ti.intent_id::text ILIKE $${paramIndex} OR
-        p.name ILIKE $${paramIndex} OR
+        p.display_name ILIKE $${paramIndex} OR
         ti.metadata::text ILIKE $${paramIndex}
       )`);
       params.push(`%${search.trim()}%`);
@@ -91,7 +91,7 @@ transactionsRouter.get('/', async (req, res, next) => {
         ti.amount_minor,
         ti.currency,
         ti.counterparty_id,
-        COALESCE(p.name, p.identifier, 'Internal / Unspecified') AS counterparty_name,
+        COALESCE(p.display_name, p.identifier_masked, 'Internal / Unspecified') AS counterparty_name,
         ti.parent_intent_id,
         ti.reconciliation_status,
         ti.metadata,
@@ -143,10 +143,10 @@ transactionsRouter.get('/:id', async (req, res, next) => {
     const intentResult = await query(
       `SELECT
          ti.*,
-         COALESCE(p.name, p.identifier, 'Internal / Counterparty') AS counterparty_name,
-         p.email AS counterparty_email,
-         p.trust_level AS counterparty_trust,
-         p.status AS counterparty_status
+         COALESCE(p.display_name, p.identifier_masked, 'Internal / Counterparty') AS counterparty_name,
+         p.identifier_masked AS counterparty_email,
+         p.trust AS counterparty_trust,
+         p.trust AS counterparty_status
        FROM transaction_intents ti
        LEFT JOIN payees p ON p.id = ti.counterparty_id AND p.org_id = ti.org_id
        WHERE ti.org_id = $1 AND ti.intent_id = $2`,

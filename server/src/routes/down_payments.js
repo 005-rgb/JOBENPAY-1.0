@@ -171,14 +171,14 @@ downPaymentsRouter.get('/:id', async (req, res, next) => {
 
 downPaymentsRouter.get('/', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const orgId = req.org?.id || req.session?.current_org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     const result = await query(`
       SELECT ti.intent_id, ti.intent_id AS id, ti.status, ti.amount_minor, ti.currency, ti.created_at,
              dp.dp_amount_minor, dp.total_amount_minor, dp.settlement_amount_minor, dp.status AS dp_status,
-             dp.authorization_id, p.name AS counterparty_name
+             dp.authorization_id, COALESCE(p.display_name, p.identifier_masked, 'Counterparty') AS counterparty_name
       FROM transaction_intents ti
       LEFT JOIN down_payment_accounts dp ON dp.intent_id = ti.intent_id
-      LEFT JOIN payees p ON p.id = ti.counterparty_id
+      LEFT JOIN payees p ON p.id = ti.counterparty_id AND p.org_id = ti.org_id
       WHERE ti.org_id = $1 AND ti.category = 'DOWN_PAYMENT'
       ORDER BY ti.created_at DESC
     `, [orgId]);

@@ -144,12 +144,12 @@ disputesRouter.get('/:id', async (req, res, next) => {
 
 disputesRouter.get('/', async (req, res, next) => {
   try {
-    const orgId = req.org?.id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const orgId = req.org?.id || req.session?.current_org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     const result = await query(`
       SELECT ti.intent_id, ti.intent_id AS id, ti.sub_type, ti.status, ti.amount_minor, ti.currency,
-             ti.created_at, ti.metadata, p.name AS counterparty_name
+             ti.created_at, ti.metadata, COALESCE(p.display_name, p.identifier_masked, 'Counterparty') AS counterparty_name
       FROM transaction_intents ti
-      LEFT JOIN payees p ON p.id = ti.counterparty_id
+      LEFT JOIN payees p ON p.id = ti.counterparty_id AND p.org_id = ti.org_id
       WHERE ti.org_id = $1 AND ti.category = 'DISPUTE'
       ORDER BY ti.created_at DESC
     `, [orgId]);
