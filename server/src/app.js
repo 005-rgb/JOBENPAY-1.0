@@ -35,6 +35,8 @@ import booksRouter from './routes/books.js';
 import { createTrustRouter } from './routes/trust.js';
 import { createIntentsRouter } from './routes/intents.js';
 import { createPactRouter } from './routes/pact.js';
+import { createOrganizationRouter } from './routes/organization.js';
+import { createMembersRouter } from './routes/members.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
 import { decrypt, encrypt, hashPassword, hmacSha256, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
@@ -137,6 +139,11 @@ const STEP_UP_PURPOSES = new Set([
   'FREEZE_TOGGLE',
   'TRUST_PAYEE',
   'ROTATE_CREDENTIALS',
+  'UPDATE_BILLING_EMAIL',
+  'INVITE_MEMBER',
+  'UPDATE_MEMBER_ROLE',
+  'REMOVE_MEMBER',
+  'UPLOAD_LOGO',
 ]);
 const AGENT_STATUSES = new Set(['ACTIVE', 'DISABLED']);
 const PAYEE_KINDS = new Set(['EMAIL', 'PAYPAL_ID', 'PHONE']);
@@ -613,6 +620,8 @@ export function createApp() {
   api.use('/trust', createTrustRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createIntentsRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createPactRouter({ requireSession, requireRole, requireCsrf }));
+  api.use('/org', createOrganizationRouter({ requireSession, requireRole, requireCsrf }));
+  api.use('/members', createMembersRouter({ requireSession, requireRole, requireCsrf }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,

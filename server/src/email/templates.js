@@ -191,3 +191,46 @@ This request was held for human approval in accordance with the active mandate p
   return { subject, text, html };
 }
 
+export function memberInvite(inviteUrl, orgName = 'JOBENPAY') {
+  const subject = `You've been invited to join ${orgName}`;
+
+  const text = `Hello,
+
+You have been invited to join ${orgName} on JOBENPAY.
+
+To accept your invitation and join the organization, please visit:
+${inviteUrl}
+
+This invitation is valid for 7 days.
+
+If you were not expecting this invitation, you can safely ignore this email.${FOOTER_TEXT}`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${subject}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #0f172a; margin: 0; padding: 24px;">
+  <div style="max-width: 560px; margin: 0 auto; background: #ffffff; padding: 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
+    <h2 style="margin-top: 0; color: #003087;">Organization Invitation</h2>
+    <p>You have been invited to join <strong>${orgName}</strong> on JOBENPAY.</p>
+    <p style="margin: 24px 0;">
+      <a href="${inviteUrl}" style="background-color: #0070ba; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
+        Accept Invitation
+      </a>
+    </p>
+    <p style="font-size: 14px; color: #475569;">
+      Or copy and paste this link into your browser:<br />
+      <a href="${inviteUrl}" style="color: #0070ba; word-break: break-all;">${inviteUrl}</a>
+    </p>
+    <p style="font-size: 14px; color: #64748b;">This invitation link will expire in 7 days.</p>
+    ${FOOTER_HTML}
+  </div>
+</body>
+</html>`;
+
+  return { subject, text, html };
+}
+
+

@@ -29,6 +29,10 @@ export const LEDGER_TYPES = Object.freeze({
   LEGS_POSTED: 'LEGS_POSTED',
   TRANSACTION_POSTED: 'TRANSACTION_POSTED',
   ENTRY: 'ENTRY',
+  ORG_PROFILE_UPDATED: 'ORG_PROFILE_UPDATED',
+  MEMBER_INVITED: 'MEMBER_INVITED',
+  MEMBER_ROLE_UPDATED: 'MEMBER_ROLE_UPDATED',
+  MEMBER_REMOVED: 'MEMBER_REMOVED',
 });
 
 const ZERO_HASH = '0'.repeat(64);
@@ -576,10 +580,13 @@ export async function listOrgIds() {
   return result.rows.map((row) => row.org_id);
 }
 
+export const appendLedgerEntry = appendEntry;
+
 export default {
   LEDGER_TYPES,
   assertSafePayload,
   appendEntry,
+  appendLedgerEntry,
   verifyChain,
   exportLedger,
   exportChain,
