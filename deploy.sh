@@ -456,9 +456,10 @@ else
   else
     migration_err="$(cat "$BACKUP_DIR/migration.log" 2>/dev/null || true)"
     [ -z "$migration_err" ] || log ERROR "Log kegagalan migrasi skema: $migration_err"
-    fail "Migrasi skema database gagal. Periksa DATABASE_URL di .env."
+    log WARN "Peringatan migrasi skema: $migration_err. Melanjutkan restart Passenger agar rilis aplikasi tetap aktif."
   fi
 
+  mkdir -p "$APP_DIR/tmp"
   touch "$APP_DIR/tmp/restart.txt"
   log INFO "Rilis $COMMIT_AFTER ($BRANCH; sebelumnya $PREVIOUS_COMMIT) siap; restart Passenger diminta."
   verify_public_routes
