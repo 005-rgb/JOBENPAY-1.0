@@ -1,5 +1,21 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { runMigrations } from '../src/db/migrate.js';
+
+const envPath = path.resolve(process.cwd(), '.env');
+if (fs.existsSync(envPath) && typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile(envPath);
+  } catch {
+    // Abaikan jika berkas .env tidak dapat dibaca
+  }
+}
+
+if (!process.env.UV_THREADPOOL_SIZE) {
+  process.env.UV_THREADPOOL_SIZE = '1';
+}
+
+const { runMigrations } = await import('../src/db/migrate.js');
 
 export { runMigrations };
 

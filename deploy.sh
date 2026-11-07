@@ -4,6 +4,21 @@
 
 set -Eeuo pipefail
 
+# Optimasi resource CloudLinux LVE: batasi thread pool dan memori V8 agar tidak melampaui limit NPROC (pthread_create EAGAIN)
+export UV_THREADPOOL_SIZE="${UV_THREADPOOL_SIZE:-1}"
+if [ -z "${NODE_OPTIONS:-}" ]; then
+  export NODE_OPTIONS="--max-old-space-size=256 --v8-pool-size=1"
+else
+  case "$NODE_OPTIONS" in
+    *--v8-pool-size*) ;;
+    *) export NODE_OPTIONS="$NODE_OPTIONS --v8-pool-size=1" ;;
+  esac
+  case "$NODE_OPTIONS" in
+    *--max-old-space-size*) ;;
+    *) export NODE_OPTIONS="$NODE_OPTIONS --max-old-space-size=256" ;;
+  esac
+fi
+
 APP_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ACCOUNT_HOME="${HOME:-$(cd "$APP_DIR/../.." && pwd -P)}"
 LOG_DIR="$ACCOUNT_HOME/logs"
@@ -436,7 +451,7 @@ else
     log WARN "Konfigurasi runtime mendeteksi kendala: $runtime_err"
   fi
   log INFO "Menjalankan migrasi skema database..."
-  if (cd "$APP_DIR" && "$NODE_BIN" server/scripts/migrate.js >"$BACKUP_DIR/migration.log" 2>&1); then
+  if (cd "$APP_DIR" && "$NODE_BIN" --env-file-if-exists=.env server/scripts/migrate.js >"$BACKUP_DIR/migration.log" 2>&1); then
     log INFO "Migrasi skema database berhasil diterapkan."
   else
     migration_err="$(cat "$BACKUP_DIR/migration.log" 2>/dev/null || true)"
