@@ -71,4 +71,4 @@ AFTER UPDATE ON escrow_accounts
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
 WHEN (NEW.status IN ('RELEASED','SLASHED','CLOSED'))
-EXECUTE FUNCTION check_escrow_balanced();
+EXECUTE PROCEDURE check_escrow_balanced();
