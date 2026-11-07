@@ -22,6 +22,8 @@ export function generateSar({
   mandateVersion = null,
   actor = null,
   vlei = null,
+  decision_integrity = null,
+  dip = null,
 }) {
   const intentId = intent.intent_id ?? intent.id;
   const category = intent.category ?? 'PAYOUT';
@@ -80,6 +82,17 @@ export function generateSar({
   if (vlei && vlei.status === 'ACTIVE') {
     sarPayload.legal_entity_lei = vlei.lei;
     sarPayload.vlei_verified = true;
+  }
+
+  const dipData = decision_integrity || dip || intent.decision_integrity || intent.dip;
+  if (dipData) {
+    sarPayload.decision_integrity = {
+      score: dipData.score,
+      components: dipData.components,
+      hard_rule_triggered: dipData.hard_rule_triggered ?? null,
+      intent_hash: dipData.intent_hash ?? null,
+      trace_hash: dipData.trace_hash ?? null,
+    };
   }
 
   const sarHash = computeSarHash(sarPayload);

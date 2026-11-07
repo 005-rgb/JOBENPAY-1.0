@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobenpay.io/schemas/reasoning-trace-v1.0.json",
+  "title": "Reasoning Trace v1.0",
+  "type": "object",
+  "required": ["trace_id", "request_id", "reasons", "created_at"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "request_id": { "type": "string" },
+    "reasons": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["claim", "evidence_ref", "data_source"],
+        "properties": {
+          "claim": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Ringkasan alasan (1 kalimat)"
+          },
+          "evidence_ref": {
+            "type": "string",
+            "pattern": "^(doc|field|record):[a-zA-Z0-9_.-]+$",
+            "description": "Referensi ke data yang mendukung klaim"
+          },
+          "data_source": {
+            "type": "string",
+            "enum": ["invoice", "vendor_profile", "request_metadata", "intent_anchor"]
+          },
+          "extracted_attributes": {
+            "type": "object",
+            "description": "Atribut yang diekstrak dari evidence_ref",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

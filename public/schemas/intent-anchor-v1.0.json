@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobenpay.io/schemas/intent-anchor-v1.0.json",
+  "title": "Intent Anchor v1.0",
+  "type": "object",
+  "required": [
+    "intent_id",
+    "org_id",
+    "principal_user_id",
+    "natural_language_input",
+    "structured_intent",
+    "intent_hash",
+    "signature",
+    "signing_key_id",
+    "valid_from",
+    "valid_to",
+    "created_at"
+  ],
+  "properties": {
+    "intent_id": { "type": "string" },
+    "org_id": { "type": "string" },
+    "principal_user_id": { "type": "string" },
+    "natural_language_input": { "type": "string", "maxLength": 2000 },
+    "structured_intent": {
+      "type": "object",
+      "required": ["purpose", "constraints"],
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "enum": [
+            "equipment_purchase",
+            "software_subscription",
+            "service_payment",
+            "supplier_payout",
+            "refund_issuance",
+            "invoice_payment",
+            "down_payment",
+            "other"
+          ]
+        },
+        "constraints": {
+          "type": "object",
+          "required": ["amount_range", "vendor_categories"],
+          "properties": {
+            "amount_range": {
+              "type": "object",
+              "required": ["min", "max"],
+              "properties": {
+                "min": { "type": "string", "pattern": "^[0-9]+$" },
+                "max": { "type": "string", "pattern": "^[0-9]+$" }
+              }
+            },
+            "vendor_categories": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "maxItems": 10
+            },
+            "required_attributes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["key", "operator", "value"],
+                "properties": {
+                  "key": { "type": "string" },
+                  "operator": {
+                    "type": "string",
+                    "enum": ["eq", "neq", "gte", "lte", "in", "not_in", "contains"]
+                  },
+                  "value": {}
+                }
+              },
+              "maxItems": 20
+            },
+            "allowed_brands": {
+              "type": "array",
+              "items": { "type": "string" },
+              "maxItems": 10
+            },
+            "deadline": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "intent_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "signature": { "type": "string" },
+    "signing_key_id": { "type": "string" },
+    "valid_from": { "type": "string", "format": "date-time" },
+    "valid_to": { "type": "string", "format": "date-time" },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

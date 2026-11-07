@@ -43,6 +43,8 @@ import {
   getProtocolHtml,
   getProofHandler,
 } from './routes/protocol.js';
+import { createDipRouter } from './routes/dip.js';
+import { handleAgentTransaction } from './controllers/dip_controller.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
 import { decrypt, encrypt, hashPassword, hmacSha256, randomToken, sha256Hex, verifyPassword } from './lib/crypto.js';
@@ -536,6 +538,8 @@ export function createApp() {
     }
   });
 
+  app.post('/agent/v1/transactions', agentAuth, handleAgentTransaction);
+
   app.post('/mcp', mcpOriginGuard, agentAuth, mcpHandler);
 
 
@@ -629,6 +633,7 @@ export function createApp() {
   api.use(createOrganizationRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createMembersRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createTenantProofsRouter({ requireSession, requireRole, requireCsrf }));
+  api.use(createDipRouter({ requireSession, requireCsrf, agentAuth }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,

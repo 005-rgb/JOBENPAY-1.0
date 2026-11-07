@@ -14,6 +14,7 @@ import {
   generateEd25519Keys,
   kidFromPublicKey,
 } from '../lib/crypto.js';
+import { StructuredIntentV2Schema } from '../../../shared/dip_schema.js';
 
 export const StructuredIntentSchema = z.object({
   purpose: z.string().min(1, 'Purpose must not be empty'),
@@ -77,6 +78,11 @@ function parseValidDate(val, fieldName) {
 export async function createIntent(orgId, userId, body, dbClient = null) {
   if (!orgId) {
     throw new AppError('VALIDATION_FAILED', 400, 'orgId is required');
+  }
+
+  // If structured_intent is v2 Intent Anchor format with constraints, delegate to createIntentAnchor
+  if (body?.structured_intent?.constraints) {
+    return createIntentAnchor(orgId, userId, body, dbClient);
   }
 
   const parseResult = CreateIntentSchema.safeParse(body);
@@ -328,3 +334,156 @@ export function verifyIntentSignature(intentMandate, publicKeyBase64) {
     return false;
   }
 }
+
+/**
+ * Creates and cryptographically signs a human Intent Anchor (PRD 1.6 §3).
+ * @param {string} orgId
+ * @param {string} userId
+ * @param {object} body
+ * @param {object} [dbClient=null]
+ * @returns {Promise<object>}
+ */
+export async function createIntentAnchor(orgId, userId, body, dbClient = null) {
+  if (!orgId) {
+    throw new AppError('VALIDATION_FAILED', 400, 'orgId is required');
+  }
+
+  const { natural_language_input, structured_intent, signing_key_id, signature, valid_from, valid_to } = body || {};
+  if (!natural_language_input) {
+    throw new AppError('VALIDATION_FAILED', 400, 'natural_language_input is required');
+  }
+
+  const parseResult = StructuredIntentV2Schema.safeParse(structured_intent);
+  if (!parseResult.success) {
+    throw new AppError('VALIDATION_FAILED', 400, 'Invalid structured_intent for Intent Anchor', {
+      errors: parseResult.error.flatten(),
+    });
+  }
+
+  const validStructured = parseResult.data;
+
+  // RFC 8785 Canonicalize and SHA-256 hash
+  const canonical = canonicalJson(validStructured);
+  const hashHex = crypto.createHash('sha256').update(canonical).digest('hex');
+  const intent_hash = `sha256:${hashHex}`;
+
+  // Key & signature
+  let finalSignature = signature;
+  let finalKeyId = signing_key_id;
+
+  if (!finalSignature) {
+    let privateKey = env.JOBENPAY_LEDGER_SIGNING_KEY;
+    if (!privateKey) {
+      const generated = generateEd25519Keys();
+      privateKey = generated.privateKey;
+      finalKeyId = kidFromPublicKey(generated.publicKey);
+    } else {
+      finalKeyId = signing_key_id || 'system-ledger-key';
+    }
+    const rawSig = signEd25519(privateKey, intent_hash);
+    finalSignature = `base64:${rawSig}`;
+  } else {
+    finalSignature = finalSignature.startsWith('base64:') ? finalSignature : `base64:${finalSignature}`;
+    finalKeyId = finalKeyId || 'principal-key';
+  }
+
+  const nowIso = new Date().toISOString();
+  const validFromIso = parseValidDate(valid_from, 'valid_from') || nowIso;
+  const validToIso =
+    parseValidDate(valid_to, 'valid_to') ||
+    parseValidDate(validStructured.constraints?.deadline, 'structured_intent.deadline') ||
+    new Date(Date.now() + 30 * 86400000).toISOString();
+
+  if (new Date(validToIso).getTime() <= new Date(validFromIso).getTime()) {
+    throw new AppError('VALIDATION_FAILED', 400, 'valid_to must be after valid_from');
+  }
+
+  const insertSql = `
+    INSERT INTO intent_mandates (
+      org_id, principal_user_id, natural_language_input, structured_intent,
+      structured_intent_v2, intent_hash, intent_hash_v2, signature, signing_key_id,
+      valid_from, valid_to, status
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'ACTIVE')
+    RETURNING intent_id, org_id, principal_user_id, natural_language_input,
+              structured_intent, structured_intent_v2, intent_hash, intent_hash_v2,
+              signature, signing_key_id, valid_from, valid_to, status, created_at;
+  `;
+
+  const { rows } = await runQuery(insertSql, [
+    orgId,
+    userId,
+    natural_language_input,
+    JSON.stringify(validStructured),
+    JSON.stringify(validStructured),
+    intent_hash,
+    intent_hash,
+    finalSignature,
+    finalKeyId,
+    validFromIso,
+    validToIso,
+  ], dbClient);
+
+  const row = rows[0];
+  return {
+    ...row,
+    structured_intent: row.structured_intent_v2 || row.structured_intent,
+  };
+}
+
+/**
+ * Retrieves an Intent Anchor by ID.
+ * @param {string} orgId
+ * @param {string} intentId
+ * @param {object} [dbClient=null]
+ * @returns {Promise<object>}
+ */
+export async function getIntentAnchor(orgId, intentId, dbClient = null) {
+  if (!orgId || !intentId) {
+    throw new AppError('VALIDATION_FAILED', 400, 'orgId and intentId are required');
+  }
+
+  if (!isValidUuid(intentId)) {
+    throw new AppError('INTENT_NOT_FOUND', 404, 'Intent anchor not found');
+  }
+
+  const { rows } = await runQuery(
+    `SELECT intent_id, org_id, principal_user_id, natural_language_input,
+            structured_intent, structured_intent_v2, intent_hash, intent_hash_v2,
+            signature, signing_key_id, valid_from, valid_to, status, created_at
+     FROM intent_mandates
+     WHERE org_id = $1 AND intent_id = $2;`,
+    [orgId, intentId],
+    dbClient
+  );
+
+  if (!rows || rows.length === 0) {
+    throw new AppError('INTENT_NOT_FOUND', 404, 'Intent anchor not found');
+  }
+
+  const row = rows[0];
+  return {
+    ...row,
+    structured_intent: row.structured_intent_v2 || row.structured_intent,
+  };
+}
+
+/**
+ * Verifies an Intent Anchor signature.
+ * @param {object} intentAnchor
+ * @param {string} publicKeyBase64
+ * @returns {boolean}
+ */
+export function verifyIntentAnchor(intentAnchor, publicKeyBase64) {
+  if (!intentAnchor || !intentAnchor.signature || !publicKeyBase64) {
+    return false;
+  }
+  const cleanSig = intentAnchor.signature.replace(/^base64:/, '').replace(/^ed25519:/, '');
+  const hash = intentAnchor.intent_hash || intentAnchor.intent_hash_v2;
+  if (!hash) return false;
+  try {
+    return verifyEd25519(publicKeyBase64, cleanSig, hash);
+  } catch {
+    return false;
+  }
+}
+

@@ -67,6 +67,7 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['POST /pact/contracts', 'Creates a new PACT contract within current session tenant'],
   ['GET /agent/v1/ping', 'Agent API authentication probe returning pong for active key'],
   ['POST /agent/v1/requests', 'Submits payment request bound to authenticated agent'],
+  ['POST /agent/v1/transactions', 'Submits transaction proposal with reasoning trace bound to authenticated agent'],
   ['POST /agent/v1/payout-requests', 'Alias for /agent/v1/requests bound to authenticated agent'],
   ['POST /agent/v1/documents', 'Uploads multipart document bound to authenticated agent'],
   ['POST /agent/v1/refund-requests', 'Submits refund request (Tier B stub)'],
@@ -723,6 +724,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         // Parameterized tested in 1.2
         'GET /admin/evidence/:requestId',
         'GET /requests/:id',
+        'GET /requests/:id/dip',
         'POST /requests/:id/cancel',
         'GET /approvals/:id',
         'POST /approvals/:id/decision',

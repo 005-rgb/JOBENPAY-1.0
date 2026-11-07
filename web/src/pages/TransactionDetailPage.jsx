@@ -31,6 +31,7 @@ import {
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
+import { DipDisplayCard } from './DipPages.jsx';
 import { StatusPill, ProviderBadge } from './TransactionsPage.jsx';
 import styles from './TransactionPages.module.css';
 
@@ -353,6 +354,15 @@ export function TransactionDetailPage() {
         >
           Reconciliation & PayPal
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('dip')}
+          className={activeTab === 'dip' ? styles.primaryLink : styles.secondaryLink}
+          style={{ height: '32px', fontSize: '13px' }}
+          data-testid="tab-dip"
+        >
+          Decision Integrity (DIP)
+        </button>
       </div>
 
       {/* Tab 1: Overview & State Timeline */}
@@ -546,6 +556,11 @@ export function TransactionDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Tab 5: Decision Integrity Proof */}
+      {activeTab === 'dip' && (
+        <DipDisplayCard requestId={intent.intent_id} />
       )}
 
       {/* Step-Up Dialog */}

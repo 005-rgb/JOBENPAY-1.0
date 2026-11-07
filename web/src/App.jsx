@@ -58,6 +58,7 @@ const SimulatorPage = lazy(() => import('./pages/F05Pages.jsx').then((pages) => 
 const ProofsPage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.ProofsPage })));
 const HandshakesPage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.HandshakesPage })));
 const ProtocolConformancePage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.ProtocolConformancePage })));
+const IntentAnchorBuilderPage = lazy(() => import('./pages/DipPages.jsx').then((p) => ({ default: p.IntentAnchorBuilderPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -138,6 +139,7 @@ function AuthenticatedApp() {
           <Route element={<ProofsPage />} path="/proofs" />
           <Route element={<HandshakesPage />} path="/handshakes" />
           <Route element={<ProtocolConformancePage />} path="/protocol/conformance" />
+          <Route element={<IntentAnchorBuilderPage />} path="/intents/new" />
           <Route element={<ComingSoonPage />} path="*" />
         </Routes>
       </Suspense>
