@@ -108,12 +108,9 @@ export async function createIntent(orgId, userId, body, dbClient = null) {
     }
     const rawSig = signEd25519(privateKey, intent_hash);
     finalSignature = `ed25519:${rawSig}`;
-  } else if (!finalSignature.startsWith('ed25519:')) {
-    finalSignature = `ed25519:${finalSignature}`;
-  }
-
-  if (!finalKeyId) {
-    finalKeyId = 'principal-key';
+  } else {
+    finalSignature = finalSignature.startsWith('ed25519:') ? finalSignature : `ed25519:${finalSignature}`;
+    finalKeyId = finalKeyId || 'principal-key';
   }
 
   // 3. Compute timestamps

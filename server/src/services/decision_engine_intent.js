@@ -17,12 +17,13 @@ import { validateIntentMatch } from './intent_service.js';
  */
 export async function evaluateIntentMandateStageA({ orgId, mandate, transaction = {}, dbClient }) {
   const policy = mandate?.policy || mandate;
-  const isIntentCheckEnabled =
-    mandate?.ai?.intentCheck === true ||
-    mandate?.ai?.intent_check === true ||
-    policy?.ai?.intentCheck === true ||
-    policy?.ai?.intent_check === true ||
-    transaction?.requireIntentCheck === true;
+  const isIntentCheckEnabled = Boolean(
+    mandate?.ai?.intentCheck ||
+    mandate?.ai?.intent_check ||
+    policy?.ai?.intentCheck ||
+    policy?.ai?.intent_check ||
+    transaction?.requireIntentCheck
+  );
 
   if (!isIntentCheckEnabled) {
     return { valid: true };

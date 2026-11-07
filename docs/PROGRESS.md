@@ -95,7 +95,7 @@
 | B-F9 | DONE | B-F9 | 2026-11-07 | Verifikasi Akhir, Dokumentasi & Rilis: 28/28 pasangan kategori/sub-tipe E2E lifecycle terverifikasi, 10 kriteria PRD §13 terpenuhi, Traceability 100% (135/135 Done, 0 pending), API Reference dibangkitkan dari skema Zod, README 10 bagian lengkap, seluruh 6 SG ditutup |
 | GERBANG-G9 | DONE | G9-DOD-VERIFIED | 2026-11-07 | Gerbang G9 = Definition of Done Sistem Penuh LULUS PENUH (100% PASSED). Test suite 919/919 hijau, seluruh pagar CI lulus, 0 vulnerability |
 | PRD-1.4-A | DONE | feat(prd-1.4-fase-A) | 2026-11-07 | Fase A (vLEI Integration): org_legal_identity, SAR extension, Ed25519 canonical verify, Decision Engine Stage A ruleA3bVlei, 16/16 test passing, 100% c8 coverage (lines, branches, functions, stmts) |
-| PRD-1.4-B | WIP | - | 2026-11-07 | Fase B (Intent Layer): intent_mandates, natural language & structured intent hash chain, Decision Engine Stage A integration |
+| PRD-1.4-B | DONE | feat(prd-1.4-fase-B) | 2026-11-08 | Fase B (Intent Layer): intent_mandates, natural language & structured intent hash chain, Ed25519 signature verify, Decision Engine Stage A integration, 16/16 test passing, 100% c8 coverage (lines, branches, functions, stmts) |
 | PRD-1.4-C | TODO | - | - | Fase C (PACT - Polymorphic Agent Contract Tokens) |
 
 ## Resume
