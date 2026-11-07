@@ -55,6 +55,8 @@ const RequestDetailPage = lazy(() => import('./pages/F04Pages.jsx').then((pages)
 const RequestsPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.RequestsPage })));
 const SecurityPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.SecurityPage })));
 const SimulatorPage = lazy(() => import('./pages/F05Pages.jsx').then((pages) => ({ default: pages.SimulatorPage })));
+const OrganizationPage = lazy(() => import('./pages/OrganizationPage.jsx'));
+const MembersPage = lazy(() => import('./pages/MembersPage.jsx'));
 const ProofsPage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.ProofsPage })));
 const HandshakesPage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.HandshakesPage })));
 const ProtocolConformancePage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.ProtocolConformancePage })));
@@ -136,6 +138,8 @@ function AuthenticatedApp() {
           <Route element={<PayeeDetailPage />} path="/payees/:id" />
           <Route element={<PaypalSettingsPage />} path="/settings/paypal" />
           <Route element={<SecurityPage />} path="/settings/security" />
+          <Route element={<RequireRole roles={['OWNER', 'ADMIN']}><OrganizationPage /></RequireRole>} path="/organization" />
+          <Route element={<RequireRole roles={['OWNER', 'ADMIN']}><MembersPage /></RequireRole>} path="/members" />
           <Route element={<ProofsPage />} path="/proofs" />
           <Route element={<HandshakesPage />} path="/handshakes" />
           <Route element={<ProtocolConformancePage />} path="/protocol/conformance" />
