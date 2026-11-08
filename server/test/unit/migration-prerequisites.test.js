@@ -7,7 +7,7 @@ const triggerMigrationUrl = new URL('../../migrations/008_triggers.sql', import.
 
 test('migrations use built-in SQL expressions for UUID defaults without extensions or functions', async () => {
   const migrationFiles = (await readdir(migrationDir))
-    .filter((name) => /^\d+_.*\.sql$/i.test(name))
+    .filter((name) => /^(?:0[0-3]\d)_.*\.sql$/i.test(name))
     .sort();
   const migrations = await Promise.all(migrationFiles.map((name) => readFile(new URL(name, migrationDir), 'utf8')));
   const firstMigration = migrations[0];

@@ -2,7 +2,7 @@ BEGIN;
 
 -- 4.1.1 Protocol Versions
 CREATE TABLE IF NOT EXISTS protocol_versions (
-  version_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
+  version_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   protocol_version TEXT NOT NULL UNIQUE,
   schema_json JSONB NOT NULL,
   released_at TIMESTAMPTZ NOT NULL,
@@ -15,7 +15,7 @@ CREATE INDEX IF NOT EXISTS idx_protocol_versions_status ON protocol_versions(sta
 
 -- 4.1.2 Public Proofs
 CREATE TABLE IF NOT EXISTS public_proofs (
-  proof_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
+  proof_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sar_id TEXT NOT NULL,
   org_id UUID NOT NULL REFERENCES organizations(id),
   sar_json JSONB NOT NULL,
@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_public_proofs_expires ON public_proofs(expires_at
 
 -- 4.1.3 Trust Handshakes
 CREATE TABLE IF NOT EXISTS trust_handshakes (
-  handshake_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
+  handshake_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   requester_org_id UUID NOT NULL REFERENCES organizations(id),
   target_org_id UUID NOT NULL REFERENCES organizations(id),
   agent_id UUID NOT NULL,
@@ -58,7 +58,7 @@ CREATE INDEX IF NOT EXISTS idx_trust_handshakes_status ON trust_handshakes(statu
 
 -- 4.1.4 Conformance Vectors
 CREATE TABLE IF NOT EXISTS conformance_vectors (
-  vector_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
+  vector_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   vector_name TEXT NOT NULL UNIQUE,
   sar_json JSONB NOT NULL,
   expected_result TEXT NOT NULL CHECK (expected_result IN ('VALID','INVALID','INDETERMINATE')),
@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_conformance_vectors_category ON conformance_vecto
 
 -- 4.1.5 Partner Systems
 CREATE TABLE IF NOT EXISTS partner_systems (
-  partner_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
+  partner_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   partner_name TEXT NOT NULL,
   partner_type TEXT NOT NULL CHECK (partner_type IN ('SIMULATED','REAL')),
   base_url TEXT NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS partner_systems (
 
 -- 4.1.6 Revocation Subscriptions
 CREATE TABLE IF NOT EXISTS revocation_subscriptions (
-  subscription_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
+  subscription_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID REFERENCES organizations(id),
   url TEXT NOT NULL,
   events TEXT[] NOT NULL,

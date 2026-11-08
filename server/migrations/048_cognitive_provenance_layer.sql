@@ -5,7 +5,7 @@ BEGIN;
 
 -- 5.1.1 Cognitive Snapshots
 CREATE TABLE IF NOT EXISTS cognitive_snapshots (
-  snapshot_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
+  snapshot_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   request_id UUID NOT NULL,
   org_id UUID NOT NULL REFERENCES organizations(id),
   model JSONB NOT NULL,
@@ -17,8 +17,16 @@ CREATE TABLE IF NOT EXISTS cognitive_snapshots (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-ALTER TABLE cognitive_snapshots DROP CONSTRAINT IF EXISTS uq_cognitive_snapshots_request;
-ALTER TABLE cognitive_snapshots ADD CONSTRAINT uq_cognitive_snapshots_request UNIQUE(request_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'uq_cognitive_snapshots_request'
+      AND conrelid = 'cognitive_snapshots'::regclass
+  ) THEN
+    ALTER TABLE cognitive_snapshots ADD CONSTRAINT uq_cognitive_snapshots_request UNIQUE(request_id);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_cognitive_snapshots_request ON cognitive_snapshots(request_id);
 CREATE INDEX IF NOT EXISTS idx_cognitive_snapshots_org ON cognitive_snapshots(org_id);
@@ -26,7 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_cognitive_snapshots_hash ON cognitive_snapshots(s
 
 -- 5.1.2 Replay Results
 CREATE TABLE IF NOT EXISTS replay_results (
-  replay_id UUID PRIMARY KEY DEFAULT (overlay(overlay(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text) placing '4' from 13 for 1) placing CASE substr(md5(random()::text || clock_timestamp()::text || txid_current()::text || pg_backend_pid()::text), 1, 1) WHEN '0' THEN '8' WHEN '1' THEN '8' WHEN '2' THEN '8' WHEN '3' THEN '8' WHEN '4' THEN '9' WHEN '5' THEN '9' WHEN '6' THEN '9' WHEN '7' THEN '9' WHEN '8' THEN 'a' WHEN '9' THEN 'a' WHEN 'a' THEN 'a' WHEN 'b' THEN 'a' ELSE 'b' END from 17 for 1)::uuid),
+  replay_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   snapshot_id UUID NOT NULL REFERENCES cognitive_snapshots(snapshot_id),
   org_id UUID NOT NULL REFERENCES organizations(id),
   replay_model JSONB NOT NULL,
