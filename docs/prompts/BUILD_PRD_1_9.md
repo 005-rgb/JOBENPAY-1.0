@@ -1,0 +1,395 @@
+# PERFECT PROMPT — PRD 1.9 Production Operations Layer
+## Zero-Hallucination Build Prompt untuk AI Builder
+
+**Versi:** 1.0  
+**Target:** AI Builder (Replit / Cursor / Claude Code)  
+**Filosofi:** Setiap langkah eksplisit, setiap file eksplisit, setiap test eksplisit. Tidak ada ruang untuk menebak.  
+**Cara pakai:** Simpan sebagai `docs/prompts/BUILD_PRD_1_9.md`. Tempel ke AI builder sekali; prompt ini mencakup seluruh 12 WP.
+
+---
+
+## 0. ATURAN GLOBAL (WAJIB DIBACA SEBELUM MULAI)
+
+```markdown
+# ATURAN MUTLAK — PELANGGARAN = BUILD GAGAL
+
+1. Baca HANYA file yang dirujuk prompt. Jangan membaca seluruh repo.
+2. Jangan menebak nama file, tabel, kolom, endpoint, atau fungsi. Verifikasi dengan `ls` dan `grep` sebelum menulis kode.
+3. Jika ada yang tidak jelas: TULIS pertanyaan di `docs/PROGRESS.md` bagian "Blockers" dan BERHENTI. Jangan mengasumsikan.
+4. Satu langkah (WP) = satu commit. Commit message: `feat(prd-1.9-wp-X): <deskripsi>`.
+5. Test adalah hakim. Selesai bila semua test di WP tersebut hijau.
+6. Coverage 100% untuk modul baru (`circuit-breaker.js`, `slo_service.js`, `secret_rotation.js`, `shutdown.js`). CI gagal jika < 100%.
+7. Jangan mengerjakan WP berikutnya sebelum WP saat ini DONE.
+8. Jangan mengubah test lama kecuali spesifikasi berubah. Jika diubah, beri label `test-changed` + alasan.
+9. Jangan commit rahasia (API key, password, token).
+10. Gunakan `node:crypto` untuk kriptografi. Jangan bikin algoritma sendiri.
+11. Semua error menggunakan `AppError` dengan kode eksplisit.
+12. Tidak ada `console.log` di kode produksi. Gunakan `logger`.
+13. Fail-closed: jika integrasi eksternal (PayPal, LLM) tidak tersedia → circuit breaker membuka, request ditolak/ditahan.
+14. Migrasi wajib `IF NOT EXISTS` dan idempoten.
+15. Setiap query baru wajib memiliki index. Test dengan `EXPLAIN ANALYZE` — jika `Seq Scan` muncul, test gagal.
+```
+
+---
+
+## 1. STRUKTUR FILE YANG HARUS DIBACA
+
+AI builder **hanya boleh membaca** file berikut:
+
+- `docs/PRD_1.9_Production_Operations.md` — **seluruh dokumen** (ini adalah satu-satunya PRD yang dibaca untuk PRD 1.9)
+- `docs/PRD_1.2_Sandbox_Gatekeeper.md` — **hanya §9.9 (job worker), §13.2 (keamanan)**
+- `docs/PRD_1.8_JPL.md` — **hanya §5 (compiler), §6 (evaluator)** untuk konteks module structure
+- `docs/DECISIONS.md`
+- `docs/PROGRESS.md`
+
+**Jangan membaca** PRD 1.3–1.7 kecuali dirujuk secara eksplisit oleh PRD 1.9.
+
+---
+
+## 2. PROMPT PEMBUKA (SATU-SATUNYA YANG DITEMpel)
+
+```markdown
+# PROMPT PEMBUKA — PRD 1.9 Production Operations Layer
+
+Baca file berikut (HANYA ini):
+1. docs/PRD_1.9_Production_Operations.md (seluruh dokumen)
+2. docs/PRD_1.2_Sandbox_Gatekeeper.md — hanya §9.9, §13.2
+3. docs/PRD_1.8_JPL.md — hanya §5, §6
+4. docs/DECISIONS.md
+5. docs/PROGRESS.md
+
+## PRASYARAT
+- Semua test PRD 1.2–1.8 harus hijau sebelum memulai.
+- Jalankan `npm test` dan catat baseline (jumlah test lulus).
+- Jika ada test yang gagal, BERHENTI dan tulis di PROGRESS.md "Blockers".
+
+## Tugas: Kerjakan PRD 1.9 — WP1 sampai WP12 (BERURUTAN)
+
+Setiap WP memiliki:
+- File yang harus dibuat/diubah (eksplisit)
+- Test yang harus ditulis lebih dulu (TDD)
+- Definition of Done (DoD)
+- Commit message
+
+Jangan mengerjakan WP berikutnya sebelum WP saat ini DONE.
+
+---
+
+### WP1 — SLI/SLO Definitions + Endpoint
+
+**File yang dibuat:**
+- `shared/sli-definitions.js` — persis seperti PRD 1.9 §3.1 (6 SLI)
+- `shared/slo-definitions.js` — persis seperti PRD 1.9 §3.2 (6 SLO)
+- `server/src/services/slo_service.js` — fungsi: `getAllSLOs()`, `getSLOById(id)`, `computeBurnRate(sloId)`, `getErrorBudget(sloId)`
+- `server/src/controllers/slo_controller.js` — handler: `getSLOs`, `getSLOById`
+- `server/src/routes/ops.js` — route: `GET /api/v1/ops/slo`, `GET /api/v1/ops/slo/:id`
+- `docs/error-budget-policy.md` — persis seperti PRD 1.9 §3.3
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/slo_service.test.js` — 4 test: `test_sli_definition_valid`, `test_slo_definition_valid`, `test_error_budget_calculation`, `test_burn_rate_calculation`
+- `server/test/integration/slo_api.test.js` — 2 test: `test_slo_endpoint`, `test_slo_by_id_endpoint`
+
+**DoD:**
+- [ ] 6 SLI tersedia
+- [ ] 6 SLO tersedia
+- [ ] `GET /api/v1/ops/slo` → 200 dengan 6 SLO
+- [ ] `GET /api/v1/ops/slo/:id` → 200 dengan history
+- [ ] Error budget policy tersedia
+- [ ] Coverage 100% untuk `slo_service.js`
+- [ ] Semua test di atas lulus
+
+**Commit:** `feat(prd-1.9-wp1): add SLI/SLO definitions and endpoint`
+
+---
+
+### WP2 — Graceful Shutdown + Health Checks
+
+**File yang dibuat:**
+- `server/src/shutdown.js` — persis seperti PRD 1.9 §4.1
+- `server/src/routes/health.js` — persis seperti PRD 1.9 §4.3 (`/healthz`, `/readyz`, `/startupz`)
+
+**File yang diubah:**
+- `server/src/jobs/worker.js` — tambahkan method `pause()`, `drain()`, `isAlive()`
+- `server/src/server.js` — panggil `setupGracefulShutdown(server)`, daftarkan `healthRouter`
+- `server/src/db/migrations.js` — tambahkan fungsi `migrationStatus()` yang mengembalikan boolean
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/shutdown.test.js` — 3 test: `test_graceful_shutdown_timeout`, `test_worker_pause`, `test_worker_drain`
+- `server/test/integration/health.test.js` — 4 test: `test_healthz_200`, `test_readyz_200`, `test_readyz_503_db_down`, `test_startupz_200`
+
+**DoD:**
+- [ ] SIGTERM → server.close() → worker.pause() → worker.drain() → pool.end() → exit 0
+- [ ] Timeout 30s → exit 1
+- [ ] `GET /healthz` → 200 (process alive)
+- [ ] `GET /readyz` → 200 jika DB + migrasi + worker OK, 503 jika tidak
+- [ ] `GET /startupz` → 200 jika migrasi selesai
+- [ ] Coverage 100% untuk `shutdown.js`
+- [ ] Semua test di atas lulus
+
+**Commit:** `feat(prd-1.9-wp2): add graceful shutdown and health checks`
+
+---
+
+### WP3 — Circuit Breaker
+
+**File yang dibuat:**
+- `server/src/lib/circuit-breaker.js` — persis seperti PRD 1.9 §5.1
+- `server/src/controllers/circuit_breaker_controller.js` — handler: `getCircuitBreakers`
+
+**File yang diubah:**
+- `server/src/paypal/client.js` — bungkus semua panggilan PayPal dengan `paypalBreaker.execute()`
+- `server/src/ai/index.js` — bungkus `generateStructured()` dengan `aiBreaker.execute()`
+- `server/src/routes/ops.js` — tambahkan route `GET /api/v1/ops/circuit-breakers`
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/circuit_breaker.test.js` — 4 test: `test_circuit_breaker_closed`, `test_circuit_breaker_open`, `test_circuit_breaker_half_open`, `test_circuit_breaker_reset`
+- `server/test/integration/circuit_breaker_api.test.js` — 1 test: `test_circuit_breaker_endpoint`
+
+**DoD:**
+- [ ] Circuit breaker state: CLOSED → OPEN (setelah 5 failures) → HALF_OPEN (setelah 60s) → CLOSED (setelah 2 successes)
+- [ ] PayPal call dibungkus circuit breaker
+- [ ] LLM call dibungkus circuit breaker
+- [ ] `GET /api/v1/ops/circuit-breakers` → 200 dengan daftar breaker
+- [ ] Coverage 100% untuk `circuit-breaker.js`
+- [ ] Semua test di atas lulus
+
+**Commit:** `feat(prd-1.9-wp3): add circuit breaker for PayPal and LLM`
+
+---
+
+### WP4 — Per-Tenant Metrics + Audit Log
+
+**File yang dibuat:**
+- `server/src/services/metrics_service.js` — fungsi: `getTenantMetrics(orgId, window)`
+- `server/src/controllers/metrics_controller.js` — handler: `getTenantMetrics`
+- `server/src/controllers/audit_controller.js` — handler: `getAuditLog`
+- `server/src/services/audit_service.js` — fungsi: `queryAuditLog(orgId, filters, cursor, limit)`
+
+**File yang diubah:**
+- `server/src/routes/ops.js` — tambahkan route `GET /api/v1/ops/tenants/:org_id/metrics`, `GET /api/v1/audit`
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/metrics_service.test.js` — 2 test: `test_tenant_metrics_aggregation`, `test_tenant_metrics_window`
+- `server/test/unit/audit_service.test.js` — 2 test: `test_audit_query_by_user`, `test_audit_query_by_time_range`
+- `server/test/integration/metrics_api.test.js` — 1 test: `test_tenant_metrics_endpoint`
+- `server/test/integration/audit_api.test.js` — 1 test: `test_audit_log_query`
+
+**DoD:**
+- [ ] `GET /api/v1/ops/tenants/:org_id/metrics` → 200 dengan metrics lengkap
+- [ ] `GET /api/v1/audit` → 200 dengan events, filter by user_id/action/time
+- [ ] Audit log muncul < 30 detik setelah aksi
+- [ ] Semua test di atas lulus
+
+**Commit:** `feat(prd-1.9-wp4): add per-tenant metrics and audit log query`
+
+---
+
+### WP5 — Runbook (10 Dokumen)
+
+**File yang dibuat:**
+- `docs/runbook/README.md` — daftar 10 runbook
+- `docs/runbook/01-database-down.md` — persis seperti PRD 1.9 §7.2
+- `docs/runbook/02-paypal-unavailable.md`
+- `docs/runbook/03-llm-timeout.md`
+- `docs/runbook/04-worker-stuck.md`
+- `docs/runbook/05-ledger-verification-failed.md`
+- `docs/runbook/06-double-payout-detected.md`
+- `docs/runbook/07-high-error-rate.md`
+- `docs/runbook/08-high-latency.md`
+- `docs/runbook/09-circuit-breaker-open.md`
+- `docs/runbook/10-webhook-processing-delayed.md`
+
+Setiap runbook harus memiliki bagian:
+- Symptom
+- Impact
+- Diagnosis (dengan perintah eksplisit)
+- Resolution (dengan langkah eksplisit)
+- Escalation
+- Post-Incident
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/runbook.test.js` — 2 test: `test_runbook_all_exist`, `test_runbook_has_sections`
+
+**DoD:**
+- [ ] 10 runbook tersedia
+- [ ] Setiap runbook memiliki 6 bagian
+- [ ] Semua test di atas lulus
+
+**Commit:** `docs(prd-1.9-wp5): add 10 operational runbooks`
+
+---
+
+### WP6 — Alert Definitions
+
+**File yang dibuat:**
+- `shared/alert-definitions.js` — persis seperti PRD 1.9 §7.3 (4 alert: database down, paypal unavailable, double payout, slo burn rate)
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/alert_definitions.test.js` — 2 test: `test_alert_has_runbook`, `test_alert_has_severity`
+
+**DoD:**
+- [ ] 4 alert tersedia
+- [ ] Setiap alert memiliki runbook
+- [ ] Setiap alert memiliki severity
+- [ ] Semua test di atas lulus
+
+**Commit:** `feat(prd-1.9-wp6): add alert definitions`
+
+---
+
+### WP7 — Rollback Plan + Canary
+
+**File yang dibuat:**
+- `docs/runbook/rollback.md` — persis seperti PRD 1.9 §8.1
+- `docs/runbook/canary.md` — persis seperti PRD 1.9 §8.2
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/deployment.test.js` — 2 test: `test_rollback_plan_exists`, `test_canary_procedure_exists`
+
+**DoD:**
+- [ ] Rollback plan tersedia dan teruji di staging
+- [ ] Canary procedure tersedia
+- [ ] Semua test di atas lulus
+
+**Commit:** `docs(prd-1.9-wp7): add rollback and canary procedures`
+
+---
+
+### WP8 — Exception Tracking
+
+**File yang dibuat:**
+- `docs/exceptions.md` — persis seperti PRD 1.9 §8.3
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/exceptions.test.js` — 2 test: `test_exceptions_have_expiry`, `test_exceptions_have_owner`
+
+**DoD:**
+- [ ] Exception tracking tersedia
+- [ ] Setiap exception memiliki expiry + owner
+- [ ] Semua test di atas lulus
+
+**Commit:** `docs(prd-1.9-wp8): add exception tracking`
+
+---
+
+### WP9 — Secret Rotation
+
+**File yang dibuat:**
+- `server/src/services/secret_rotation.js` — persis seperti PRD 1.9 §9.1 (rotateAgentApiKey, rotateLedgerSigningKey)
+- `server/src/controllers/rotation_controller.js` — handler: `rotateApiKey`, `rotateLedgerKey`
+- `server/migrations/023_secret_rotation.sql` — persis seperti PRD 1.9 §9.2 (grace_until, ledger_signing_keys)
+
+**File yang diubah:**
+- `server/src/routes/agents.js` — tambahkan `POST /api/v1/agents/:agent_id/keys/rotate`
+- `server/src/routes/org.js` — tambahkan `POST /api/v1/org/ledger-keys/rotate`
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/secret_rotation.test.js` — 2 test: `test_secret_rotation_grace`, `test_secret_rotation_new_key`
+- `server/test/integration/rotation_api.test.js` — 4 test: `test_rotate_api_key`, `test_rotate_api_key_grace`, `test_rotate_api_key_expired`, `test_rotate_ledger_key`
+
+**DoD:**
+- [ ] API key rotation: key baru langsung valid, key lama valid selama grace (1 jam)
+- [ ] Ledger key rotation: key baru ACTIVE, key lama ROTATED (tetap valid untuk verifikasi)
+- [ ] `POST /api/v1/agents/:id/keys/rotate` → 200 dengan new_key
+- [ ] `POST /api/v1/org/ledger-keys/rotate` → 200 dengan new_kid
+- [ ] Semua test di atas lulus
+
+**Commit:** `feat(prd-1.9-wp9): add secret rotation`
+
+---
+
+### WP10 — Load Testing
+
+**File yang dibuat:**
+- `scripts/load-test.js` — persis seperti PRD 1.9 §10.1
+- `docs/load-test-results.md` — dokumentasi hasil
+
+**Test yang ditulis lebih dulu:**
+- `server/test/load/load_test.test.js` — 4 test (hanya dijalankan manual dengan `RUN_LOAD_TESTS=1`)
+
+**DoD:**
+- [ ] Load test scenario tersedia (payout_burst, mixed_workload)
+- [ ] 1000 concurrent payout: p95 < 500ms, 0 error
+- [ ] 5000 concurrent decisions: p95 < 300ms, 0 error
+- [ ] 10.000 webhook events: 0 duplicate, 0 error
+- [ ] Hasil didokumentasikan
+
+**Commit:** `test(prd-1.9-wp10): add load test scenarios`
+
+---
+
+### WP11 — Capacity Model
+
+**File yang dibuat:**
+- `docs/capacity-model.md` — persis seperti PRD 1.9 §10.3
+
+**Test yang ditulis lebih dulu:**
+- `server/test/unit/capacity.test.js` — 2 test: `test_capacity_model_exists`, `test_capacity_has_assumptions`
+
+**DoD:**
+- [ ] Capacity model tersedia
+- [ ] Model mencakup: assumptions, per-instance capacity, required instances, cost estimate
+- [ ] Semua test di atas lulus
+
+**Commit:** `docs(prd-1.9-wp11): add capacity model`
+
+---
+
+### WP12 — Test Suite Integration
+
+**File yang dibuat:**
+- `server/test/integration/full_ops.test.js` — 1 test E2E: `test_full_ops_flow` (health → SLO → circuit breaker → tenant metrics → audit)
+
+**File yang diubah:**
+- `package.json` — tambahkan `test:coverage` untuk modul baru
+
+**DoD:**
+- [ ] E2E test lulus
+- [ ] Coverage 100% untuk `circuit-breaker.js`, `slo_service.js`, `secret_rotation.js`, `shutdown.js`
+- [ ] Semua test dari WP1–WP11 lulus
+- [ ] `npm test` hijau
+
+**Commit:** `test(prd-1.9-wp12): add full ops integration test and coverage`
+
+---
+
+## URUTAN EKSEKUSI (WAJIB BERURUTAN)
+
+1. WP1 → commit `feat(prd-1.9-wp1): add SLI/SLO definitions and endpoint`
+2. WP2 → commit `feat(prd-1.9-wp2): add graceful shutdown and health checks`
+3. WP3 → commit `feat(prd-1.9-wp3): add circuit breaker for PayPal and LLM`
+4. WP4 → commit `feat(prd-1.9-wp4): add per-tenant metrics and audit log query`
+5. WP5 → commit `docs(prd-1.9-wp5): add 10 operational runbooks`
+6. WP6 → commit `feat(prd-1.9-wp6): add alert definitions`
+7. WP7 → commit `docs(prd-1.9-wp7): add rollback and canary procedures`
+8. WP8 → commit `docs(prd-1.9-wp8): add exception tracking`
+9. WP9 → commit `feat(prd-1.9-wp9): add secret rotation`
+10. WP10 → commit `test(prd-1.9-wp10): add load test scenarios`
+11. WP11 → commit `docs(prd-1.9-wp11): add capacity model`
+12. WP12 → commit `test(prd-1.9-wp12): add full ops integration test and coverage`
+
+---
+
+## DEFINITION OF DONE (PRD 1.9 SELURUHNYA)
+
+PRD 1.9 selesai HANYA jika:
+
+- [ ] 6 SLI tersedia dan valid
+- [ ] 6 SLO tersedia dan valid
+- [ ] Error budget policy tersedia
+- [ ] Graceful shutdown berfungsi (SIGTERM → drain → exit 0)
+- [ ] `/healthz`, `/readyz`, `/startupz` berfungsi
+- [ ] Circuit breaker berfungsi untuk PayPal dan LLM
+- [ ] Per-tenant metrics endpoint berfungsi
+- [ ] Audit log queryable endpoint berfungsi (< 30 detik)
+- [ ] 10 runbook tersedia
+- [ ] 4 alert definitions tersedia
+- [ ] Rollback plan teruji di staging
+- [ ] Canary procedure tersedia
+- [ ] Exception tracking tersedia
+- [ ] Secret rotation (API key + ledger key) berfungsi
+- [ ] Load test scenario tersedia dan lulus
+- [ ] Capacity model tersedia
+- [ ] Coverage 100% untuk `circuit-breaker.js`, `slo_service.js`, `secret_rotation.js`, `shutdown.js`
+- [ ] Semua test di PRD 1.9 §11 lulus
+- [ ] `npm test` hijau (semua test PRD 1.2–1.9)

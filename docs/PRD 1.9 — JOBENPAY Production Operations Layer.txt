@@ -1,0 +1,1442 @@
+# PRD 1.9 — JOBENPAY Production Operations Layer
+## Operational Readiness for Real-World Deployment
+
+**Versi:** 1.0 · **Status:** Implementation-ready, Zero-Hallucination  
+**Tanggal:** 7 November 2026  
+**Basis:** PRD 1.2–1.8 (semua layer fungsional selesai)  
+**Prinsip:** Setiap endpoint, konfigurasi, dan test case eksplisit. AI builder tidak perlu menebak. Tidak ada "disiratkan".  
+**Tujuan:** Membuat JOBENPAY tidak hanya "secara konsep matang" tetapi juga "siap beroperasi" di lingkungan produksi dengan SLO terukur, observability lengkap, dan prosedur insiden yang teruji.
+
+---
+
+## 0. ATURAN EMAS (NON-NEGOTIABLE)
+
+1. **Setiap SLO memiliki SLI yang terukur.** Tidak ada SLO tanpa metrik.
+2. **Setiap alert memiliki runbook.** Tidak ada alert yang tidak dapat ditindaklanjuti.
+3. **Setiap kegagalan memiliki circuit breaker.** Tidak ada panggilan eksternal tanpa timeout.
+4. **Setiap perubahan memiliki rollback plan yang diuji.** Tidak ada deploy tanpa rollback.
+5. **Setiap secret memiliki rotasi.** Tidak ada secret permanen.
+6. **Setiap pengecualian memiliki expiry.** Tidak ada "TODO" tanpa tanggal.
+7. **Coverage 100%** untuk modul baru (`slo_service.js`, `circuit_breaker.js`, `runbook_service.js`). CI gagal jika < 100%.
+8. **Setiap test case memiliki assertion eksplisit** (§9). Tidak ada "test bahwa X berfungsi".
+
+---
+
+## 1. RINGKASAN DAN FILOSOFI
+
+### 1.1 Masalah yang Diselesaikan
+
+PRD 1.2–1.8 membangun sistem yang **secara fungsional lengkap**: mandat, gerbang deterministik, ledger, verifikasi lintas organisasi, DIP, CPL, JPL. Tetapi sistem ini **belum siap produksi** karena:
+
+1. **Tidak ada SLO terukur.** Tim tidak tahu apakah sistem "sehat" atau tidak.
+2. **Tidak ada graceful shutdown.** Restart dapat menyebabkan status `EXECUTING` menggantung.
+3. **Tidak ada circuit breaker.** Jika PayPal lambat, JOBENPAY ikut menggantung.
+4. **Tidak ada per-tenant dashboard.** Support tidak dapat mendiagnosis masalah tenant dalam hitungan detik.
+5. **Tidak ada runbook.** On-call engineer tidak tahu apa yang harus dilakukan saat insiden.
+6. **Tidak ada rollback teruji.** Rollback plan hanya ada di dokumen, tidak pernah dijalankan.
+7. **Tidak ada rotasi secret.** Secret permanen adalah risiko keamanan.
+8. **Tidak ada load test realistis.** Kapasitas tidak divalidasi.
+
+### 1.2 Solusi: Production Operations Layer
+
+PRD 1.9 menambahkan **lapisan operasional** yang mencakup:
+
+1. **SLO/SLI Framework** — metrik keandalan yang terukur.
+2. **Graceful Shutdown** — menyelesaikan request yang sedang berjalan sebelum keluar.
+3. **Circuit Breaker** — mencegah cascade failure.
+4. **Observability** — per-tenant dashboard, audit log queryable, distributed tracing.
+5. **Runbook** — prosedur eksplisit untuk setiap insiden.
+6. **Deployment Readiness** — rollback teruji, canary release, exception tracking.
+7. **Secret Management** — rotasi tanpa downtime.
+8. **Load Testing** — validasi kapasitas pada 2x peak traffic.
+
+### 1.3 Filosofi
+
+> **"Sistem yang tidak dapat dioperasikan bukanlah sistem. Itu adalah prototipe."**
+
+PRD 1.9 mengubah JOBENPAY dari **prototipe** menjadi **sistem produksi** yang dapat diandalkan, diamati, dan dipulihkan.
+
+---
+
+## 2. CAKUPAN
+
+### 2.1 Yang Termasuk
+
+| Komponen | Deskripsi | Tier |
+|---|---|---|
+| **SLO/SLI Framework** | Definisi SLI, SLO, Error Budget | A |
+| **Graceful Shutdown** | SIGTERM handling, connection draining | A |
+| **Health Checks** | `/healthz`, `/readyz`, `/startupz` | A |
+| **Circuit Breaker** | Untuk PayPal, LLM, DB | A |
+| **Per-Tenant Dashboard** | Metrik per tenant | A |
+| **Audit Log Queryable** | Pencarian audit log | A |
+| **Distributed Tracing** | OpenTelemetry integration | B |
+| **Runbook** | Prosedur insiden | A |
+| **Rollback Plan** | Prosedur rollback teruji | A |
+| **Canary Release** | Deploy bertahap | B |
+| **Exception Tracking** | Pengecualian dengan expiry | A |
+| **Secret Rotation** | Rotasi tanpa downtime | A |
+| **Load Testing** | 2x peak traffic | A |
+
+### 2.2 Yang Tidak Termasuk
+
+- Bukan pengganti PRD 1.2–1.8 (layer fungsional).
+- Bukan SOC 2 / ISO 27001 certification (hanya roadmap).
+- Bukan chaos engineering penuh (hanya fault injection terbatas).
+
+---
+
+## 3. SLO/SLI FRAMEWORK
+
+### 3.1 Definisi SLI (Service Level Indicator)
+
+**File:** `shared/sli-definitions.js`
+
+```javascript
+// @ts-check
+
+/**
+ * Setiap SLI memiliki:
+ * - id: identifier unik
+ * - name: nama manusiawi
+ * - description: deskripsi
+ * - metric: query Prometheus/PostgreSQL
+ * - unit: unit (ms, %, count)
+ * - good_event: kondisi "good"
+ * - valid_event: kondisi "valid"
+ */
+export const SLI_DEFINITIONS = [
+  {
+    id: 'sli_decision_latency',
+    name: 'Decision Latency',
+    description: 'Persentase keputusan yang selesai < 500ms',
+    metric: 'histogram_quantile(0.95, rate(jp_decision_duration_seconds_bucket[5m]))',
+    unit: 'ms',
+    good_event: 'duration < 0.5',
+    valid_event: 'all_decisions'
+  },
+  {
+    id: 'sli_decision_availability',
+    name: 'Decision Availability',
+    description: 'Persentase request keputusan yang berhasil (tidak 5xx)',
+    metric: 'sum(rate(jp_decision_total{status!~"5.."}[5m])) / sum(rate(jp_decision_total[5m]))',
+    unit: '%',
+    good_event: 'status != 5xx',
+    valid_event: 'all_requests'
+  },
+  {
+    id: 'sli_payout_success',
+    name: 'Payout Success Rate',
+    description: 'Persentase payout yang berhasil (RECONCILED) dalam 5 menit',
+    metric: 'sum(rate(jp_payout_total{status="RECONCILED"}[5m])) / sum(rate(jp_payout_total[5m]))',
+    unit: '%',
+    good_event: 'status == RECONCILED within 300s',
+    valid_event: 'all_payouts'
+  },
+  {
+    id: 'sli_double_payout',
+    name: 'Double Payout Rate',
+    description: 'Jumlah double payout per 1 juta transaksi',
+    metric: 'sum(rate(jp_double_payout_total[1h])) / sum(rate(jp_payout_total[1h])) * 1000000',
+    unit: 'per_million',
+    good_event: 'double_payout == 0',
+    valid_event: 'all_payouts'
+  },
+  {
+    id: 'sli_webhook_processing',
+    name: 'Webhook Processing Time',
+    description: 'Persentase webhook yang diproses < 60 detik',
+    metric: 'histogram_quantile(0.95, rate(jp_webhook_processing_seconds_bucket[5m]))',
+    unit: 's',
+    good_event: 'duration < 60',
+    valid_event: 'all_webhooks'
+  },
+  {
+    id: 'sli_ledger_verification',
+    name: 'Ledger Verification',
+    description: 'Persentase verifikasi ledger yang berhasil (valid)',
+    metric: 'sum(rate(jp_ledger_verify_total{status="valid"}[1h])) / sum(rate(jp_ledger_verify_total[1h]))',
+    unit: '%',
+    good_event: 'status == valid',
+    valid_event: 'all_verifications'
+  }
+];
+```
+
+### 3.2 Definisi SLO (Service Level Objective)
+
+**File:** `shared/slo-definitions.js`
+
+```javascript
+// @ts-check
+import { SLI_DEFINITIONS } from './sli-definitions.js';
+
+/**
+ * Setiap SLO memiliki:
+ * - id: identifier unik
+ * - name: nama manusiawi
+ * - sli_id: referensi ke SLI
+ * - target: target (0-1)
+ * - window: window (30d, 7d, 1d)
+ * - error_budget: 1 - target
+ * - burn_rate_threshold: threshold untuk alert
+ */
+export const SLO_DEFINITIONS = [
+  {
+    id: 'slo_decision_latency',
+    name: 'Decision Latency < 500ms',
+    sli_id: 'sli_decision_latency',
+    target: 0.95,
+    window: '30d',
+    error_budget: 0.05,
+    burn_rate_threshold: 14.4  // 2% budget in 1 hour
+  },
+  {
+    id: 'slo_decision_availability',
+    name: 'Decision Availability 99.9%',
+    sli_id: 'sli_decision_availability',
+    target: 0.999,
+    window: '30d',
+    error_budget: 0.001,
+    burn_rate_threshold: 14.4
+  },
+  {
+    id: 'slo_payout_success',
+    name: 'Payout Success Rate 99.5%',
+    sli_id: 'sli_payout_success',
+    target: 0.995,
+    window: '30d',
+    error_budget: 0.005,
+    burn_rate_threshold: 6
+  },
+  {
+    id: 'slo_double_payout',
+    name: 'Zero Double Payout',
+    sli_id: 'sli_double_payout',
+    target: 1.0,  // 0 double payout
+    window: '30d',
+    error_budget: 0,
+    burn_rate_threshold: 1  // Any double payout = alert
+  },
+  {
+    id: 'slo_webhook_processing',
+    name: 'Webhook Processing < 60s',
+    sli_id: 'sli_webhook_processing',
+    target: 0.99,
+    window: '7d',
+    error_budget: 0.01,
+    burn_rate_threshold: 14.4
+  },
+  {
+    id: 'slo_ledger_verification',
+    name: 'Ledger Verification 100%',
+    sli_id: 'sli_ledger_verification',
+    target: 1.0,
+    window: '30d',
+    error_budget: 0,
+    burn_rate_threshold: 1
+  }
+];
+```
+
+### 3.3 Error Budget Policy
+
+**File:** `docs/error-budget-policy.md`
+
+```markdown
+# Error Budget Policy
+
+## Tujuan
+Mendefinisikan apa yang terjadi ketika Error Budget habis.
+
+## Aturan
+1. **Jika Error Budget > 50%:** Normal operations.
+2. **Jika Error Budget 10-50%:** Warning. Review SLO, identifikasi penyebab.
+3. **Jika Error Budget < 10%:** Freeze fitur baru. Fokus pada perbaikan keandalan.
+4. **Jika Error Budget habis (0%):** Freeze total. Hanya perbaikan bug dan keandalan.
+5. **Jika double payout terjadi:** Error Budget dianggap habis, terlepas dari persentase.
+
+## Proses
+- Review mingguan: tim engineering + product.
+- Keputusan freeze: oleh Engineering Lead.
+- Unfreeze: setelah 2 minggu tanpa insiden kritis.
+```
+
+### 3.4 Endpoint SLO
+
+#### 3.4.1 GET /api/v1/ops/slo
+
+**Response 200:**
+```json
+{
+  "slos": [
+    {
+      "id": "slo_decision_latency",
+      "name": "Decision Latency < 500ms",
+      "target": 0.95,
+      "current": 0.97,
+      "error_budget_remaining": 0.6,
+      "burn_rate": 0.4,
+      "status": "healthy",
+      "window": "30d"
+    },
+    {
+      "id": "slo_double_payout",
+      "name": "Zero Double Payout",
+      "target": 1.0,
+      "current": 1.0,
+      "error_budget_remaining": 1.0,
+      "burn_rate": 0,
+      "status": "healthy",
+      "window": "30d"
+    }
+  ],
+  "generated_at": "2026-11-07T10:00:00Z"
+}
+```
+
+#### 3.4.2 GET /api/v1/ops/slo/{slo_id}
+
+**Response 200:**
+```json
+{
+  "id": "slo_decision_latency",
+  "name": "Decision Latency < 500ms",
+  "target": 0.95,
+  "current": 0.97,
+  "error_budget_remaining": 0.6,
+  "burn_rate": 0.4,
+  "status": "healthy",
+  "window": "30d",
+  "history": [
+    { "timestamp": "2026-11-06T10:00:00Z", "value": 0.96 },
+    { "timestamp": "2026-11-07T10:00:00Z", "value": 0.97 }
+  ]
+}
+```
+
+---
+
+## 4. GRACEFUL SHUTDOWN
+
+### 4.1 Prosedur
+
+**File:** `server/src/shutdown.js`
+
+```javascript
+// @ts-check
+import { logger } from './lib/logger.js';
+import { pool } from './db/pool.js';
+import { worker } from './jobs/worker.js';
+
+const SHUTDOWN_TIMEOUT_MS = 30000;
+
+export function setupGracefulShutdown(server) {
+  let isShuttingDown = false;
+
+  async function shutdown(signal) {
+    if (isShuttingDown) {
+      logger.warn({ signal }, 'Shutdown already in progress');
+      return;
+    }
+    isShuttingDown = true;
+    logger.info({ signal }, 'Graceful shutdown initiated');
+
+    // 1. Stop accepting new connections
+    server.close(() => {
+      logger.info('HTTP server closed');
+    });
+
+    // 2. Stop worker from claiming new jobs
+    worker.pause();
+
+    // 3. Wait for in-flight requests (with timeout)
+    const timeout = setTimeout(() => {
+      logger.error('Shutdown timeout exceeded, forcing exit');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+
+    try {
+      // 4. Wait for worker to finish current jobs
+      await worker.drain();
+      logger.info('Worker drained');
+
+      // 5. Close database pool
+      await pool.end();
+      logger.info('Database pool closed');
+
+      clearTimeout(timeout);
+      logger.info('Graceful shutdown complete');
+      process.exit(0);
+    } catch (err) {
+      logger.error({ err }, 'Error during shutdown');
+      clearTimeout(timeout);
+      process.exit(1);
+    }
+  }
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
+```
+
+### 4.2 Worker Pause/Drain
+
+**File:** `server/src/jobs/worker.js` (modifikasi)
+
+```javascript
+// Tambahkan method pause() dan drain()
+class Worker {
+  constructor() {
+    this.paused = false;
+    this.activeJobs = new Set();
+  }
+
+  pause() {
+    this.paused = true;
+  }
+
+  async drain() {
+    while (this.activeJobs.size > 0) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  async processJob(job) {
+    if (this.paused) return;
+    this.activeJobs.add(job.id);
+    try {
+      await this.executeJob(job);
+    } finally {
+      this.activeJobs.delete(job.id);
+    }
+  }
+}
+```
+
+### 4.3 Health Checks
+
+**File:** `server/src/routes/health.js`
+
+```javascript
+// @ts-check
+import { Router } from 'express';
+import { pool } from '../db/pool.js';
+import { worker } from '../jobs/worker.js';
+import { migrationStatus } from '../db/migrations.js';
+
+const router = Router();
+
+// Liveness: hanya cek process alive
+router.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Readiness: cek DB, migrasi, worker heartbeat
+router.get('/readyz', async (req, res) => {
+  const checks = {
+    database: false,
+    migrations: false,
+    worker_heartbeat: false
+  };
+
+  try {
+    const dbResult = await pool.query('SELECT 1');
+    checks.database = dbResult.rowCount === 1;
+  } catch (err) {
+    // database false
+  }
+
+  try {
+    checks.migrations = await migrationStatus();
+  } catch (err) {
+    // migrations false
+  }
+
+  try {
+    checks.worker_heartbeat = worker.isAlive();
+  } catch (err) {
+    // worker false
+  }
+
+  const allReady = Object.values(checks).every(v => v === true);
+  res.status(allReady ? 200 : 503).json({
+    status: allReady ? 'ready' : 'not_ready',
+    checks,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Startup: cek migrasi selesai
+router.get('/startupz', async (req, res) => {
+  try {
+    const ready = await migrationStatus();
+    res.status(ready ? 200 : 503).json({ status: ready ? 'started' : 'starting' });
+  } catch (err) {
+    res.status(503).json({ status: 'error' });
+  }
+});
+
+export default router;
+```
+
+---
+
+## 5. CIRCUIT BREAKER
+
+### 5.1 Implementasi
+
+**File:** `server/src/lib/circuit-breaker.js`
+
+```javascript
+// @ts-check
+import { logger } from './logger.js';
+
+export class CircuitBreaker {
+  constructor(name, options = {}) {
+    this.name = name;
+    this.failureThreshold = options.failureThreshold || 5;
+    this.successThreshold = options.successThreshold || 2;
+    this.timeout = options.timeout || 30000;  // 30s
+    this.resetTimeout = options.resetTimeout || 60000;  // 60s
+
+    this.state = 'CLOSED';  // CLOSED, OPEN, HALF_OPEN
+    this.failures = 0;
+    this.successes = 0;
+    this.nextAttempt = Date.now();
+  }
+
+  async execute(fn) {
+    if (this.state === 'OPEN') {
+      if (Date.now() < this.nextAttempt) {
+        throw new Error(`Circuit ${this.name} is OPEN`);
+      }
+      this.state = 'HALF_OPEN';
+    }
+
+    try {
+      const result = await Promise.race([
+        fn(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), this.timeout)
+        )
+      ]);
+      this.onSuccess();
+      return result;
+    } catch (err) {
+      this.onFailure();
+      throw err;
+    }
+  }
+
+  onSuccess() {
+    this.failures = 0;
+    if (this.state === 'HALF_OPEN') {
+      this.successes++;
+      if (this.successes >= this.successThreshold) {
+        this.state = 'CLOSED';
+        this.successes = 0;
+        logger.info({ name: this.name }, 'Circuit CLOSED');
+      }
+    }
+  }
+
+  onFailure() {
+    this.failures++;
+    if (this.failures >= this.failureThreshold) {
+      this.state = 'OPEN';
+      this.nextAttempt = Date.now() + this.resetTimeout;
+      logger.warn({ name: this.name, failures: this.failures }, 'Circuit OPEN');
+    }
+  }
+
+  getState() {
+    return {
+      name: this.name,
+      state: this.state,
+      failures: this.failures,
+      next_attempt: new Date(this.nextAttempt).toISOString()
+    };
+  }
+}
+
+// Circuit breaker registry
+const breakers = new Map();
+
+export function getCircuitBreaker(name, options) {
+  if (!breakers.has(name)) {
+    breakers.set(name, new CircuitBreaker(name, options));
+  }
+  return breakers.get(name);
+}
+
+export function getAllCircuitBreakers() {
+  return Array.from(breakers.values()).map(b => b.getState());
+}
+```
+
+### 5.2 Integrasi
+
+**File:** `server/src/paypal/client.js` (modifikasi)
+
+```javascript
+import { getCircuitBreaker } from '../lib/circuit-breaker.js';
+
+const paypalBreaker = getCircuitBreaker('paypal', {
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeout: 30000,
+  resetTimeout: 60000
+});
+
+export async function paypalRequest(method, path, body) {
+  return paypalBreaker.execute(async () => {
+    const response = await fetch(`${PAYPAL_API_BASE}${path}`, {
+      method,
+      headers: { /* ... */ },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000)
+    });
+    if (!response.ok) throw new Error(`PayPal ${response.status}`);
+    return response.json();
+  });
+}
+```
+
+**File:** `server/src/ai/index.js` (modifikasi)
+
+```javascript
+import { getCircuitBreaker } from '../lib/circuit-breaker.js';
+
+const aiBreaker = getCircuitBreaker('ai', {
+  failureThreshold: 3,
+  successThreshold: 2,
+  timeout: 60000,  // 60s untuk LLM
+  resetTimeout: 120000
+});
+
+export async function generateStructured(task, schema, input) {
+  return aiBreaker.execute(async () => {
+    // existing implementation
+  });
+}
+```
+
+### 5.3 Endpoint Circuit Breaker
+
+#### 5.3.1 GET /api/v1/ops/circuit-breakers
+
+**Response 200:**
+```json
+{
+  "breakers": [
+    {
+      "name": "paypal",
+      "state": "CLOSED",
+      "failures": 0,
+      "next_attempt": "2026-11-07T10:00:00Z"
+    },
+    {
+      "name": "ai",
+      "state": "HALF_OPEN",
+      "failures": 3,
+      "next_attempt": "2026-11-07T10:01:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## 6. OBSERVABILITY
+
+### 6.1 Per-Tenant Dashboard
+
+#### 6.1.1 GET /api/v1/ops/tenants/{org_id}/metrics
+
+**Response 200:**
+```json
+{
+  "org_id": "org_01HX...",
+  "window": "1h",
+  "metrics": {
+    "requests_total": 1500,
+    "requests_success": 1485,
+    "requests_error": 15,
+    "latency_p50_ms": 120,
+    "latency_p95_ms": 450,
+    "latency_p99_ms": 800,
+    "decisions_total": 300,
+    "decisions_approved": 250,
+    "decisions_rejected": 30,
+    "decisions_pending_approval": 20,
+    "payouts_total": 200,
+    "payouts_success": 198,
+    "payouts_failed": 2,
+    "rate_limit_utilization": 0.15
+  },
+  "generated_at": "2026-11-07T10:00:00Z"
+}
+```
+
+### 6.2 Audit Log Queryable
+
+#### 6.2.1 GET /api/v1/audit
+
+**Query params:**
+- `org_id` (required)
+- `user_id` (optional)
+- `action` (optional)
+- `from` (optional, ISO-8601)
+- `to` (optional, ISO-8601)
+- `limit` (default 100, max 1000)
+- `cursor` (optional)
+
+**Response 200:**
+```json
+{
+  "events": [
+    {
+      "event_id": "evt_01HX...",
+      "org_id": "org_01HX...",
+      "user_id": "usr_01HX...",
+      "action": "mandate.activated",
+      "resource_type": "mandate",
+      "resource_id": "mnd_01HX...",
+      "metadata": { "version": 3 },
+      "created_at": "2026-11-07T09:30:00Z"
+    }
+  ],
+  "next_cursor": "cursor_xyz...",
+  "has_more": false
+}
+```
+
+**Aturan:**
+- Audit log harus muncul dalam < 30 detik setelah aksi.
+- Pencarian harus dapat dilakukan berdasarkan `user_id`, `action`, dan rentang waktu.
+- Hasil harus diurutkan berdasarkan `created_at` descending.
+
+### 6.3 Distributed Tracing (Tier B)
+
+**File:** `server/src/lib/tracing.js`
+
+```javascript
+// @ts-check
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+
+export function setupTracing() {
+  const sdk = new NodeSDK({
+    traceExporter: new OTLPTraceExporter({
+      url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+    }),
+    instrumentations: [getNodeAutoInstrumentations()]
+  });
+  sdk.start();
+}
+```
+
+**Env vars:**
+- `OTEL_EXPORTER_OTLP_ENDPOINT` — endpoint OTLP collector.
+- `OTEL_SERVICE_NAME` — `jobenpay`.
+- `OTEL_TRACES_SAMPLER` — `parentbased_traceidratio`.
+- `OTEL_TRACES_SAMPLER_ARG` — `0.1` (10% sampling).
+
+---
+
+## 7. RUNBOOK
+
+### 7.1 Struktur Runbook
+
+**File:** `docs/runbook/README.md`
+
+```markdown
+# JOBENPAY Runbook
+
+## Daftar Runbook
+1. [Database Down](./01-database-down.md)
+2. [PayPal Unavailable](./02-paypal-unavailable.md)
+3. [LLM Timeout](./03-llm-timeout.md)
+4. [Worker Stuck](./04-worker-stuck.md)
+5. [Ledger Verification Failed](./05-ledger-verification-failed.md)
+6. [Double Payout Detected](./06-double-payout-detected.md)
+7. [High Error Rate](./07-high-error-rate.md)
+8. [High Latency](./08-high-latency.md)
+9. [Circuit Breaker Open](./09-circuit-breaker-open.md)
+10. [Webhook Processing Delayed](./10-webhook-processing-delayed.md)
+```
+
+### 7.2 Contoh Runbook: Database Down
+
+**File:** `docs/runbook/01-database-down.md`
+
+```markdown
+# Runbook: Database Down
+
+## Symptom
+- `/readyz` returns 503 with `database: false`.
+- Logs show `ECONNREFUSED` or `ETIMEDOUT`.
+- All requests return 503.
+
+## Impact
+- All transactions halted.
+- No new decisions possible.
+
+## Diagnosis
+1. Check database connectivity:
+   ```bash
+   psql $DATABASE_URL -c "SELECT 1"
+   ```
+2. Check connection pool:
+   ```bash
+   curl -s localhost:3000/api/v1/ops/db-pool | jq
+   ```
+3. Check PostgreSQL logs:
+   ```bash
+   tail -f /var/log/postgresql/postgresql.log
+   ```
+
+## Resolution
+1. **If database is down:**
+   - Restart PostgreSQL: `sudo systemctl restart postgresql`
+   - If restart fails, check disk space: `df -h`
+   - If disk full, clean up old logs: `find /var/log/postgresql -name "*.log" -mtime +7 -delete`
+
+2. **If connection pool exhausted:**
+   - Check active connections: `SELECT count(*) FROM pg_stat_activity;`
+   - Kill idle connections: `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE state = 'idle' AND state_change < now() - interval '10 minutes';`
+   - Increase pool size if needed.
+
+3. **If network issue:**
+   - Check firewall rules.
+   - Check VPC peering (if cloud).
+   - Check DNS resolution: `nslookup db.jobenpay.io`
+
+## Escalation
+- If not resolved in 15 minutes, escalate to Database Administrator.
+- If data loss suspected, escalate to CTO immediately.
+
+## Post-Incident
+- Write post-mortem within 48 hours.
+- Update runbook if new scenario discovered.
+- Update SLO if necessary.
+```
+
+### 7.3 Integrasi Runbook dengan Alert
+
+**File:** `shared/alert-definitions.js`
+
+```javascript
+// @ts-check
+
+export const ALERT_DEFINITIONS = [
+  {
+    id: 'alert_database_down',
+    name: 'Database Down',
+    condition: 'up{job="postgres"} == 0',
+    severity: 'critical',
+    runbook: 'docs/runbook/01-database-down.md',
+    notify: ['pagerduty', 'slack']
+  },
+  {
+    id: 'alert_paypal_unavailable',
+    name: 'PayPal Unavailable',
+    condition: 'rate(jp_paypal_errors_total[5m]) > 0.1',
+    severity: 'high',
+    runbook: 'docs/runbook/02-paypal-unavailable.md',
+    notify: ['slack']
+  },
+  {
+    id: 'alert_double_payout',
+    name: 'Double Payout Detected',
+    condition: 'increase(jp_double_payout_total[1h]) > 0',
+    severity: 'critical',
+    runbook: 'docs/runbook/06-double-payout-detected.md',
+    notify: ['pagerduty', 'slack', 'email']
+  },
+  {
+    id: 'alert_slo_burn_rate',
+    name: 'SLO Burn Rate High',
+    condition: 'jp:slo_burn_rate > 14.4',
+    severity: 'high',
+    runbook: 'docs/runbook/07-high-error-rate.md',
+    notify: ['slack']
+  }
+];
+```
+
+---
+
+## 8. DEPLOYMENT READINESS
+
+### 8.1 Rollback Plan
+
+**File:** `docs/runbook/rollback.md`
+
+```markdown
+# Rollback Plan
+
+## Prerequisites
+- Staging environment tested.
+- Previous version tagged and pushed.
+- Database migration is expand-only (no destructive).
+
+## Procedure
+1. **Identify last known good version:**
+   ```bash
+   git log --oneline -10
+   ```
+
+2. **Rollback code:**
+   ```bash
+   git checkout <last_good_commit>
+   npm ci --omit=dev
+   npm run migrate  # idempotent, no-op if already applied
+   touch tmp/restart.txt  # cPanel restart
+   ```
+
+3. **Verify:**
+   ```bash
+   curl -s localhost:3000/healthz
+   curl -s localhost:3000/readyz
+   npm run judge-smoke
+   ```
+
+4. **If rollback fails:**
+   - Restore from database backup (see `docs/runbook/database-restore.md`).
+   - Escalate to CTO.
+
+## Testing
+- Rollback must be tested in staging **before** each production deploy.
+- Rollback test is part of G4 (feature freeze) checklist.
+```
+
+### 8.2 Canary Release
+
+**File:** `docs/runbook/canary.md`
+
+```markdown
+# Canary Release Procedure
+
+## When to Use
+- Changes to Decision Engine (Tahap A/B/C/D).
+- Changes to Ledger.
+- Changes to Payment Execution.
+- Changes to JPL Compiler/Evaluator.
+
+## Procedure
+1. **Deploy to 1 pilot tenant:**
+   - Set `CANARY_TENANT_IDS=org_pilot`.
+   - Deploy.
+   - Monitor for 30 minutes.
+
+2. **Verify:**
+   - SLO for pilot tenant: healthy.
+   - No increase in error rate.
+   - No double payout.
+   - Latency within target.
+
+3. **Expand to 10% tenants:**
+   - Set `CANARY_PERCENTAGE=10`.
+   - Monitor for 1 hour.
+
+4. **Expand to 100%:**
+   - Set `CANARY_PERCENTAGE=100`.
+   - Monitor for 24 hours.
+
+## Rollback
+- If SLO degraded: revert to previous version.
+- If new error: revert immediately.
+```
+
+### 8.3 Exception Tracking
+
+**File:** `docs/exceptions.md`
+
+```markdown
+# Exception Tracking
+
+Setiap pengecualian harus memiliki:
+- **ID:** EXC-001
+- **Description:** Apa yang dikecualikan.
+- **Reason:** Mengapa dikecualikan.
+- **Owner:** Siapa yang bertanggung jawab.
+- **Mitigation:** Apa yang dilakukan untuk mengurangi risiko.
+- **Expiry:** Kapan pengecualian harus diselesaikan.
+
+## Active Exceptions
+
+### EXC-001: No circuit breaker for SMTP
+- **Description:** SMTP calls have no circuit breaker.
+- **Reason:** Low priority; SMTP rarely fails.
+- **Owner:** @backend-lead
+- **Mitigation:** Timeout 10s; retry 3x.
+- **Expiry:** 2026-12-07
+
+### EXC-002: No distributed tracing in production
+- **Description:** OpenTelemetry not yet deployed.
+- **Reason:** Tier B; deferred.
+- **Owner:** @observability-lead
+- **Mitigation:** Prometheus + logs sufficient for now.
+- **Expiry:** 2027-01-07
+```
+
+---
+
+## 9. SECRET ROTATION
+
+### 9.1 Prosedur
+
+**File:** `server/src/services/secret_rotation.js`
+
+```javascript
+// @ts-check
+import { pool } from '../db/pool.js';
+import { logger } from '../lib/logger.js';
+import { encrypt, decrypt } from '../lib/crypto.js';
+
+const ROTATION_GRACE_PERIOD_MS = 3600000;  // 1 hour
+
+/**
+ * Rotasi API key untuk agen.
+ * Key lama tetap valid selama grace period.
+ */
+export async function rotateAgentApiKey(agentId, orgId, userId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Ambil key lama
+    const oldKey = await client.query(
+      `SELECT key_id, key_hash FROM agent_api_keys 
+       WHERE agent_id = $1 AND org_id = $2 AND revoked_at IS NULL`,
+      [agentId, orgId]
+    );
+
+    // 2. Generate key baru
+    const newKey = generateApiKey();
+    const newKeyHash = hashApiKey(newKey);
+
+    // 3. Insert key baru
+    await client.query(
+      `INSERT INTO agent_api_keys (agent_id, org_id, key_hash, prefix, created_by, grace_until)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [agentId, orgId, newKeyHash, newKey.prefix, userId, new Date(Date.now() + ROTATION_GRACE_PERIOD_MS)]
+    );
+
+    // 4. Set grace period untuk key lama
+    await client.query(
+      `UPDATE agent_api_keys SET grace_until = $1 
+       WHERE agent_id = $2 AND org_id = $3 AND revoked_at IS NULL AND key_id != $4`,
+      [new Date(Date.now() + ROTATION_GRACE_PERIOD_MS), agentId, orgId, newKey.key_id]
+    );
+
+    await client.query('COMMIT');
+
+    logger.info({ agentId, orgId }, 'API key rotated');
+    return { new_key: newKey.raw, expires_at: new Date(Date.now() + ROTATION_GRACE_PERIOD_MS).toISOString() };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Rotasi signing key untuk ledger.
+ * Entri lama tetap valid dengan key lama.
+ */
+export async function rotateLedgerSigningKey(orgId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Ambil key lama
+    const oldKey = await client.query(
+      `SELECT kid, private_key_enc, public_key_jwk FROM ledger_signing_keys 
+       WHERE org_id = $1 AND status = 'ACTIVE'`,
+      [orgId]
+    );
+
+    // 2. Generate key baru
+    const newKey = generateEd25519Key();
+    const newKid = generateKid();
+
+    // 3. Insert key baru (status ACTIVE)
+    await client.query(
+      `INSERT INTO ledger_signing_keys (org_id, kid, private_key_enc, public_key_jwk, status)
+       VALUES ($1, $2, $3, $4, 'ACTIVE')`,
+      [orgId, newKid, encrypt(newKey.privateKey), newKey.publicKey]
+    );
+
+    // 4. Set key lama ke status ROTATED (tetap valid untuk verifikasi)
+    await client.query(
+      `UPDATE ledger_signing_keys SET status = 'ROTATED', rotated_at = now()
+       WHERE org_id = $1 AND kid = $2`,
+      [orgId, oldKey.rows[0].kid]
+    );
+
+    await client.query('COMMIT');
+
+    logger.info({ orgId, newKid }, 'Ledger signing key rotated');
+    return { new_kid: newKid };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+```
+
+### 9.2 Skema Data
+
+```sql
+-- Tambah kolom grace_until di agent_api_keys
+ALTER TABLE agent_api_keys ADD COLUMN IF NOT EXISTS grace_until TIMESTAMPTZ;
+CREATE INDEX idx_agent_api_keys_grace ON agent_api_keys(grace_until) WHERE grace_until IS NOT NULL;
+
+-- Tabel untuk ledger signing keys
+CREATE TABLE IF NOT EXISTS ledger_signing_keys (
+  kid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES organizations(org_id),
+  private_key_enc TEXT NOT NULL,
+  public_key_jwk JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'ROTATED', 'REVOKED')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  rotated_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_ledger_signing_keys_org ON ledger_signing_keys(org_id);
+CREATE INDEX idx_ledger_signing_keys_status ON ledger_signing_keys(status);
+```
+
+### 9.3 Endpoint Rotasi
+
+#### 9.3.1 POST /api/v1/agents/{agent_id}/keys/rotate
+
+**Response 200:**
+```json
+{
+  "new_key": "jp_sbx_abc12345_xyz...",
+  "expires_at": "2026-11-07T11:00:00Z",
+  "old_key_grace_until": "2026-11-07T11:00:00Z"
+}
+```
+
+#### 9.3.2 POST /api/v1/org/ledger-keys/rotate
+
+**Response 200:**
+```json
+{
+  "new_kid": "kid_01HX...",
+  "old_kid": "kid_01HY...",
+  "rotated_at": "2026-11-07T10:00:00Z"
+}
+```
+
+---
+
+## 10. LOAD TESTING
+
+### 10.1 Skenario
+
+**File:** `scripts/load-test.js`
+
+```javascript
+// @ts-check
+import autocannon from 'autocannon';
+
+const SCENARIOS = {
+  payout_burst: {
+    url: 'http://localhost:3000/agent/v1/payout-requests',
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer <test_key>', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payeeId: '<test_payee>', amountMinor: 1000, currency: 'USD' }),
+    connections: 100,
+    duration: 60
+  },
+  mixed_workload: {
+    // 60% payout, 30% refund, 10% sale
+    // Implementasi dengan custom request function
+  }
+};
+
+async function runScenario(name, scenario) {
+  const result = await autocannon(scenario);
+  console.log(`Scenario ${name}:`);
+  console.log(`  Requests/sec: ${result.requests.average}`);
+  console.log(`  Latency p50: ${result.latency.p50}ms`);
+  console.log(`  Latency p95: ${result.latency.p95}ms`);
+  console.log(`  Latency p99: ${result.latency.p99}ms`);
+  console.log(`  Errors: ${result.errors}`);
+  return result;
+}
+
+async function main() {
+  await runScenario('payout_burst', SCENARIOS.payout_burst);
+  // ...
+}
+
+main();
+```
+
+### 10.2 Target
+
+| Skenario | Target |
+|---|---|
+| 1000 concurrent payout requests | p95 < 500ms, 0 error |
+| 5000 concurrent decisions | p95 < 300ms, 0 error |
+| 10.000 webhook events dalam 1 menit | 0 duplicate, 0 error |
+| Mixed workload (60/30/10) | p95 < 500ms, 0 error |
+
+### 10.3 Capacity Model
+
+**File:** `docs/capacity-model.md`
+
+```markdown
+# Capacity Model
+
+## Assumptions
+- 10.000 tenants
+- 1000 active agents per tenant
+- 100 transactions per agent per day
+- Total: 1 billion transactions/day (peak: 50.000 TPS)
+
+## Per-Instance Capacity
+- Node.js 22 instance (4 vCPU, 8GB RAM)
+- 20 PostgreSQL connections
+- Average query time: 10ms
+- Throughput: 20 / 0.01 = 2000 queries/sec
+- With 3 queries per transaction: ~666 TPS per instance
+
+## Required Instances
+- 50.000 TPS / 666 TPS = **75 instances**
+- Plus 30% headroom: **100 instances**
+- Database: PostgreSQL with 50 connections per instance × 100 = 5000 connections
+- PgBouncer: `default_pool_size = 5000`, `max_client_conn = 10000`
+
+## Cost Estimate
+- 100 Node.js instances: ~$5000/month
+- PostgreSQL (managed): ~$3000/month
+- PgBouncer: ~$500/month
+- Total: ~$8500/month
+```
+
+---
+
+## 11. TEST SUITE (WAJIB LULUS, COVERAGE 100%)
+
+### 11.1 Unit Tests
+
+| Test ID | Assertion |
+|---|---|
+| `test_sli_definition_valid` | Semua SLI valid |
+| `test_slo_definition_valid` | Semua SLO valid |
+| `test_error_budget_calculation` | Error budget = 1 - target |
+| `test_burn_rate_calculation` | Burn rate = error_rate / error_budget |
+| `test_circuit_breaker_closed` | State CLOSED setelah sukses |
+| `test_circuit_breaker_open` | State OPEN setelah N failures |
+| `test_circuit_breaker_half_open` | State HALF_OPEN setelah timeout |
+| `test_circuit_breaker_reset` | State CLOSED setelah N successes |
+| `test_graceful_shutdown_timeout` | Shutdown timeout 30s |
+| `test_worker_pause` | Worker berhenti claim job |
+| `test_worker_drain` | Worker menyelesaikan job aktif |
+| `test_secret_rotation_grace` | Key lama valid selama grace |
+| `test_secret_rotation_new_key` | Key baru langsung valid |
+
+### 11.2 Integration Tests
+
+| Test ID | Assertion |
+|---|---|
+| `test_healthz_200` | GET /healthz → 200 |
+| `test_readyz_200` | GET /readyz → 200 (DB, migrasi, worker OK) |
+| `test_readyz_503_db_down` | GET /readyz → 503 (DB down) |
+| `test_startupz_200` | GET /startupz → 200 |
+| `test_slo_endpoint` | GET /api/v1/ops/slo → 200 |
+| `test_circuit_breaker_endpoint` | GET /api/v1/ops/circuit-breakers → 200 |
+| `test_tenant_metrics_endpoint` | GET /api/v1/ops/tenants/{id}/metrics → 200 |
+| `test_audit_log_query` | GET /api/v1/audit → 200, < 30s |
+| `test_rotate_api_key` | POST /keys/rotate → 200, new_key valid |
+| `test_rotate_api_key_grace` | Key lama valid setelah rotasi (dalam grace) |
+| `test_rotate_api_key_expired` | Key lama invalid setelah grace |
+| `test_rotate_ledger_key` | POST /ledger-keys/rotate → 200, entri lama tetap valid |
+
+### 11.3 Load Tests
+
+| Test ID | Assertion |
+|---|---|
+| `test_load_1000_payouts` | 1000 concurrent, p95 < 500ms, 0 error |
+| `test_load_5000_decisions` | 5000 concurrent, p95 < 300ms, 0 error |
+| `test_load_10000_webhooks` | 10.000 webhooks, 0 duplicate, 0 error |
+| `test_load_mixed` | Mixed workload, p95 < 500ms, 0 error |
+
+### 11.4 Coverage Configuration
+
+```json
+{
+  "scripts": {
+    "test:coverage": "c8 --check-coverage --lines 100 --functions 100 --branches 100 --statements 100 --include 'server/src/lib/circuit-breaker.js' --include 'server/src/services/slo_service.js' --include 'server/src/services/secret_rotation.js' --include 'server/src/shutdown.js' node --test server/test/"
+  }
+}
+```
+
+---
+
+## 12. DEFINITION OF DONE
+
+- [ ] SLI/SLO definitions tersedia (`shared/sli-definitions.js`, `shared/slo-definitions.js`).
+- [ ] Error budget policy tersedia (`docs/error-budget-policy.md`).
+- [ ] `/api/v1/ops/slo` endpoint berfungsi.
+- [ ] Graceful shutdown berfungsi (SIGTERM → drain → exit 0).
+- [ ] `/healthz`, `/readyz`, `/startupz` berfungsi.
+- [ ] Circuit breaker berfungsi untuk PayPal dan LLM.
+- [ ] `/api/v1/ops/circuit-breakers` endpoint berfungsi.
+- [ ] Per-tenant metrics endpoint berfungsi.
+- [ ] Audit log queryable endpoint berfungsi (< 30 detik).
+- [ ] Runbook tersedia (10 runbook).
+- [ ] Alert definitions tersedia (`shared/alert-definitions.js`).
+- [ ] Rollback plan teruji di staging.
+- [ ] Canary release procedure tersedia.
+- [ ] Exception tracking tersedia (`docs/exceptions.md`).
+- [ ] Secret rotation (API key + ledger key) berfungsi.
+- [ ] Load test scenario tersedia dan lulus.
+- [ ] Capacity model tersedia.
+- [ ] Coverage 100% untuk modul baru.
+- [ ] Semua test di §11 lulus.
+
+---
+
+## 13. RENCANA KERJA (40 JAM)
+
+| WP | Isi | Jam |
+|---|---|---|
+| WP1 | SLI/SLO definitions + endpoint | 4 |
+| WP2 | Graceful shutdown + health checks | 4 |
+| WP3 | Circuit breaker + integrasi | 6 |
+| WP4 | Per-tenant metrics + audit log | 4 |
+| WP5 | Runbook (10 dokumen) | 4 |
+| WP6 | Alert definitions | 2 |
+| WP7 | Rollback plan + canary | 3 |
+| WP8 | Exception tracking | 1 |
+| WP9 | Secret rotation | 5 |
+| WP10 | Load test scenario | 4 |
+| WP11 | Capacity model | 2 |
+| WP12 | Test suite | 5 |
+| **Total** | | **44** |
+
+---
+
+## 14. PROMPT UNTUK AI BUILDER (ZERO-HALLUCINATION)
+
+### 14.1 Preamble (tempel ke `replit.md`)
+
+```markdown
+# ATURAN PRD 1.9 (Production Operations Layer)
+
+Kamu membangun Production Operations Layer persis sesuai PRD 1.9. Jangan menebak.
+- Baca HANYA bagian yang dirujuk prompt.
+- Setiap SLI, SLO, endpoint, dan test eksplisit di PRD 1.9.
+- Setiap SLO memiliki SLI yang terukur.
+- Setiap alert memiliki runbook.
+- Setiap panggilan eksternal memiliki circuit breaker.
+- Setiap perubahan memiliki rollback plan yang diuji.
+- Setiap secret memiliki rotasi.
+- Coverage 100% untuk circuit-breaker.js, slo_service.js, secret_rotation.js, shutdown.js.
+- Zero ambiguity. Setiap field, endpoint, test eksplisit.
+```
+
+### 14.2 Prompt Pembuka
+
+```markdown
+Baca AGENTS.md, docs/PROGRESS.md, docs/DECISIONS.md.
+Lalu baca docs/PRD_1.9_Production_Operations.md bagian:
+- §3 (SLO/SLI Framework)
+- §4 (Graceful Shutdown)
+- §5 (Circuit Breaker)
+- §6 (Observability)
+- §7 (Runbook)
+- §8 (Deployment Readiness)
+- §9 (Secret Rotation)
+- §10 (Load Testing)
+- §11 (Test Suite)
+
+Kerjakan WP1–WP12.
+Jangan mengerjakan WP lain (tidak ada).
+
+Sebelum menulis kode:
+1. Verifikasi struktur repo aktual (ls/grep). Jangan menebak nama file.
+2. Tulis rencana singkat (file yang akan dibuat/diubah).
+3. Tulis tes yang gagal lebih dulu (dari §11).
+4. Implementasi sampai hijau.
+5. Jalankan `npm test` — semua tes lama harus tetap hijau.
+6. Coverage 100% untuk modul baru.
+
+Selesai bila:
+- Semua test di §11 lulus.
+- Coverage 100%.
+- Semua SLO memiliki SLI.
+- Semua alert memiliki runbook.
+- Semua panggilan eksternal memiliki circuit breaker.
+- Rollback plan teruji di staging.
+- Secret rotation berfungsi.
+
+Jika gagal 3x berturut-turut: berhenti, tulis di PROGRESS.md "Blockers", commit `wip(prd-1.9): blocked`.
+```
+
+### 14.3 Prompt Pemeriksa
+
+```markdown
+Audit TANPA mengubah kode: bandingkan implementasi dengan PRD 1.9.
+Tabel [butir | Ya/Sebagian/Tidak | file:baris | catatan].
+Periksa khusus:
+(a) Apakah setiap SLO memiliki SLI yang terukur?
+(b) Apakah setiap alert memiliki runbook?
+(c) Apakah circuit breaker membuka setelah N failures?
+(d) Apakah graceful shutdown menyelesaikan request aktif?
+(e) Apakah `/readyz` memeriksa DB, migrasi, dan worker?
+(f) Apakah secret rotation mempertahankan key lama selama grace period?
+(g) Apakah audit log muncul < 30 detik setelah aksi?
+(h) Apakah load test lulus target?
+(i) Apakah coverage 100% untuk circuit-breaker.js, slo_service.js, secret_rotation.js, shutdown.js?
+
+Cobalah MEMATAHKAN: tulis tes serangan yang gagal (jangan perbaiki).
+Simpan ke docs/audit/PRD-1.9.md.
+```
+
+### 14.4 Prompt Penutup
+
+```markdown
+Jangan mulai hal baru. (1) `npm run lint && npm test`, catat hasil.
+(2) PROGRESS.md: paket aktif, butir selesai/belum, file setengah jadi, perintah lanjut persis.
+(3) commit `wip(prd-1.9): ...` dan push.
+```
+
+### 14.5 Prompt BLOCKER
+
+```markdown
+Berhenti mengubah kode. Baca Blockers PROGRESS.md.
+Jelaskan akar masalah ≤10 baris + 2 opsi dengan trade-off.
+Jangan menerapkan sebelum saya memilih.
+```
+
+---
+
+## 15. PRINSIP NON-NEGOTIABLE
+
+1. **Setiap SLO memiliki SLI yang terukur.** Tidak ada SLO tanpa metrik.
+2. **Setiap alert memiliki runbook.** Tidak ada alert yang tidak dapat ditindaklanjuti.
+3. **Setiap kegagalan memiliki circuit breaker.** Tidak ada panggilan eksternal tanpa timeout.
+4. **Setiap perubahan memiliki rollback plan yang diuji.** Tidak ada deploy tanpa rollback.
+5. **Setiap secret memiliki rotasi.** Tidak ada secret permanen.
+6. **Setiap pengecualian memiliki expiry.** Tidak ada "TODO" tanpa tanggal.
+7. **Coverage 100%.** CI gagal jika < 100%.
+8. **Zero ambiguity.** Setiap field, endpoint, test eksplisit.
+
+---
+
+**Dokumen ini selesai. AI builder dapat mengimplementasikan tanpa menebak. JOBENPAY siap beroperasi di produksi.**
