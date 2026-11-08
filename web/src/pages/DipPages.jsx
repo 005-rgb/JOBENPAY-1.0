@@ -561,8 +561,438 @@ export function IntentAnchorBuilderPage() {
   );
 }
 
+/**
+ * Intent Anchors Directory & DIP Hub Page (PRD 1.6 §8)
+ */
+export function IntentAnchorsPage({ initialTab = 'anchors' }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [intents, setIntents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [selectedIntent, setSelectedIntent] = useState(null);
+
+  // DIS Inspector Interactive State
+  const [inspectPurpose, setInspectPurpose] = useState(1.0);
+  const [inspectAmount, setInspectAmount] = useState(1.0);
+  const [inspectVendor, setInspectVendor] = useState(1.0);
+  const [inspectBrand, setInspectBrand] = useState(1.0);
+  const [inspectAttributes, setInspectAttributes] = useState(1.0);
+  const [inspectEvidence, setInspectEvidence] = useState(1.0);
+  const [hardRuleTrigger, setHardRuleTrigger] = useState('NONE');
+
+  const fetchIntents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch('/api/v1/intents');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setIntents(data.intents || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchIntents();
+  }, []);
+
+  const handleRevoke = async (intentId) => {
+    if (!window.confirm('Are you sure you want to revoke this Intent Anchor?')) return;
+    try {
+      const res = await fetch(`/api/v1/intents/${intentId}/revoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error(`Revocation failed: HTTP ${res.status}`);
+      await fetchIntents();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Compute simulated DIS score
+  const computedDisScore = Math.round(
+    (0.15 * inspectPurpose +
+     0.15 * inspectAmount +
+     0.20 * inspectVendor +
+     0.10 * inspectBrand +
+     0.20 * inspectAttributes +
+     0.20 * inspectEvidence) * 100
+  );
+
+  let simulatedDecision = computedDisScore >= 80 ? 'AUTO_APPROVE' : computedDisScore >= 50 ? 'REQUIRE_APPROVAL' : 'REJECTED';
+  if (hardRuleTrigger !== 'NONE') {
+    simulatedDecision = hardRuleTrigger === 'DIP_EVIDENCE_INVALID' ? 'REJECTED' : 'REQUIRE_APPROVAL';
+  }
+
+  const filteredIntents = intents.filter((item) => {
+    if (filterStatus === 'ALL') return true;
+    return item.status === filterStatus;
+  });
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Page Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <Award size={24} color="#10b981" />
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>
+              Decision Integrity Proof (DIP)
+            </h1>
+            <span className={styles.providerBadge} style={{ background: '#0a2b9e', color: '#fff' }}>
+              PRD 1.6
+            </span>
+          </div>
+          <p className={styles.pageSubtitle} style={{ margin: 0 }}>
+            Cryptographically signed human intent anchors bounding autonomous agent decisions with Ground-Truth verification.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <a
+            href="/intents/new"
+            className={styles.primaryLink}
+            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            + New Intent Anchor
+          </a>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--jp-border)', marginBottom: '20px' }}>
+        <button
+          onClick={() => setActiveTab('anchors')}
+          style={{
+            padding: '10px 16px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'anchors' ? '2px solid var(--jp-primary)' : '2px solid transparent',
+            color: activeTab === 'anchors' ? 'var(--jp-text)' : 'var(--jp-text-muted)',
+            fontWeight: activeTab === 'anchors' ? 'bold' : 'normal',
+            cursor: 'pointer',
+            fontSize: '14px',
+          }}
+        >
+          Intent Anchors Directory ({intents.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('inspector')}
+          style={{
+            padding: '10px 16px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'inspector' ? '2px solid var(--jp-primary)' : '2px solid transparent',
+            color: activeTab === 'inspector' ? 'var(--jp-text)' : 'var(--jp-text-muted)',
+            fontWeight: activeTab === 'inspector' ? 'bold' : 'normal',
+            cursor: 'pointer',
+            fontSize: '14px',
+          }}
+        >
+          DIS Mathematical Inspector & Simulator
+        </button>
+      </div>
+
+      {/* Tab 1: Intent Anchors Directory */}
+      {activeTab === 'anchors' && (
+        <div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            {['ALL', 'ACTIVE', 'REVOKED'].map((s) => (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={filterStatus === s ? styles.primaryLink : styles.secondaryLink}
+                style={{ padding: '4px 12px', height: '32px', fontSize: '12px' }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          <div className={styles.tableCard}>
+            <table className={styles.dataTable}>
+              <thead>
+                <tr>
+                  <th>Intent ID</th>
+                  <th>Natural Language Context</th>
+                  <th>Constraints & Budget</th>
+                  <th>Signature</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px' }}>Loading intent anchors...</td></tr>
+                ) : filteredIntents.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--jp-text-muted)' }}>
+                      No intent anchors found. Click <strong>+ New Intent Anchor</strong> to create one.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredIntents.map((item) => {
+                    const structured = typeof item.structured_intent === 'string'
+                      ? JSON.parse(item.structured_intent)
+                      : (item.structured_intent || {});
+                    const amountRange = structured.constraints?.amount_range || structured.amount_range;
+                    const maxBudget = amountRange?.max ? `$${(amountRange.max / 100).toFixed(2)}` : '—';
+
+                    return (
+                      <tr key={item.intent_id}>
+                        <td className={styles.mono} style={{ fontSize: '12px' }}>
+                          {item.intent_id?.slice(0, 8)}...
+                        </td>
+                        <td style={{ maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span title={item.natural_language_input}>
+                            {item.natural_language_input || structured.purpose || '—'}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '12px' }}>
+                          <span>Max: <strong>{maxBudget}</strong></span>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '11px', color: item.signature ? '#10b981' : '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ShieldCheck size={13} /> {item.signature ? 'Ed25519 Valid' : 'Unsigned'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`${styles.providerBadge} ${item.status === 'ACTIVE' ? styles.badgeSandbox : styles.badgeFailed}`}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '12px', color: 'var(--jp-text-muted)' }}>
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString() : '—'}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className={styles.secondaryLink}
+                              onClick={() => setSelectedIntent(item)}
+                              style={{ padding: '2px 8px', height: '28px', fontSize: '11px' }}
+                            >
+                              <Eye size={12} /> View
+                            </button>
+                            {item.status === 'ACTIVE' && (
+                              <button
+                                type="button"
+                                className={styles.secondaryLink}
+                                onClick={() => handleRevoke(item.intent_id)}
+                                style={{ padding: '2px 8px', height: '28px', fontSize: '11px', color: '#ef4444' }}
+                              >
+                                Revoke
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: DIS Mathematical Inspector & Simulator */}
+      {activeTab === 'inspector' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 400px) 1fr', gap: '24px', alignItems: 'start' }}>
+          {/* Left: Gauge and Decision Summary */}
+          <div className={styles.formCard} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>Decision Integrity Score (DIS)</h2>
+            <DisGauge score={computedDisScore} size={150} />
+            <div style={{ marginTop: '16px', fontSize: '18px', fontWeight: 'bold' }}>
+              {computedDisScore} / 100
+            </div>
+            <div style={{ marginTop: '8px' }}>
+              <span className={`${styles.providerBadge} ${simulatedDecision === 'AUTO_APPROVE' ? styles.badgeSandbox : simulatedDecision === 'REQUIRE_APPROVAL' ? styles.badgeSimulated : styles.badgeFailed}`} style={{ fontSize: '13px', padding: '6px 14px' }}>
+                {simulatedDecision}
+              </span>
+            </div>
+            {hardRuleTrigger !== 'NONE' && (
+              <div style={{ marginTop: '16px', padding: '10px', background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', borderRadius: '6px', fontSize: '12px', color: '#ef4444' }}>
+                <AlertTriangle size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                Hard Rule Overridden: <strong>{hardRuleTrigger}</strong>
+              </div>
+            )}
+            <p style={{ fontSize: '12px', color: 'var(--jp-text-muted)', marginTop: '16px', lineHeight: '1.4' }}>
+              Formula: DIS = 0.15(Purpose) + 0.15(Amount) + 0.20(Vendor) + 0.10(Brand) + 0.20(Attributes) + 0.20(Evidence)
+            </p>
+          </div>
+
+          {/* Right: Component Sliders & Hard Rules */}
+          <div className={styles.formCard}>
+            <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>Adjust Component Weights & Ground Truth</h2>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                  <span>Purpose Semantic Match (15% weight)</span>
+                  <strong>{(inspectPurpose * 100).toFixed(0)}%</strong>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={inspectPurpose}
+                  onChange={(e) => setInspectPurpose(parseFloat(e.target.value))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                  <span>Amount Cap & Tolerance Match (15% weight)</span>
+                  <strong>{(inspectAmount * 100).toFixed(0)}%</strong>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={inspectAmount}
+                  onChange={(e) => setInspectAmount(parseFloat(e.target.value))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                  <span>Vendor Category Consistency (20% weight)</span>
+                  <strong>{(inspectVendor * 100).toFixed(0)}%</strong>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={inspectVendor}
+                  onChange={(e) => setInspectVendor(parseFloat(e.target.value))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                  <span>Brand Alignment (10% weight)</span>
+                  <strong>{(inspectBrand * 100).toFixed(0)}%</strong>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={inspectBrand}
+                  onChange={(e) => setInspectBrand(parseFloat(e.target.value))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                  <span>Required Attributes Satisfaction (20% weight)</span>
+                  <strong>{(inspectAttributes * 100).toFixed(0)}%</strong>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={inspectAttributes}
+                  onChange={(e) => setInspectAttributes(parseFloat(e.target.value))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                  <span>Evidence Ground-Truth Validity (20% weight)</span>
+                  <strong>{(inspectEvidence * 100).toFixed(0)}%</strong>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={inspectEvidence}
+                  onChange={(e) => setInspectEvidence(parseFloat(e.target.value))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--jp-border)', paddingTop: '16px', marginTop: '8px' }}>
+                <label className={styles.fieldLabel} style={{ marginBottom: '8px' }}>Trigger Hard Rule (Deterministic Override)</label>
+                <select
+                  className={styles.inputField}
+                  value={hardRuleTrigger}
+                  onChange={(e) => setHardRuleTrigger(e.target.value)}
+                >
+                  <option value="NONE">None (Rely purely on weighted DIS score)</option>
+                  <option value="DIP_EVIDENCE_INVALID">DIP_EVIDENCE_INVALID (Evidence invalid or ungrounded -&gt; REJECTED)</option>
+                  <option value="DIP_BRAND_MISMATCH">DIP_BRAND_MISMATCH (Brand not in allowlist -&gt; REQUIRE_APPROVAL)</option>
+                  <option value="DIP_ATTRIBUTES_MISMATCH">DIP_ATTRIBUTES_MISMATCH (Required specs missing -&gt; REQUIRE_APPROVAL)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selected Intent Modal */}
+      {selectedIntent && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+          onClick={() => setSelectedIntent(null)}
+        >
+          <div
+            className={styles.formCard}
+            style={{ width: '100%', maxWidth: '640px', maxHeight: '80vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>Intent Anchor Details</h3>
+              <button className={styles.secondaryLink} onClick={() => setSelectedIntent(null)} style={{ padding: '2px 8px' }}>
+                Close
+              </button>
+            </div>
+            <p style={{ fontStyle: 'italic', color: 'var(--jp-text)' }}>
+              "{selectedIntent.natural_language_input}"
+            </p>
+            <pre className={styles.mono} style={{ fontSize: '11px', background: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '6px', overflowX: 'auto' }}>
+              {JSON.stringify(selectedIntent, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function DipPage() {
+  return <IntentAnchorsPage initialTab="inspector" />;
+}
+
 export default {
   DisGauge,
   DipDisplayCard,
   IntentAnchorBuilderPage,
+  IntentAnchorsPage,
+  DipPage,
 };

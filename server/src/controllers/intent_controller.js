@@ -4,7 +4,7 @@
  * Controller endpoints for human intent mandate creation and revocation.
  */
 
-import { createIntent, revokeIntent, getIntentMandate } from '../services/intent_service.js';
+import { createIntent, revokeIntent, getIntentMandate, listIntentMandates } from '../services/intent_service.js';
 
 function resolveOrgId(req) {
   return req.org?.id || req.session?.current_org_id || req.user?.org_id;
@@ -12,6 +12,18 @@ function resolveOrgId(req) {
 
 function resolveUserId(req) {
   return req.session?.user_id || req.user?.id || req.user?.user_id;
+}
+
+export async function listIntentsHandler(req, res, next) {
+  try {
+    const orgId = resolveOrgId(req);
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    const offset = Number(req.query.offset) || 0;
+    const intents = await listIntentMandates(orgId, { limit, offset });
+    return res.status(200).json({ intents });
+  } catch (err) {
+    next(err);
+  }
 }
 
 export async function postIntent(req, res, next) {
@@ -51,4 +63,5 @@ export default {
   postIntent,
   postRevokeIntent,
   getIntentHandler,
+  listIntentsHandler,
 };

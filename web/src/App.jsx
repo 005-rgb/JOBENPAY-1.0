@@ -61,6 +61,10 @@ const ProofsPage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({
 const HandshakesPage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.HandshakesPage })));
 const ProtocolConformancePage = lazy(() => import('./pages/ProtocolPages.jsx').then((p) => ({ default: p.ProtocolConformancePage })));
 const IntentAnchorBuilderPage = lazy(() => import('./pages/DipPages.jsx').then((p) => ({ default: p.IntentAnchorBuilderPage })));
+const IntentAnchorsPage = lazy(() => import('./pages/DipPages.jsx').then((p) => ({ default: p.IntentAnchorsPage })));
+const DipPage = lazy(() => import('./pages/DipPages.jsx').then((p) => ({ default: p.DipPage })));
+const CplPage = lazy(() => import('./pages/CplPages.jsx').then((p) => ({ default: p.CplPage })));
+const JplPage = lazy(() => import('./pages/JplPages.jsx').then((p) => ({ default: p.JplPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -143,7 +147,11 @@ function AuthenticatedApp() {
           <Route element={<ProofsPage />} path="/proofs" />
           <Route element={<HandshakesPage />} path="/handshakes" />
           <Route element={<ProtocolConformancePage />} path="/protocol/conformance" />
+          <Route element={<IntentAnchorsPage />} path="/intents" />
           <Route element={<IntentAnchorBuilderPage />} path="/intents/new" />
+          <Route element={<DipPage />} path="/dip" />
+          <Route element={<CplPage />} path="/cpl" />
+          <Route element={<JplPage />} path="/jpl" />
           <Route element={<ComingSoonPage />} path="*" />
         </Routes>
       </Suspense>

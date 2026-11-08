@@ -1,7 +1,7 @@
 // @ts-check
 import { Router } from 'express';
 import { AppError } from '../lib/errors.js';
-import { getCognitiveSnapshot } from '../services/snapshot_service.js';
+import { getCognitiveSnapshot, listCognitiveSnapshots } from '../services/snapshot_service.js';
 import {
   evaluateCplForRequest,
   getLatestReplayResult,
@@ -14,6 +14,23 @@ function resolveOrgId(req) {
 export function createCplRouter({ requireSession } = {}) {
   const router = Router();
   const sessionAuth = requireSession || ((req, res, next) => next());
+
+  // 0. GET /api/v1/cpl/snapshots - List snapshots for org
+  router.get('/cpl/snapshots', sessionAuth, async (req, res, next) => {
+    try {
+      const orgId = resolveOrgId(req);
+      if (!orgId) {
+        throw new AppError('UNAUTHORIZED', 401, 'Organization context required');
+      }
+
+      const limit = Math.min(Number(req.query.limit) || 50, 100);
+      const offset = Number(req.query.offset) || 0;
+      const snapshots = await listCognitiveSnapshots(orgId, { limit, offset });
+      return res.status(200).json({ snapshots });
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // 1. GET /api/v1/requests/:id/snapshot (PRD 1.7 §8.1)
   router.get('/requests/:id/snapshot', sessionAuth, async (req, res, next) => {

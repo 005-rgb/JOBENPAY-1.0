@@ -369,4 +369,336 @@ export function CplDisplayCard({ requestId }) {
   );
 }
 
-export default CplDisplayCard;
+/**
+ * Cognitive Provenance Layer (CPL) Hub Page (PRD 1.7)
+ */
+export function CplPage({ initialTab = 'snapshots' }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [snapshots, setSnapshots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filterScore, setFilterScore] = useState('ALL');
+  const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+
+  // Replay Studio State
+  const [targetRequestId, setTargetRequestId] = useState('');
+  const [activeReplayId, setActiveReplayId] = useState('');
+
+  const fetchSnapshots = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch('/api/v1/cpl/snapshots');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setSnapshots(data.snapshots || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSnapshots();
+  }, []);
+
+  const handleRunReplayFromTable = (requestId) => {
+    setTargetRequestId(requestId);
+    setActiveReplayId(requestId);
+    setActiveTab('replay');
+  };
+
+  const filteredSnapshots = snapshots.filter((s) => {
+    const score = s.reproducibility_score ?? 100;
+    if (filterScore === 'HIGH') return score >= 90;
+    if (filterScore === 'MID') return score >= 70 && score < 90;
+    if (filterScore === 'LOW') return score < 70;
+    return true;
+  });
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Page Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <Cpu size={24} color="#10b981" />
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>
+              Cognitive Provenance Layer (CPL)
+            </h1>
+            <span className={styles.providerBadge} style={{ background: '#0a2b9e', color: '#fff' }}>
+              PRD 1.7
+            </span>
+          </div>
+          <p className={styles.pageSubtitle} style={{ margin: 0 }}>
+            Proving that AI agent decisions are cryptographically reproducible from the same ground-truth data, model, and parameters.
+          </p>
+        </div>
+        <div>
+          <button
+            type="button"
+            className={styles.primaryLink}
+            onClick={() => {
+              setActiveTab('replay');
+              if (snapshots.length > 0 && !targetRequestId) {
+                setTargetRequestId(snapshots[0].request_id);
+                setActiveReplayId(snapshots[0].request_id);
+              }
+            }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <RotateCcw size={14} /> Open Replay Studio
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--jp-border)', marginBottom: '20px' }}>
+        <button
+          onClick={() => setActiveTab('snapshots')}
+          style={{
+            padding: '10px 16px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'snapshots' ? '2px solid var(--jp-primary)' : '2px solid transparent',
+            color: activeTab === 'snapshots' ? 'var(--jp-text)' : 'var(--jp-text-muted)',
+            fontWeight: activeTab === 'snapshots' ? 'bold' : 'normal',
+            cursor: 'pointer',
+            fontSize: '14px',
+          }}
+        >
+          Cognitive Snapshots & Provenance Ledger ({snapshots.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('replay')}
+          style={{
+            padding: '10px 16px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'replay' ? '2px solid var(--jp-primary)' : '2px solid transparent',
+            color: activeTab === 'replay' ? 'var(--jp-text)' : 'var(--jp-text-muted)',
+            fontWeight: activeTab === 'replay' ? 'bold' : 'normal',
+            cursor: 'pointer',
+            fontSize: '14px',
+          }}
+        >
+          Deterministic Replay Studio
+        </button>
+      </div>
+
+      {/* Tab 1: Snapshots List */}
+      {activeTab === 'snapshots' && (
+        <div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            {[
+              { id: 'ALL', label: 'All Snapshots' },
+              { id: 'HIGH', label: 'Reproducible (RS ≥ 90)' },
+              { id: 'MID', label: 'Require Approval (70-89)' },
+              { id: 'LOW', label: 'Divergent (RS < 70)' },
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilterScore(f.id)}
+                className={filterScore === f.id ? styles.primaryLink : styles.secondaryLink}
+                style={{ padding: '4px 12px', height: '32px', fontSize: '12px' }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div className={styles.tableCard}>
+            <table className={styles.dataTable}>
+              <thead>
+                <tr>
+                  <th>Snapshot ID</th>
+                  <th>Request ID</th>
+                  <th>Model & Engine</th>
+                  <th>Parameters</th>
+                  <th>Reproducibility Score</th>
+                  <th>Ed25519 Proof</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px' }}>Loading cognitive snapshots...</td></tr>
+                ) : filteredSnapshots.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--jp-text-muted)' }}>
+                      No cognitive snapshots recorded yet. When transactions pass AI evaluation with CPL, immutable snapshots will appear here.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredSnapshots.map((item) => {
+                    const score = item.reproducibility_score ?? 100;
+                    return (
+                      <tr key={item.snapshot_id || item.request_id}>
+                        <td className={styles.mono} style={{ fontSize: '12px' }}>
+                          {item.snapshot_id ? `${item.snapshot_id.slice(0, 10)}...` : '—'}
+                        </td>
+                        <td className={styles.mono} style={{ fontSize: '12px' }}>
+                          <a href={`/transactions/${item.request_id}`} style={{ color: 'var(--jp-primary)' }}>
+                            {item.request_id?.slice(0, 8)}...
+                          </a>
+                        </td>
+                        <td style={{ fontSize: '12px' }}>
+                          <strong>{item.model?.model_id || 'simulated-engine'}</strong>
+                          <span style={{ color: 'var(--jp-text-muted)' }}> ({item.model?.model_version || '1.0'})</span>
+                        </td>
+                        <td className={styles.mono} style={{ fontSize: '11px', color: 'var(--jp-text-muted)' }}>
+                          seed: {item.model?.seed ?? 42} · temp: {item.model?.temperature ?? 0}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '13px', color: score >= 90 ? '#10b981' : score >= 70 ? '#f59e0b' : '#ef4444' }}>
+                              {score} / 100
+                            </span>
+                            <span className={`${styles.providerBadge} ${score >= 90 ? styles.badgeSandbox : score >= 70 ? styles.badgeSimulated : styles.badgeFailed}`}>
+                              {score >= 90 ? 'REPRODUCIBLE' : score >= 70 ? 'NEEDS APPROVAL' : 'DIVERGENT'}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '11px', color: item.signature ? '#10b981' : '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ShieldCheck size={13} /> {item.signature ? 'Signed' : 'Unsigned'}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className={styles.secondaryLink}
+                              onClick={() => setSelectedSnapshot(item)}
+                              style={{ padding: '2px 8px', height: '28px', fontSize: '11px' }}
+                            >
+                              <Eye size={12} /> JSON
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.primaryLink}
+                              onClick={() => handleRunReplayFromTable(item.request_id)}
+                              style={{ padding: '2px 10px', height: '28px', fontSize: '11px', gap: '4px' }}
+                            >
+                              <RotateCcw size={11} /> Replay
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: Deterministic Replay Studio */}
+      {activeTab === 'replay' && (
+        <div>
+          <div className={styles.formCard} style={{ marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}>Target Request Replay Runner</h2>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '280px' }}>
+                <input
+                  type="text"
+                  className={styles.inputField}
+                  placeholder="Enter Request ID UUID (e.g. 550e8400-e29b-41d4-a716-446655440000)"
+                  value={targetRequestId}
+                  onChange={(e) => setTargetRequestId(e.target.value.trim())}
+                />
+              </div>
+              <button
+                type="button"
+                className={styles.primaryLink}
+                onClick={() => setActiveReplayId(targetRequestId)}
+                disabled={!targetRequestId}
+                style={{ height: '40px', padding: '0 20px' }}
+              >
+                Load Snapshot & Replay
+              </button>
+            </div>
+            {snapshots.length > 0 && (
+              <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--jp-text-muted)' }}>
+                <span>Quick Select from recent snapshots: </span>
+                {snapshots.slice(0, 4).map((s) => (
+                  <button
+                    key={s.request_id}
+                    type="button"
+                    onClick={() => {
+                      setTargetRequestId(s.request_id);
+                      setActiveReplayId(s.request_id);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--jp-primary)',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      marginRight: '8px',
+                      fontSize: '12px',
+                    }}
+                  >
+                    {s.request_id.slice(0, 8)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {activeReplayId ? (
+            <CplDisplayCard requestId={activeReplayId} />
+          ) : (
+            <div className={styles.formCard} style={{ textAlign: 'center', padding: '40px' }}>
+              <Cpu size={40} color="var(--jp-text-muted)" style={{ margin: '0 auto 12px auto' }} />
+              <p style={{ margin: 0, color: 'var(--jp-text-muted)' }}>
+                Select a snapshot from the ledger or enter a Request ID above to execute deterministic cognitive replay.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Selected Snapshot JSON Modal */}
+      {selectedSnapshot && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+          onClick={() => setSelectedSnapshot(null)}
+        >
+          <div
+            className={styles.formCard}
+            style={{ width: '100%', maxWidth: '720px', maxHeight: '80vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Cognitive Snapshot Details</h3>
+              <button className={styles.secondaryLink} onClick={() => setSelectedSnapshot(null)} style={{ padding: '2px 8px' }}>
+                Close
+              </button>
+            </div>
+            <pre className={styles.mono} style={{ fontSize: '11px', background: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '6px', overflowX: 'auto' }}>
+              {JSON.stringify(selectedSnapshot, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default {
+  RsGauge,
+  CplDisplayCard,
+  CplPage,
+};

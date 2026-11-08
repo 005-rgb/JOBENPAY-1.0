@@ -221,6 +221,33 @@ export async function getIntentMandate(orgId, intentId, dbClient = null) {
 }
 
 /**
+ * Lists intent mandates for an organization.
+ * @param {string} orgId - Organization UUID
+ * @param {object} [options] - Pagination options
+ * @param {object} [dbClient=null] - DB client
+ * @returns {Promise<Array<object>>}
+ */
+export async function listIntentMandates(orgId, { limit = 50, offset = 0 } = {}, dbClient = null) {
+  if (!orgId) {
+    throw new AppError('VALIDATION_FAILED', 400, 'orgId is required');
+  }
+
+  const { rows } = await runQuery(
+    `SELECT intent_id, org_id, principal_user_id, natural_language_input,
+            structured_intent, intent_hash, signature, signing_key_id,
+            valid_from, valid_to, status, created_at
+     FROM intent_mandates
+     WHERE org_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2 OFFSET $3;`,
+    [orgId, limit, offset],
+    dbClient
+  );
+
+  return rows || [];
+}
+
+/**
  * Validates whether a proposed transaction adheres to the bounded intent mandate.
  * @param {string} orgId - Organization UUID
  * @param {string} intentMandateId - Mandate UUID

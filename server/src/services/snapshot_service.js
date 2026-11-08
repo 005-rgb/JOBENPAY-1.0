@@ -273,6 +273,47 @@ export async function getCognitiveSnapshot(requestId, orgId, dbClient = null) {
   };
 }
 
+/**
+ * Lists cognitive snapshots for an organization.
+ * @param {string} orgId
+ * @param {object} [options]
+ * @param {any} [dbClient]
+ * @returns {Promise<Array<object>>}
+ */
+export async function listCognitiveSnapshots(orgId, { limit = 50, offset = 0 } = {}, dbClient = null) {
+  const db = dbClient || { query };
+  const res = await db.query(
+    `SELECT cs.snapshot_id, cs.request_id, cs.org_id, cs.model, cs.outputs, cs.snapshot_hash, cs.signature, cs.created_at,
+            rr.reproducibility_score, rr.decision as replay_decision, rr.replayed_at
+     FROM cognitive_snapshots cs
+     LEFT JOIN LATERAL (
+       SELECT reproducibility_score, decision, replayed_at
+       FROM replay_results
+       WHERE snapshot_id = cs.snapshot_id
+       ORDER BY replayed_at DESC
+       LIMIT 1
+     ) rr ON true
+     WHERE cs.org_id = $1
+     ORDER BY cs.created_at DESC
+     LIMIT $2 OFFSET $3;`,
+    [orgId, limit, offset],
+  );
+
+  return res.rows.map(row => ({
+    snapshot_id: row.snapshot_id,
+    request_id: row.request_id,
+    org_id: row.org_id,
+    model: typeof row.model === 'string' ? JSON.parse(row.model) : row.model,
+    outputs: typeof row.outputs === 'string' ? JSON.parse(row.outputs) : row.outputs,
+    snapshot_hash: row.snapshot_hash,
+    signature: row.signature,
+    reproducibility_score: row.reproducibility_score,
+    replay_decision: row.replay_decision,
+    replayed_at: row.replayed_at ? new Date(row.replayed_at).toISOString() : null,
+    created_at: new Date(row.created_at).toISOString(),
+  }));
+}
+
 export default {
   generateSnapshotId,
   detectPII,
@@ -282,4 +323,5 @@ export default {
   createCognitiveSnapshotPayload,
   createAndSaveCognitiveSnapshot,
   getCognitiveSnapshot,
+  listCognitiveSnapshots,
 };
