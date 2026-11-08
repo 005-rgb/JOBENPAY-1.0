@@ -32,6 +32,7 @@ import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
 import { DipDisplayCard } from './DipPages.jsx';
+import { CplDisplayCard } from './CplPages.jsx';
 import { StatusPill, ProviderBadge } from './TransactionsPage.jsx';
 import styles from './TransactionPages.module.css';
 
@@ -363,6 +364,15 @@ export function TransactionDetailPage() {
         >
           Decision Integrity (DIP)
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('cpl')}
+          className={activeTab === 'cpl' ? styles.primaryLink : styles.secondaryLink}
+          style={{ height: '32px', fontSize: '13px' }}
+          data-testid="tab-cpl"
+        >
+          Cognitive Provenance (CPL)
+        </button>
       </div>
 
       {/* Tab 1: Overview & State Timeline */}
@@ -561,6 +571,11 @@ export function TransactionDetailPage() {
       {/* Tab 5: Decision Integrity Proof */}
       {activeTab === 'dip' && (
         <DipDisplayCard requestId={intent.intent_id} />
+      )}
+
+      {/* Tab 6: Cognitive Provenance Layer */}
+      {activeTab === 'cpl' && (
+        <CplDisplayCard requestId={intent.intent_id} />
       )}
 
       {/* Step-Up Dialog */}

@@ -11,6 +11,8 @@ import {
 import { query } from '../db/pool.js';
 import { withTx } from '../db/tx.js';
 import { generateSar } from '../services/sar.js';
+import { createAndSaveCognitiveSnapshot } from '../services/snapshot_service.js';
+import { evaluateCplForRequest } from '../services/cpl_service.js';
 import crypto from 'node:crypto';
 
 function resolveOrgId(req) {
@@ -264,6 +266,9 @@ export async function handleAgentTransaction(req, res, next) {
       return inserted.rows[0];
     });
 
+    let snapshot = null;
+    let cplResult = null;
+
     if (dip && reasoning_trace && txResult.intent_id) {
       await storeReasoningTrace({
         orgId,
@@ -276,6 +281,55 @@ export async function handleAgentTransaction(req, res, next) {
         requestId: txResult.intent_id,
         dipResult: dip,
       }).catch(() => {});
+
+      // CPL Cognitive Snapshot capture (PRD 1.7 §3.3)
+      const promptHash = `sha256:${crypto.createHash('sha256').update(JSON.stringify(txPayload)).digest('hex')}`;
+      const contextHash = intentAnchor?.intent_hash || `sha256:${crypto.createHash('sha256').update(orgId).digest('hex')}`;
+      const rawHash = `sha256:${crypto.createHash('sha256').update(JSON.stringify(txPayload)).digest('hex')}`;
+
+      snapshot = await createAndSaveCognitiveSnapshot({
+        requestId: txResult.intent_id,
+        orgId,
+        model: {
+          provider: 'openai',
+          model_id: 'gpt-4o',
+          model_version: '2024-08-06',
+          temperature: 0,
+          top_p: 1,
+          seed: 42,
+          max_tokens: 2000,
+        },
+        inputs: {
+          user_prompt_hash: promptHash,
+          context_hash: contextHash,
+          document_hashes: [],
+          tool_calls: [],
+        },
+        outputs: {
+          decision: decision === 'AUTO_APPROVE' ? 'APPROVED' : (decision === 'REJECT' ? 'REJECTED' : 'REQUIRE_APPROVAL'),
+          reasoning_trace_hash: dip.trace_hash,
+          raw_output_hash: rawHash,
+          decision_integrity_score: disScore || 0,
+        },
+      }).catch(() => null);
+
+      if (snapshot) {
+        cplResult = await evaluateCplForRequest(txResult.intent_id, orgId, {
+          originalReasons: reasoning_trace.reasons,
+        }).catch(() => null);
+
+        if (cplResult) {
+          if (cplResult.reproducibility_score < 70) {
+            status = 'REJECTED';
+            decision = 'REJECT';
+            reasonCodes.push('CPL_CRITICAL');
+          } else if (cplResult.reproducibility_score < 90) {
+            status = 'PENDING_APPROVAL';
+            decision = 'REQUIRE_APPROVAL';
+            reasonCodes.push('CPL_LOW_REPRODUCIBILITY');
+          }
+        }
+      }
     }
 
     let sarId = null;
@@ -285,6 +339,15 @@ export async function handleAgentTransaction(req, res, next) {
         intent: txResult,
         legs: [],
         decision_integrity: dip,
+        cognitive_provenance: (cplResult && snapshot) ? {
+          snapshot_hash: snapshot.snapshot_hash,
+          replay_hash: cplResult.replay_hash,
+          reproducibility_score: cplResult.reproducibility_score,
+          components: cplResult.components,
+          model_id: snapshot.model.model_id,
+          model_version: snapshot.model.model_version,
+          seed: snapshot.model.seed,
+        } : null,
       });
       sarId = sar.sar_hash;
       sarObj = sar;
@@ -296,10 +359,12 @@ export async function handleAgentTransaction(req, res, next) {
       decision,
       reason_codes: reasonCodes,
       dis_score: disScore,
+      reproducibility_score: cplResult?.reproducibility_score ?? null,
       sar_id: sarId,
       sar: sarObj,
     });
   } catch (err) {
+    console.error('[handleAgentTransaction ERROR]', err);
     next(err);
   }
 }

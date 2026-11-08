@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobenpay.io/schemas/cognitive-snapshot-v1.0.json",
+  "title": "Cognitive Snapshot v1.0",
+  "type": "object",
+  "required": [
+    "snapshot_id",
+    "request_id",
+    "org_id",
+    "model",
+    "inputs",
+    "outputs",
+    "snapshot_hash",
+    "created_at"
+  ],
+  "properties": {
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^snap_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "org_id": {
+      "type": "string"
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "provider",
+        "model_id",
+        "model_version",
+        "temperature",
+        "seed"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "anthropic",
+            "google",
+            "local"
+          ]
+        },
+        "model_id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "model_version": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "top_p": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Seed untuk reproducibility"
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "system_prompt_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "inputs": {
+      "type": "object",
+      "required": [
+        "user_prompt_hash",
+        "context_hash",
+        "document_hashes"
+      ],
+      "properties": {
+        "user_prompt_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "context_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "document_hashes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "maxItems": 20
+        },
+        "retrieval_context_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "tool_calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "tool_name",
+              "input_hash",
+              "output_hash"
+            ],
+            "properties": {
+              "tool_name": {
+                "type": "string"
+              },
+              "input_hash": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "output_hash": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputs": {
+      "type": "object",
+      "required": [
+        "decision",
+        "reasoning_trace_hash",
+        "raw_output_hash"
+      ],
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": [
+            "APPROVED",
+            "REJECTED",
+            "REQUIRE_APPROVAL"
+          ]
+        },
+        "reasoning_trace_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "raw_output_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "decision_integrity_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "api_version": {
+          "type": "string"
+        },
+        "sdk_version": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "snapshot_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^base64:[A-Za-z0-9+/=]+$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

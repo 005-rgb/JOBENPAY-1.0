@@ -24,6 +24,8 @@ export function generateSar({
   vlei = null,
   decision_integrity = null,
   dip = null,
+  cognitive_provenance = null,
+  cpl = null,
 }) {
   const intentId = intent.intent_id ?? intent.id;
   const category = intent.category ?? 'PAYOUT';
@@ -92,6 +94,19 @@ export function generateSar({
       hard_rule_triggered: dipData.hard_rule_triggered ?? null,
       intent_hash: dipData.intent_hash ?? null,
       trace_hash: dipData.trace_hash ?? null,
+    };
+  }
+
+  const cplData = cognitive_provenance || cpl || intent.cognitive_provenance || intent.cpl;
+  if (cplData) {
+    sarPayload.cognitive_provenance = {
+      snapshot_hash: cplData.snapshot_hash,
+      replay_hash: cplData.replay_hash,
+      reproducibility_score: cplData.reproducibility_score,
+      components: cplData.components,
+      model_id: cplData.model_id,
+      model_version: cplData.model_version,
+      seed: cplData.seed,
     };
   }
 

@@ -44,6 +44,7 @@ import {
   getProofHandler,
 } from './routes/protocol.js';
 import { createDipRouter } from './routes/dip.js';
+import { createCplRouter } from './routes/cpl.js';
 import { handleAgentTransaction } from './controllers/dip_controller.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
@@ -634,6 +635,7 @@ export function createApp() {
   api.use(createMembersRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createTenantProofsRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createDipRouter({ requireSession, requireCsrf, agentAuth }));
+  api.use(createCplRouter({ requireSession }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,

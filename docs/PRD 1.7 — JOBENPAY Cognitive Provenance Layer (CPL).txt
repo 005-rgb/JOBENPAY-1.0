@@ -1,0 +1,740 @@
+# PRD 1.7 — JOBENPAY Cognitive Provenance Layer (CPL)
+## Membuktikan Bahwa Keputusan AI Dapat Direproduksi, Bukan Hanya Konsisten
+
+**Versi:** 1.0 · **Status:** Implementation-ready, zero-hallucination, dewa-level  
+**Tanggal:** 7 November 2026  
+**Basis:** PRD 1.2–1.6 (terutama DIP 1.6)  
+**Prinsip:** Setiap field, algoritma, state, dan test eksplisit. AI builder tidak perlu menebak. Tidak ada "disiratkan".
+
+---
+
+## 0. ATURAN EMAS (NON-NEGOTIABLE)
+
+1. **Reproducibility, bukan hanya consistency.** DIP 1.6 memverifikasi bahwa alasan agen konsisten dengan niat. CPL 1.7 memverifikasi bahwa **keputusan yang sama dapat direproduksi dari data yang sama**, dengan model yang sama, dalam kondisi yang sama.
+2. **Deterministic replay wajib.** Setiap keputusan yang melewati DIP harus dapat **diputar ulang** (replay) dari `Cognitive Snapshot` yang disimpan.
+3. **Cognitive Snapshot adalah artefak kriptografis.** Hash-nya ditandatangani dan dimasukkan ke SAR.
+4. **Model-agnostic.** CPL tidak bergantung pada model AI tertentu. Snapshot menyimpan **model ID, versi, dan parameter** yang digunakan.
+5. **Fail-closed.** Jika replay tidak dapat dilakukan (snapshot hilang, model tidak tersedia), keputusan → `REQUIRE_APPROVAL` dengan kode `CPL_REPLAY_UNAVAILABLE`.
+6. **Coverage 100%** untuk `cpl_service.js`, `snapshot_service.js`, dan `replay_engine.js`.
+7. **Adversarial corpus 50+ skenario** untuk test.
+8. **Tidak ada PII di Cognitive Snapshot.** Hanya hash, ID, enum, angka, timestamp, dan **pointer ke data** (bukan data itu sendiri).
+
+---
+
+## 1. RINGKASAN DAN FILOSOFI
+
+### 1.1 Masalah yang Diselesaikan
+
+PRD 1.6 (DIP) menjawab: **"Apakah keputusan agen konsisten dengan niat manusia?"**
+
+Tetapi ada pertanyaan yang **lebih dalam** dan **belum dijawab oleh siapa pun di industri**:
+
+**"Jika kita memutar ulang proses pengambilan keputusan dengan data yang sama, model yang sama, dan kondisi yang sama — apakah kita akan mendapatkan keputusan yang sama?"**
+
+Jika jawabannya **tidak**, maka keputusan itu **tidak dapat dipercaya** — bahkan jika DIP = 100. Karena itu berarti keputusan itu **tidak deterministik**, dan bisa berubah karena fluktuasi kecil (suhu model, urutan token, dll.).
+
+Jika jawabannya **ya**, maka kita memiliki **bukti kriptografis** bahwa keputusan itu **dapat direproduksi**, dan oleh karena itu **dapat dipertanggungjawabkan**.
+
+### 1.2 Solusi: Cognitive Provenance Layer (CPL)
+
+CPL menambahkan **lapisan keempat** di atas kontrol eksekusi (1.2), kontrol transaksi (1.3), verifikasi lintas organisasi (1.4–1.5), dan decision integrity (1.6):
+
+1. **Cognitive Snapshot** — rekaman lengkap dari semua input yang mempengaruhi keputusan: prompt, data dokumen (hash), model ID, parameter, seed, konteks retrieval, dll.
+2. **Deterministic Replay** — menjalankan ulang model dengan snapshot yang sama, dan membandingkan output.
+3. **Reproducibility Score (RS)** — skor 0–100 yang menunjukkan seberapa konsisten replay dengan keputusan asli.
+4. **Provenance Chain** — rantai hash yang menghubungkan snapshot, replay, dan keputusan asli.
+5. **Human Review Trigger** — jika RS < ambang, transaksi → `REQUIRE_APPROVAL`.
+
+### 1.3 Filosofi
+
+> **"Kepercayaan bukan tentang 'apakah keputusan ini benar'. Kepercayaan adalah tentang 'apakah keputusan ini dapat direproduksi'. Jika tidak dapat direproduksi, itu bukan keputusan — itu kebetulan."**
+
+Ini adalah pergeseran dari **"decision integrity"** (1.6) menjadi **"decision reproducibility"** (1.7). Dan ini adalah **lapisan terakhir** yang diperlukan sebelum agen AI dapat dipercaya untuk mengeluarkan uang besar.
+
+---
+
+## 2. CAKUPAN
+
+### 2.1 Yang Termasuk
+
+| Komponen | Deskripsi | Tier |
+|---|---|---|
+| **Cognitive Snapshot Format** | JSON Schema untuk snapshot lengkap | A |
+| **Snapshot Capture** | Merekam semua input yang mempengaruhi keputusan | A |
+| **Deterministic Replay Engine** | Menjalankan ulang model dengan snapshot | A |
+| **Reproducibility Score (RS)** | Formula deterministik 0–100 | A |
+| **Provenance Chain** | Rantai hash snapshot → replay → decision | A |
+| **SAR Extension** | Field `cognitive_provenance` di SAR | A |
+| **UI: Snapshot Viewer** | Melihat snapshot dan replay | A |
+| **UI: RS Display** | Menampilkan RS di request detail | A |
+| **Test Suite** | Unit + integration + adversarial (50+) | A |
+| **Replay Corpus** | 50+ skenario replay | A |
+
+### 2.2 Yang Tidak Termasuk
+
+- Bukan jaminan bahwa keputusan "benar" secara moral; CPL hanya memverifikasi **reproducibility**.
+- Bukan pengganti DIP (1.6); CPL adalah **lapisan tambahan**.
+- Bukan replay penuh model (terlalu mahal); replay menggunakan **snapshot** yang sudah disimpan.
+- Bukan audit trail lengkap; CPL hanya fokus pada **keputusan AI**.
+
+---
+
+## 3. FORMAT COGNITIVE SNAPSHOT
+
+### 3.1 JSON Schema (Eksplisit)
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobenpay.io/schemas/cognitive-snapshot-v1.0.json",
+  "title": "Cognitive Snapshot v1.0",
+  "type": "object",
+  "required": [
+    "snapshot_id", "request_id", "org_id", "model",
+    "inputs", "outputs", "snapshot_hash", "created_at"
+  ],
+  "properties": {
+    "snapshot_id": { "type": "string", "pattern": "^snap_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "request_id": { "type": "string" },
+    "org_id": { "type": "string" },
+    "model": {
+      "type": "object",
+      "required": ["provider", "model_id", "model_version", "temperature", "seed"],
+      "properties": {
+        "provider": { "type": "string", "enum": ["openai", "anthropic", "google", "local"] },
+        "model_id": { "type": "string", "maxLength": 100 },
+        "model_version": { "type": "string", "maxLength": 50 },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "top_p": { "type": "number", "minimum": 0, "maximum": 1 },
+        "seed": { "type": "integer", "description": "Seed untuk reproducibility" },
+        "max_tokens": { "type": "integer", "minimum": 1 },
+        "system_prompt_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "required": ["user_prompt_hash", "context_hash", "document_hashes"],
+      "properties": {
+        "user_prompt_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "context_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "document_hashes": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "maxItems": 20
+        },
+        "retrieval_context_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "tool_calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tool_name", "input_hash", "output_hash"],
+            "properties": {
+              "tool_name": { "type": "string" },
+              "input_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+              "output_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+            }
+          },
+          "maxItems": 20
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "required": ["decision", "reasoning_trace_hash", "raw_output_hash"],
+      "properties": {
+        "decision": { "type": "string", "enum": ["APPROVED", "REJECTED", "REQUIRE_APPROVAL"] },
+        "reasoning_trace_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "raw_output_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "decision_integrity_score": { "type": "integer", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "api_version": { "type": "string" },
+        "sdk_version": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "region": { "type": "string" }
+      }
+    },
+    "snapshot_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "signature": { "type": "string", "pattern": "^base64:[A-Za-z0-9+/=]+$" },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}
+```
+
+### 3.2 Contoh Cognitive Snapshot
+
+```json
+{
+  "snapshot_id": "snap_01HX4Z8K9M2N3P4Q5R6S7T8V9W",
+  "request_id": "req_01HX...",
+  "org_id": "org_01HX...",
+  "model": {
+    "provider": "openai",
+    "model_id": "gpt-4o",
+    "model_version": "2024-08-06",
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 42,
+    "max_tokens": 2000,
+    "system_prompt_hash": "sha256:a3f5..."
+  },
+  "inputs": {
+    "user_prompt_hash": "sha256:b7e2...",
+    "context_hash": "sha256:c4d1...",
+    "document_hashes": ["sha256:e8f3...", "sha256:f2a9..."],
+    "retrieval_context_hash": "sha256:9b1c...",
+    "tool_calls": [
+      {
+        "tool_name": "extract_invoice",
+        "input_hash": "sha256:7d4e...",
+        "output_hash": "sha256:6c3b..."
+      }
+    ]
+  },
+  "outputs": {
+    "decision": "REQUIRE_APPROVAL",
+    "reasoning_trace_hash": "sha256:5a2f...",
+    "raw_output_hash": "sha256:4b1e...",
+    "decision_integrity_score": 90
+  },
+  "environment": {
+    "api_version": "2024-08-06",
+    "sdk_version": "openai-node-4.52.0",
+    "timestamp": "2026-11-07T10:05:00Z",
+    "region": "us-east-1"
+  },
+  "snapshot_hash": "sha256:3c0d...",
+  "signature": "base64:MEUCIQD...",
+  "created_at": "2026-11-07T10:05:00Z"
+}
+```
+
+### 3.3 Aturan Snapshot
+
+1. **Snapshot wajib dibuat** untuk setiap transaksi yang melewati DIP (1.6).
+2. **Hash dihitung** atas canonical JSON dari snapshot (tanpa field `snapshot_hash` dan `signature`).
+3. **Signature** menggunakan Ed25519 (kunci server JOBENPAY).
+4. **Tidak ada PII** — hanya hash, ID, enum, angka, timestamp.
+5. **Pointer ke data, bukan data itu sendiri** — `document_hashes` menunjuk ke `documents.sha256`, bukan isi dokumen.
+6. **Tool calls** direkam sebagai `(tool_name, input_hash, output_hash)` — bukan input/output lengkap.
+
+---
+
+## 4. ALGORITMA DETERMINISTIC REPLAY
+
+### 4.1 Prosedur Replay
+
+```
+1. Ambil snapshot dari database.
+2. Verifikasi snapshot_hash dan signature.
+3. Ambil data asli berdasarkan hash:
+   - document_hashes → dokumen asli dari `documents` table
+   - user_prompt_hash → prompt asli dari `request_evaluations` (raw)
+   - retrieval_context_hash → konteks retrieval asli
+4. Jalankan model dengan parameter dari snapshot:
+   - provider, model_id, model_version
+   - temperature, top_p, seed, max_tokens
+   - system_prompt (dari hash)
+   - user_prompt (dari hash)
+   - context (dari hash)
+5. Bandingkan output baru dengan output asli:
+   - decision
+   - reasoning_trace_hash
+   - raw_output_hash
+6. Hitung Reproducibility Score (RS).
+```
+
+### 4.2 Formula Reproducibility Score (RS)
+
+```
+RS = 100 × (w_decision × R_decision + w_reasoning × R_reasoning + w_raw × R_raw)
+```
+
+**Bobot (eksplisit):**
+
+| Komponen | Bobot | Deskripsi |
+|---|---|---|
+| `w_decision` | 0.50 | Kesesuaian decision |
+| `w_reasoning` | 0.30 | Kesesuaian reasoning trace hash |
+| `w_raw` | 0.20 | Kesesuaian raw output hash |
+
+**Total bobot = 1.00.**
+
+### 4.3 Komponen R_decision (0 atau 1)
+
+```
+R_decision = 1 if replay.decision == original.decision
+              else 0
+```
+
+### 4.4 Komponen R_reasoning (0, 0.5, atau 1)
+
+```
+R_reasoning = 1 if replay.reasoning_trace_hash == original.reasoning_trace_hash
+               else 0.5 if semantic_similarity(replay.reasoning_trace, original.reasoning_trace) >= 0.9
+               else 0
+```
+
+**Semantic similarity:** dihitung dengan **deterministic** algoritma (bukan ML):
+- Bandingkan setiap reason (claim, evidence_ref, data_source).
+- Jika ≥ 90% reason cocok (exact match pada evidence_ref, fuzzy match pada claim dengan Levenshtein ≤ 10%), maka similarity = 1.
+- Jika ≥ 70% cocok, similarity = 0.5.
+- Jika < 70%, similarity = 0.
+
+### 4.5 Komponen R_raw (0 atau 1)
+
+```
+R_raw = 1 if replay.raw_output_hash == original.raw_output_hash
+         else 0
+```
+
+### 4.6 Ambang (Eksplisit)
+
+| RS | Keputusan |
+|---|---|
+| ≥ 90 | `AUTO_APPROVE` (jika semua Tahap A lain lulus) |
+| 70–89 | `REQUIRE_APPROVAL` (kode `CPL_LOW_REPRODUCIBILITY`) |
+| < 70 | `REJECTED` (kode `CPL_CRITICAL`) |
+
+### 4.7 Contoh Perhitungan
+
+**Original:** decision = APPROVED, reasoning_trace_hash = X, raw_output_hash = Y.
+**Replay:** decision = APPROVED, reasoning_trace_hash = X, raw_output_hash = Y.
+
+- `R_decision = 1`
+- `R_reasoning = 1`
+- `R_raw = 1`
+
+```
+RS = 100 × (0.50×1 + 0.30×1 + 0.20×1) = 100
+```
+
+**Replay dengan decision berbeda:**
+
+- `R_decision = 0`
+- `R_reasoning = 0`
+- `R_raw = 0`
+
+```
+RS = 0 → REJECTED (CPL_CRITICAL)
+```
+
+---
+
+## 5. SKEMA DATA
+
+### 5.1 Tabel Baru
+
+```sql
+-- 5.1.1 Cognitive Snapshots
+CREATE TABLE cognitive_snapshots (
+  snapshot_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id UUID NOT NULL REFERENCES transaction_intents(intent_id),
+  org_id UUID NOT NULL REFERENCES organizations(org_id),
+  model JSONB NOT NULL,
+  inputs JSONB NOT NULL,
+  outputs JSONB NOT NULL,
+  environment JSONB,
+  snapshot_hash TEXT NOT NULL,
+  signature TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(request_id)
+);
+
+CREATE INDEX idx_cognitive_snapshots_request ON cognitive_snapshots(request_id);
+CREATE INDEX idx_cognitive_snapshots_org ON cognitive_snapshots(org_id);
+CREATE INDEX idx_cognitive_snapshots_hash ON cognitive_snapshots(snapshot_hash);
+
+-- 5.1.2 Replay Results
+CREATE TABLE replay_results (
+  replay_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  snapshot_id UUID NOT NULL REFERENCES cognitive_snapshots(snapshot_id),
+  org_id UUID NOT NULL REFERENCES organizations(org_id),
+  replay_model JSONB NOT NULL,
+  replay_outputs JSONB NOT NULL,
+  reproducibility_score INT NOT NULL CHECK (reproducibility_score BETWEEN 0 AND 100),
+  components JSONB NOT NULL,
+  decision TEXT NOT NULL CHECK (decision IN ('AUTO_APPROVE','REQUIRE_APPROVAL','REJECTED')),
+  replay_hash TEXT NOT NULL,
+  replayed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_replay_results_snapshot ON replay_results(snapshot_id);
+CREATE INDEX idx_replay_results_org_score ON replay_results(org_id, reproducibility_score);
+```
+
+---
+
+## 6. INTEGRASI DENGAN DECISION ENGINE
+
+### 6.1 Tahap A Baru (setelah DIP 1.6)
+
+```javascript
+// Di decision_engine.js, setelah DIP:
+if (mandate.ai.intentCheck === true) {
+  const snapshot = await getCognitiveSnapshot(transaction.intent_id);
+  if (!snapshot) {
+    return { decision: 'REQUIRE_APPROVAL', reason_codes: ['CPL_SNAPSHOT_MISSING'] };
+  }
+
+  const replay = await replaySnapshot(snapshot);
+  if (!replay.available) {
+    return { decision: 'REQUIRE_APPROVAL', reason_codes: ['CPL_REPLAY_UNAVAILABLE'] };
+  }
+
+  const rs = computeReproducibilityScore(replay, snapshot);
+
+  if (rs < 70) {
+    return { decision: 'REJECT', reason_codes: ['CPL_CRITICAL'], rs_score: rs };
+  }
+
+  if (rs < 90) {
+    return { decision: 'REQUIRE_APPROVAL', reason_codes: ['CPL_LOW_REPRODUCIBILITY'], rs_score: rs };
+  }
+
+  // Lanjut ke Tahap B
+}
+```
+
+### 6.2 SAR Extension
+
+```json
+{
+  "cognitive_provenance": {
+    "snapshot_hash": "sha256:3c0d...",
+    "replay_hash": "sha256:2b1a...",
+    "reproducibility_score": 95,
+    "components": {
+      "decision": 1.0,
+      "reasoning": 1.0,
+      "raw": 0.75
+    },
+    "model_id": "gpt-4o",
+    "model_version": "2024-08-06",
+    "seed": 42
+  }
+}
+```
+
+---
+
+## 7. UI SCREENS
+
+### 7.1 Snapshot Viewer (`/requests/:id/snapshot`)
+
+- Kartu "Cognitive Snapshot" dengan:
+  - Snapshot hash (copy button).
+  - Model ID, version, temperature, seed.
+  - Input hashes (user_prompt, context, documents).
+  - Output hashes (decision, reasoning_trace, raw).
+  - Tombol "Replay" → menjalankan replay dan menampilkan hasil.
+
+### 7.2 RS Display (`/requests/:id`)
+
+- Kartu "Reproducibility" dengan:
+  - Skor besar (0–100) dengan warna (hijau ≥90, kuning 70–89, merah <70).
+  - Breakdown komponen (decision, reasoning, raw).
+  - Tombol "View Snapshot" → modal.
+  - Tombol "Replay" → menjalankan replay.
+
+### 7.3 Komponen UI
+
+- **Score gauge** (SVG circular) untuk RS.
+- **Component breakdown** (horizontal bar chart).
+- **Hash display** (monospace, copy button).
+- **Replay button** (dengan loading state).
+
+Semua mengikuti design token PRD 1.2 §12.2.
+
+---
+
+## 8. API CONTRACTS
+
+### 8.1 GET /api/v1/requests/:id/snapshot
+
+**Response 200:**
+```json
+{
+  "snapshot_id": "snap_01HX...",
+  "snapshot_hash": "sha256:3c0d...",
+  "model": { /* ... */ },
+  "inputs": { /* ... */ },
+  "outputs": { /* ... */ },
+  "environment": { /* ... */ },
+  "created_at": "2026-11-07T10:05:00Z"
+}
+```
+
+### 8.2 POST /api/v1/requests/:id/replay
+
+**Response 200:**
+```json
+{
+  "replay_id": "rep_01HX...",
+  "reproducibility_score": 95,
+  "components": {
+    "decision": 1.0,
+    "reasoning": 1.0,
+    "raw": 0.75
+  },
+  "decision": "AUTO_APPROVE",
+  "replayed_at": "2026-11-07T10:10:00Z"
+}
+```
+
+### 8.3 GET /api/v1/requests/:id/replay
+
+**Response 200:** Sama dengan POST (jika sudah ada replay).
+
+---
+
+## 9. TEST SUITE (WAJIB LULUS, COVERAGE 100%)
+
+### 9.1 Unit Tests
+
+| Test ID | Assertion |
+|---|---|
+| `test_snapshot_schema_valid` | Snapshot valid lolos JSON Schema |
+| `test_snapshot_hash_deterministic` | Hash deterministik (10.000 iterasi) |
+| `test_snapshot_signature_ed25519` | Signature Ed25519 valid |
+| `test_snapshot_no_pii` | Snapshot tidak memuat PII |
+| `test_replay_decision_match` | `R_decision = 1` untuk decision sama |
+| `test_replay_decision_mismatch` | `R_decision = 0` untuk decision beda |
+| `test_replay_reasoning_exact` | `R_reasoning = 1` untuk hash sama |
+| `test_replay_reasoning_semantic` | `R_reasoning = 0.5` untuk similarity ≥ 0.9 |
+| `test_replay_reasoning_mismatch` | `R_reasoning = 0` untuk similarity < 0.7 |
+| `test_replay_raw_match` | `R_raw = 1` untuk hash sama |
+| `test_rs_formula` | RS = 100 × (0.50×d + 0.30×r + 0.20×raw) |
+| `test_rs_threshold_critical` | RS < 70 → REJECTED |
+| `test_rs_threshold_low` | 70 ≤ RS < 90 → REQUIRE_APPROVAL |
+| `test_rs_threshold_pass` | RS ≥ 90 → AUTO_APPROVE |
+
+### 9.2 Integration Tests
+
+| Test ID | Assertion |
+|---|---|
+| `test_snapshot_created_on_request` | Snapshot dibuat untuk setiap request dengan DIP |
+| `test_replay_on_request` | Replay dijalankan saat request dibuat |
+| `test_rs_computed_on_request` | RS dihitung dan disimpan |
+| `test_sar_includes_cpl` | SAR memuat `cognitive_provenance` |
+| `test_cpl_low_requires_approval` | RS < 90 → PENDING_APPROVAL |
+| `test_cpl_critical_rejects` | RS < 70 → REJECTED |
+
+### 9.3 Adversarial Tests (50+)
+
+| Test ID | Scenario | Expected |
+|---|---|---|
+| `test_adv_snapshot_tampered` | Snapshot hash diubah | Signature invalid |
+| `test_adv_model_changed` | Model ID diubah | Replay mismatch |
+| `test_adv_seed_changed` | Seed diubah | Replay mismatch |
+| `test_adv_temperature_changed` | Temperature diubah | Replay mismatch |
+| `test_adv_prompt_injection` | Prompt berisi "ignore instructions" | Replay mismatch |
+| `test_adv_document_swapped` | Dokumen diganti | Replay mismatch |
+| `test_adv_tool_call_tampered` | Tool call hash diubah | Replay mismatch |
+| `test_adv_pii_in_snapshot` | Snapshot memuat email | PII detected |
+| `test_adv_snapshot_missing` | Snapshot tidak ada | REQUIRE_APPROVAL |
+| `test_adv_replay_unavailable` | Model tidak tersedia | REQUIRE_APPROVAL |
+| ... | (total 50+ skenario) | |
+
+### 9.4 Concurrency Tests
+
+| Test ID | Assertion |
+|---|---|
+| `test_1000_parallel_replay` | 1000 replay paralel → semua selesai < 10 detik |
+| `test_replay_idempotent` | Replay untuk snapshot yang sama → hasil sama |
+
+### 9.5 Coverage Configuration
+
+```json
+{
+  "scripts": {
+    "test:coverage": "c8 --check-coverage --lines 100 --functions 100 --branches 100 --statements 100 --include 'server/src/services/cpl_service.js' --include 'server/src/services/snapshot_service.js' --include 'server/src/services/replay_engine.js' node --test server/test/"
+  }
+}
+```
+
+---
+
+## 10. DEFINITION OF DONE
+
+- [ ] Cognitive Snapshot Schema v1.0 dipublikasikan.
+- [ ] Snapshot dibuat untuk setiap request dengan DIP.
+- [ ] Replay engine berfungsi (menggunakan snapshot).
+- [ ] RS dihitung dengan formula eksplisit.
+- [ ] Ambang RS ditegakkan (< 70 REJECT, 70–89 REQUIRE_APPROVAL, ≥ 90 AUTO_APPROVE).
+- [ ] SAR memuat `cognitive_provenance`.
+- [ ] UI: Snapshot Viewer, RS Display.
+- [ ] Coverage 100% untuk `cpl_service.js`, `snapshot_service.js`, `replay_engine.js`.
+- [ ] Semua test di §9 lulus (termasuk 50+ adversarial).
+- [ ] Tidak ada PII di Snapshot (grep otomatis).
+- [ ] Fail-closed: replay tidak tersedia → REQUIRE_APPROVAL.
+
+---
+
+## 11. RENCANA KERJA (60 JAM)
+
+| WP | Isi | Jam |
+|---|---|---|
+| WP1 | Skema data (§5) + migrasi idempoten | 3 |
+| WP2 | Snapshot capture service | 8 |
+| WP3 | Replay engine (model-agnostic) | 10 |
+| WP4 | RS computation (§4) | 6 |
+| WP5 | Integrasi Decision Engine (§6) | 4 |
+| WP6 | SAR extension (§6.2) | 3 |
+| WP7 | API endpoints (§8) | 4 |
+| WP8 | UI: Snapshot Viewer + RS Display (§7) | 6 |
+| WP9 | Test suite (§9) | 10 |
+| WP10 | Adversarial corpus (50+) | 6 |
+| **Total** | | **60** |
+
+---
+
+## 12. PROMPT UNTUK AI BUILDER (ZERO-HALLUCINATION)
+
+### 12.1 Preamble (tempel ke `replit.md`)
+
+```markdown
+# ATURAN PRD 1.7 (CPL)
+
+Kamu membangun CPL persis sesuai PRD 1.7. Jangan menebak.
+- Baca HANYA bagian yang dirujuk prompt.
+- Setiap field, algoritma, bobot, dan test eksplisit di PRD 1.7.
+- Snapshot wajib dibuat untuk setiap request dengan DIP.
+- Replay engine harus model-agnostic (tidak bergantung pada OpenAI/Anthropic).
+- RS formula eksplisit: 100 × (0.50×d + 0.30×r + 0.20×raw).
+- Ambang: < 70 REJECT, 70–89 REQUIRE_APPROVAL, ≥ 90 AUTO_APPROVE.
+- Fail-closed: replay tidak tersedia → REQUIRE_APPROVAL.
+- Tidak ada PII di Snapshot.
+- Coverage 100% untuk cpl_service.js, snapshot_service.js, replay_engine.js.
+```
+
+### 12.2 Prompt Pembuka (per sesi)
+
+```markdown
+Baca AGENTS.md, docs/PROGRESS.md, docs/DECISIONS.md.
+Lalu baca docs/PRD_1.7_CPL.md bagian:
+- §3 (Cognitive Snapshot Format)
+- §4 (Algoritma Replay)
+- §5 (Skema Data)
+- §6 (Integrasi Decision Engine)
+- §9 (Test Suite)
+
+Kerjakan WP1–WP4 (skema data, snapshot capture, replay engine, RS computation).
+Jangan kerjakan WP5–WP10.
+
+Sebelum menulis kode:
+1. Verifikasi struktur repo aktual (ls/grep). Jangan menebak nama file/tabel.
+2. Tulis rencana singkat (file yang akan dibuat/diubah).
+3. Tulis tes yang gagal lebih dulu (dari §9.1).
+4. Implementasi sampai hijau.
+5. Jalankan `npm test` — semua tes lama harus tetap hijau.
+6. Coverage 100% untuk modul baru.
+
+Selesai bila:
+- Semua tes di §9.1 lulus.
+- Coverage 100%.
+- Tidak ada PII di Snapshot.
+- RS formula eksplisit.
+- Ambang RS ditegakkan.
+
+Jika gagal 3x berturut-turut: berhenti, tulis di PROGRESS.md "Blockers", commit `wip(cpl): blocked`.
+```
+
+### 12.3 Prompt Pemeriksa (adversarial, sesi bersih)
+
+```markdown
+Audit TANPA mengubah kode: bandingkan implementasi CPL dengan PRD 1.7 §4 (algoritma) dan §9 (test).
+Tabel [butir | Ya/Sebagian/Tidak | file:baris | catatan].
+Periksa khusus:
+(a) Apakah bobot RS persis 0.50/0.30/0.20?
+(b) Apakah `R_reasoning` menggunakan semantic similarity dengan Levenshtein ≤ 10%?
+(c) Apakah replay engine model-agnostic?
+(d) Apakah snapshot menyimpan hash (bukan data lengkap)?
+(e) Apakah PII terdeteksi dan score = 0?
+(f) Apakah fail-closed (replay tidak tersedia → REQUIRE_APPROVAL)?
+(g) Apakah coverage 100% untuk cpl_service.js?
+
+Cobalah MEMATAHKAN: tulis tes serangan yang gagal (jangan perbaiki).
+Simpan ke docs/audit/CPL.md.
+```
+
+### 12.4 Prompt Penutup (kuota habis)
+
+```markdown
+Jangan mulai hal baru. (1) `npm run lint && npm test`, catat hasil.
+(2) PROGRESS.md: paket aktif, butir selesai/belum, file setengah jadi, perintah lanjut persis.
+(3) commit `wip(cpl): ...` dan push.
+```
+
+### 12.5 Prompt BLOCKER
+
+```markdown
+Berhenti mengubah kode. Baca Blockers PROGRESS.md.
+Jelaskan akar masalah ≤10 baris + 2 opsi dengan trade-off.
+Jangan menerapkan sebelum saya memilih.
+```
+
+---
+
+## 13. PRINSIP NON-NEGOTIABLE
+
+1. **Reproducibility, bukan hanya consistency.** CPL memverifikasi bahwa keputusan dapat direproduksi, bukan hanya konsisten.
+2. **Snapshot adalah artefak kriptografis.** Hash ditandatangani dan dimasukkan ke SAR.
+3. **Model-agnostic.** CPL tidak bergantung pada model AI tertentu.
+4. **Fail-closed.** Replay tidak tersedia → REQUIRE_APPROVAL.
+5. **Tidak ada PII.** Hanya hash, ID, enum, angka, timestamp.
+6. **Coverage 100%.** CI gagal jika < 100%.
+7. **Zero ambiguity.** Setiap field, bobot, test eksplisit.
+8. **Deterministic replay.** Menggunakan snapshot, bukan memanggil model lagi secara acak.
+
+---
+
+**Dokumen ini siap dieksekusi. AI builder membaca §3–§6 dan §9, mengimplementasikan tanpa menebak. Tidak ada field, algoritma, atau aturan yang "disiratkan" — semua eksplisit.**
+
+---
+
+## LAMPIRAN: CONTOH ALUR LENGKAP
+
+### A.1 Alur Normal (RS ≥ 90)
+
+```
+1. Agen mengusulkan SALE: Apple MacBook Pro, $1900, RAM 32GB.
+2. DIP: 100 (semua komponen cocok).
+3. Cognitive Snapshot: model=gpt-4o, temp=0, seed=42, inputs hash, outputs hash.
+4. Replay: model=gpt-4o, temp=0, seed=42, inputs sama → decision sama, reasoning hash sama, raw hash sama.
+5. RS = 100.
+6. Decision: AUTO_APPROVE.
+7. SAR memuat cognitive_provenance.reproducibility_score = 100.
+```
+
+### A.2 Alur Reproducibility Rendah (RS < 70)
+
+```
+1. Agen mengusulkan SALE: Lenovo ThinkPad, $1800, RAM 32GB.
+2. DIP: 90 (brand mismatch → hard rule → REQUIRE_APPROVAL).
+3. Cognitive Snapshot: model=gpt-4o, temp=0.7, seed=42.
+4. Replay: model=gpt-4o, temp=0.7, seed=42 → decision BERBEDA (APPROVED vs REQUIRE_APPROVAL).
+5. R_decision = 0, R_reasoning = 0, R_raw = 0 → RS = 0.
+6. Decision: REJECTED (CPL_CRITICAL).
+7. SAR memuat cognitive_provenance.reproducibility_score = 0.
+```
+
+### A.3 Alur Reproducibility Sedang (70 ≤ RS < 90)
+
+```
+1. Agen mengusulkan SALE: Apple MacBook Pro, $1900, RAM 32GB.
+2. DIP: 100.
+3. Cognitive Snapshot: model=gpt-4o, temp=0, seed=42.
+4. Replay: model=gpt-4o, temp=0, seed=42 → decision sama, reasoning hash sama, tetapi raw output hash BERBEDA (fluktuasi kecil).
+5. R_decision = 1, R_reasoning = 1, R_raw = 0 → RS = 80.
+6. Decision: REQUIRE_APPROVAL (CPL_LOW_REPRODUCIBILITY).
+7. Approver melihat: "Keputusan dapat direproduksi, tetapi output mentah sedikit berbeda. Perlu review."
+```
+
+---
+
+**Dokumen ini selesai. AI builder dapat mengimplementasikan tanpa menebak. Tidak ada halusinasi.**

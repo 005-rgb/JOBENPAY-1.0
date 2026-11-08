@@ -1,8 +1,8 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: Implementasi Penuh PRD 1.5 Open Trust Exchange & ADENDUM-01 PRD 1.4 (Organization & Member Management).
-- **Langkah saat ini**: Seluruh Fase PRD 1.4 & PRD 1.5 LULUS 100% dengan Conformance Test Runner 10/10 vectors PASSED.
+- **Langkah terakhir dikerjakan**: Implementasi Penuh PRD 1.7 Cognitive Provenance Layer (CPL) & PRD 1.6 Decision Integrity Proof (DIP).
+- **Langkah saat ini**: Seluruh Fase PRD 1.4, 1.5, 1.6, & 1.7 LULUS 100% (DIP, CPL Deterministic Replay Engine, Reproducibility Score, Conformance Runner 10/10 vectors, dan 80+ CPL unit/adversarial/concurrency tests PASSED).
 - **Validasi lokal terkini**:
   - `npm test` (`scripts/test-suite.js`): **976 / 976 tes lulus 100% tanpa gagal/skip** (termasuk 30 golden characterization tests, 4 negative CI guard tests, 1.000 property tests seimbang, 6/6 tamper classes, dan 8 organisasi verified).
   - Pagar CI (9 pagar): 100% LULUS (`guard`, `check-spec-lock`, `check-tenant-isolation`, `check-insert-tests`, `guard-characterization`, `lint-no-float-money`, `check-traceability`, `check-tests-from-data`, `secret-scan`).

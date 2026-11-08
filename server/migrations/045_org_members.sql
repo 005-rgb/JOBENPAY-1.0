@@ -19,14 +19,8 @@ ALTER TABLE memberships ADD COLUMN IF NOT EXISTS invited_by UUID REFERENCES user
 ALTER TABLE memberships ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 ALTER TABLE memberships ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT now();
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_memberships_status' AND conrelid = 'memberships'::regclass
-  ) THEN
-    ALTER TABLE memberships ADD CONSTRAINT chk_memberships_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'INVITED'));
-  END IF;
-END $$;
+ALTER TABLE memberships DROP CONSTRAINT IF EXISTS chk_memberships_status;
+ALTER TABLE memberships ADD CONSTRAINT chk_memberships_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'INVITED'));
 
 -- 1.3 Invitations Table
 ALTER TABLE invitations ADD COLUMN IF NOT EXISTS invitation_id UUID;
@@ -36,24 +30,14 @@ ALTER TABLE invitations ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organiza
 ALTER TABLE invitations ADD COLUMN IF NOT EXISTS invited_by UUID REFERENCES users(id);
 ALTER TABLE invitations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'PENDING';
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_invitations_status' AND conrelid = 'invitations'::regclass
-  ) THEN
-    ALTER TABLE invitations ADD CONSTRAINT chk_invitations_status CHECK (status IN ('PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED'));
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_invitations_role' AND conrelid = 'invitations'::regclass
-  ) THEN
-    ALTER TABLE invitations ADD CONSTRAINT chk_invitations_role CHECK (role IN ('ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER'));
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'uq_invitations_org_email' AND conrelid = 'invitations'::regclass
-  ) THEN
-    ALTER TABLE invitations ADD CONSTRAINT uq_invitations_org_email UNIQUE(org_id, email);
-  END IF;
-END $$;
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS chk_invitations_status;
+ALTER TABLE invitations ADD CONSTRAINT chk_invitations_status CHECK (status IN ('PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED'));
+
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS chk_invitations_role;
+ALTER TABLE invitations ADD CONSTRAINT chk_invitations_role CHECK (role IN ('ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER'));
+
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS uq_invitations_org_email;
+ALTER TABLE invitations ADD CONSTRAINT uq_invitations_org_email UNIQUE(org_id, email);
 
 CREATE INDEX IF NOT EXISTS idx_invitations_org ON invitations(org_id);
 CREATE INDEX IF NOT EXISTS idx_invitations_token ON invitations(token_hash);
