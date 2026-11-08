@@ -273,7 +273,8 @@ export async function validateIntentMatch(orgId, intentMandateId, transaction, d
 
   // 4. Amount cap check
   const txAmount = transaction?.amount_minor ?? transaction?.amountMinor ?? transaction?.amount;
-  if (txAmount !== undefined && structured.amount_range) {
+  const amountRange = structured.amount_range || structured.constraints?.amount_range;
+  if (txAmount !== undefined && amountRange) {
     let txBigInt;
     try {
       txBigInt = BigInt(txAmount);
@@ -281,21 +282,22 @@ export async function validateIntentMatch(orgId, intentMandateId, transaction, d
       return { valid: false, reason: 'INTENT_AMOUNT_EXCEEDED' };
     }
 
-    if (structured.amount_range.max !== undefined) {
-      if (txBigInt > BigInt(structured.amount_range.max)) {
+    if (amountRange.max !== undefined) {
+      if (txBigInt > BigInt(amountRange.max)) {
         return { valid: false, reason: 'INTENT_AMOUNT_EXCEEDED' };
       }
     }
 
-    if (structured.amount_range.min !== undefined) {
-      if (txBigInt < BigInt(structured.amount_range.min)) {
+    if (amountRange.min !== undefined) {
+      if (txBigInt < BigInt(amountRange.min)) {
         return { valid: false, reason: 'INTENT_AMOUNT_EXCEEDED' };
       }
     }
   }
 
   // 5. Vendor categories check
-  const categories = (structured.vendor_categories || []).map(normalize);
+  const vendorCategories = structured.vendor_categories || structured.constraints?.vendor_categories || [];
+  const categories = vendorCategories.map(normalize);
   const candidates = [
     transaction?.counterparty_id,
     transaction?.counterpartyId,

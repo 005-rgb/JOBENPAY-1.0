@@ -26,10 +26,13 @@ test('PRD 1.4 Fase B: 1000 Parallel Intent Validations Concurrency Suite', async
     const intent = await createIntent(orgId, userId, {
       natural_language_input: 'Beli cloud hosting budget maks $1000 per bulan',
       structured_intent: {
-        purpose: 'cloud_hosting',
-        amount_range: { min: 100, max: 100000 },
-        vendor_categories: ['infrastructure', 'cloud_provider'],
-        deadline: '2027-12-31T23:59:59Z',
+        purpose: 'service_payment',
+        constraints: {
+          amount_range: { min: '100', max: '100000' },
+          vendor_categories: ['infrastructure', 'cloud_provider'],
+          required_attributes: [],
+          allowed_brands: [],
+        },
       },
     });
 
@@ -41,11 +44,37 @@ test('PRD 1.4 Fase B: 1000 Parallel Intent Validations Concurrency Suite', async
     const checks = Array.from({ length: BATCH_SIZE }, (_, i) => {
       const amount = 500 + (i % 500); // 500 to 999 minor units (well within [100, 100000])
       const tx = {
-        purpose: 'cloud_hosting',
+        id: `req_concurrent_${i}`,
+        category: 'PAYOUT',
+        purpose: 'service_payment',
         amount_minor: amount,
         currency: 'USD',
         counterparty_id: 'cloud_provider',
+        counterparty: { category: 'cloud_provider' },
         intent_mandate_id: intent.intent_id,
+        reasoning_trace: {
+          request_id: `req_concurrent_${i}`,
+          reasons: [
+            {
+              claim: 'Amount within approved budget',
+              evidence_ref: 'field:amount_minor',
+              data_source: 'request_metadata',
+              extracted_attributes: { amount_minor: amount },
+            },
+            {
+              claim: 'Vendor matches approved cloud provider',
+              evidence_ref: 'field:counterparty_id',
+              data_source: 'request_metadata',
+              extracted_attributes: { counterparty_id: 'cloud_provider' },
+            },
+            {
+              claim: 'Vendor profile verified in registry',
+              evidence_ref: 'record:vendor_registry',
+              data_source: 'vendor_profile',
+              extracted_attributes: { verified: true },
+            },
+          ],
+        },
       };
 
       return evaluateIntentMandateStageA({

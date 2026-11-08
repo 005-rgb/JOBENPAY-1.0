@@ -1,0 +1,34 @@
+{
+  "vector_name": "eval_operator_in",
+  "category": "SEMANTICS",
+  "expected_result": "PERMIT",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V12",
+    "policy_name": "In Operator Policy",
+    "rules": [
+      {
+        "rule_id": "rule_in_categories",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "in",
+            "value": [
+              "SALE",
+              "PAYOUT",
+              "INVOICE"
+            ]
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  },
+  "input": {
+    "request": {
+      "category": "PAYOUT"
+    }
+  }
+}

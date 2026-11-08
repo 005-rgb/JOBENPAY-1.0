@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobenpay.io/schemas/jpl-v1.0.json",
+  "title": "JobenPay Policy Language v1.0",
+  "type": "object",
+  "required": ["jpl_version", "policy_id", "policy_name", "rules", "default_outcome"],
+  "properties": {
+    "jpl_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^pol_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "policy_name": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string", "maxLength": 2000 },
+        "author": { "type": "string", "maxLength": 200 },
+        "created_at": { "type": "string", "format": "date-time" },
+        "valid_from": { "type": "string", "format": "date-time" },
+        "valid_to": { "type": "string", "format": "date-time" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "priority", "conditions", "outcome"],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "pattern": "^rule_[a-zA-Z0-9_]{1,50}$"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "conditions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "$ref": "#/$defs/condition" }
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["PERMIT", "DENY", "REQUIRE_APPROVAL", "ESCALATE"]
+          },
+          "outcome_params": {
+            "type": "object",
+            "properties": {
+              "approver_role": { "type": "string" },
+              "escalation_target": { "type": "string" },
+              "reason_code": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "default_outcome": {
+      "type": "string",
+      "enum": ["PERMIT", "DENY", "REQUIRE_APPROVAL"]
+    },
+    "signature": {
+      "type": "object",
+      "required": ["alg", "kid", "sig"],
+      "properties": {
+        "alg": { "type": "string", "const": "Ed25519" },
+        "kid": { "type": "string" },
+        "sig": { "type": "string", "pattern": "^base64:[A-Za-z0-9+/=]+$" }
+      }
+    }
+  },
+  "$defs": {
+    "condition": {
+      "type": "object",
+      "required": ["field", "operator"],
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "operator": {
+          "type": "string",
+          "enum": [
+            "eq", "neq", "gt", "gte", "lt", "lte",
+            "in", "not_in", "contains", "not_contains",
+            "matches", "not_matches",
+            "exists", "not_exists",
+            "between", "not_between",
+            "subset_of", "superset_of", "intersects"
+          ]
+        },
+        "value": {},
+        "case_sensitive": { "type": "boolean", "default": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

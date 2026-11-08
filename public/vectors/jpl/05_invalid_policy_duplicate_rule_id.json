@@ -1,0 +1,37 @@
+{
+  "vector_name": "invalid_policy_duplicate_rule_id",
+  "category": "SCHEMA",
+  "expected_result": "INVALID",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V05",
+    "policy_name": "Duplicate Rule Policy",
+    "rules": [
+      {
+        "rule_id": "rule_duplicate_id",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "eq",
+            "value": "PAYOUT"
+          }
+        ],
+        "outcome": "PERMIT"
+      },
+      {
+        "rule_id": "rule_duplicate_id",
+        "priority": 2,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "eq",
+            "value": "SALE"
+          }
+        ],
+        "outcome": "DENY"
+      }
+    ],
+    "default_outcome": "DENY"
+  }
+}

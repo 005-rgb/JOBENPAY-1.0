@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import pool from '../../src/db/pool.js';
-import { startTestApp } from '../helpers/testApp.js';
+import { startTestApp, closeTestApp } from '../helpers/testApp.js';
 import { createSession } from '../../src/repositories/sessions.js';
 import { AppError } from '../../src/lib/errors.js';
 import {
@@ -79,6 +79,9 @@ async function createStepUpGrant(userId, sessionId, purpose) {
 
 test('ADENDUM-01 (PRD 1.4) Organization & Member Management Suite', async (t) => {
   const { server, url } = await startTestApp();
+  t.after(async () => {
+    await closeTestApp(server);
+  });
 
   // -------------------------------------------------------------
   // 5.1 Organization Tests

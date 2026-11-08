@@ -1,0 +1,33 @@
+{
+  "vector_name": "eval_deny_simple",
+  "category": "SEMANTICS",
+  "expected_result": "DENY",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V07",
+    "policy_name": "Simple Deny Policy",
+    "rules": [
+      {
+        "rule_id": "rule_deny_match",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.amount_minor",
+            "operator": "gte",
+            "value": 50000
+          }
+        ],
+        "outcome": "DENY",
+        "outcome_params": {
+          "reason_code": "CAP_EXCEEDED"
+        }
+      }
+    ],
+    "default_outcome": "PERMIT"
+  },
+  "input": {
+    "request": {
+      "amount_minor": 60000
+    }
+  }
+}

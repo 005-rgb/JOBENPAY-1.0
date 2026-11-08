@@ -1,0 +1,48 @@
+{
+  "vector_name": "eval_explicit_deny_precedence",
+  "category": "SEMANTICS",
+  "expected_result": "DENY",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V08",
+    "policy_name": "Explicit Deny Precedence Policy",
+    "rules": [
+      {
+        "rule_id": "rule_permit_higher_prio",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "eq",
+            "value": "PAYOUT"
+          }
+        ],
+        "outcome": "PERMIT"
+      },
+      {
+        "rule_id": "rule_deny_lower_prio",
+        "priority": 2,
+        "conditions": [
+          {
+            "field": "org.frozen",
+            "operator": "eq",
+            "value": true
+          }
+        ],
+        "outcome": "DENY",
+        "outcome_params": {
+          "reason_code": "ORG_FROZEN"
+        }
+      }
+    ],
+    "default_outcome": "REQUIRE_APPROVAL"
+  },
+  "input": {
+    "request": {
+      "category": "PAYOUT"
+    },
+    "org": {
+      "frozen": true
+    }
+  }
+}

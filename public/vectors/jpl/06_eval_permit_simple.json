@@ -1,0 +1,30 @@
+{
+  "vector_name": "eval_permit_simple",
+  "category": "SEMANTICS",
+  "expected_result": "PERMIT",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V06",
+    "policy_name": "Simple Permit Policy",
+    "rules": [
+      {
+        "rule_id": "rule_permit_match",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.amount_minor",
+            "operator": "lt",
+            "value": 50000
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  },
+  "input": {
+    "request": {
+      "amount_minor": 25000
+    }
+  }
+}

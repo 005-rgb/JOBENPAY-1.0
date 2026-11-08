@@ -1,0 +1,25 @@
+{
+  "vector_name": "valid_policy_minimal",
+  "category": "SCHEMA",
+  "expected_result": "VALID",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V01",
+    "policy_name": "Minimal Policy",
+    "rules": [
+      {
+        "rule_id": "rule_default_deny",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "eq",
+            "value": "PAYOUT"
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  }
+}

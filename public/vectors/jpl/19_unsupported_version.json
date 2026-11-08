@@ -1,0 +1,25 @@
+{
+  "vector_name": "unsupported_version",
+  "category": "VERSION",
+  "expected_result": "ERROR",
+  "policy": {
+    "jpl_version": "2.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V19",
+    "policy_name": "Future Version Policy",
+    "rules": [
+      {
+        "rule_id": "rule_1",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "eq",
+            "value": "PAYOUT"
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  }
+}

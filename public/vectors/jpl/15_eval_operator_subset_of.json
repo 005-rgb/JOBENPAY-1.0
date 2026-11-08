@@ -1,0 +1,38 @@
+{
+  "vector_name": "eval_operator_subset_of",
+  "category": "SEMANTICS",
+  "expected_result": "PERMIT",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V15",
+    "policy_name": "Subset Operator Policy",
+    "rules": [
+      {
+        "rule_id": "rule_subset_check",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "agent.permissions",
+            "operator": "subset_of",
+            "value": [
+              "READ",
+              "PROPOSE",
+              "SIMULATE",
+              "PAY"
+            ]
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  },
+  "input": {
+    "agent": {
+      "permissions": [
+        "READ",
+        "PROPOSE"
+      ]
+    }
+  }
+}

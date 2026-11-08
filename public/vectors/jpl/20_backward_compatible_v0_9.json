@@ -1,0 +1,25 @@
+{
+  "vector_name": "backward_compatible_v0_9",
+  "category": "VERSION",
+  "expected_result": "VALID",
+  "policy": {
+    "jpl_version": "0.9",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V20",
+    "policy_name": "Legacy v0.9 Policy",
+    "rules": [
+      {
+        "rule_id": "rule_1",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "eq",
+            "value": "PAYOUT"
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  }
+}

@@ -1,0 +1,832 @@
+PRD 1.8 — JobenPay Policy Language (JPL) Specification
+Standar Terbuka untuk Kebijakan Kontrol Agen AI yang Dapat Diaudit
+Versi: 1.0 · Status: Standard Specification, Implementation-ready, Zero-Hallucination
+Tanggal: 7 November 2026
+Basis: PRD 1.2 §10.1 (policy schema) + PRD 1.3 (universal transaction) + PRD 1.6 (DIP)
+Prinsip: Setiap field, operator, dan test eksplisit. AI builder tidak perlu menebak. Tidak ada "disiratkan".
+Filosofi: Dokumen ini ditulis untuk dibaca 10 tahun dari sekarang, ketika model AI sudah berganti berkali-kali, tetapi aturan bisnis tetap sama.
+
+0. ATURAN EMAS (NON-NEGOTIABLE)
+JPL adalah bahasa deklaratif, bukan bahasa pemrograman. Tidak ada loop, tidak ada function, tidak ada side effect. Hanya aturan yang dapat dievaluasi secara deterministik.
+
+JPL tidak bergantung pada model AI. Policy yang ditulis dalam JPL dapat dievaluasi oleh interpreter mana pun, tanpa memanggil LLM.
+
+JPL memiliki compiler dan verifier referensi. Setiap implementasi JPL wajib lulus conformance test suite.
+
+JPL backward compatible minimal 10 tahun. Versi lama tetap dapat dievaluasi oleh interpreter baru.
+
+JPL deterministik. Evaluasi policy yang sama dengan input yang sama selalu menghasilkan output yang sama.
+
+JPL fail-closed. Jika evaluasi tidak dapat diselesaikan (data hilang, tipe salah), hasilnya DENY — bukan PERMIT.
+
+Coverage 100% untuk jpl_compiler.js, jpl_evaluator.js, jpl_verifier.js. CI gagal jika < 100%.
+
+Setiap test case memiliki assertion eksplisit (§9). Tidak ada "test bahwa X berfungsi".
+
+1. RINGKASAN DAN FILOSOFI
+1.1 Masalah yang Diselesaikan
+Saat ini, setiap platform kontrol agen AI memiliki bahasa policy sendiri:
+
+JOBENPAY 1.2 menggunakan JSON Schema dengan field perTransactionCapMinor, allowedActions, dll.
+
+Sardis menggunakan YAML dengan spend_limits, merchant_rules, dll.
+
+Mercury menggunakan UI form dengan checkbox.
+
+Stripe menggunakan API call dengan parameter.
+
+Akibatnya:
+
+Tidak ada interoperabilitas. Policy yang ditulis untuk JOBENPAY tidak dapat dievaluasi oleh sistem lain.
+
+Tidak ada auditability. Regulator tidak dapat memverifikasi bahwa policy yang diklaim benar-benar dievaluasi.
+
+Tidak ada portabilitas. Jika perusahaan pindah vendor, policy harus ditulis ulang.
+
+Tidak ada standar. Setiap vendor mendefinisikan semantiknya sendiri, dan tidak ada cara untuk membandingkan.
+
+1.2 Solusi: JobenPay Policy Language (JPL)
+JPL adalah bahasa deklaratif terbuka untuk mengekspresikan kebijakan kontrol agen AI. JPL mendefinisikan:
+
+Syntax — bagaimana policy ditulis (JSON-based).
+
+Semantics — bagaimana policy dievaluasi (deterministik, fail-closed).
+
+Compiler — bagaimana policy dikompilasi menjadi executable rules.
+
+Evaluator — bagaimana policy dievaluasi terhadap input.
+
+Verifier — bagaimana policy diverifikasi (hash, signature).
+
+Conformance Test Suite — bagaimana implementasi diverifikasi.
+
+1.3 Filosofi
+"Kebijakan harus dapat dibaca oleh manusia, dievaluasi oleh mesin, dan diverifikasi oleh siapa pun. Jika tidak, itu bukan kebijakan — itu kotak hitam."
+
+JPL dirancang untuk bertahan 10 tahun, karena:
+
+Tidak bergantung pada model AI.
+
+Tidak bergantung pada vendor.
+
+Tidak bergantung pada teknologi pembayaran.
+
+Hanya bergantung pada logika dan matematika.
+
+2. CAKUPAN
+2.1 Yang Termasuk
+Komponen	Deskripsi	Tier
+JPL Syntax Specification	JSON Schema untuk policy	A
+JPL Semantics Specification	Aturan evaluasi deterministik	A
+JPL Compiler	Mengubah policy menjadi executable rules	A
+JPL Evaluator	Mengevaluasi policy terhadap input	A
+JPL Verifier	Memverifikasi policy (hash, signature)	A
+Conformance Test Suite	Vektor uji untuk implementasi pihak ketiga	A
+Reference Implementation	Implementasi referensi di Node.js	A
+JPL Validator CLI	CLI untuk memvalidasi policy	A
+JPL Evaluator Library	Library untuk mengevaluasi policy	A
+Dokumentasi Publik	Spesifikasi + contoh + tutorial	A
+2.2 Yang Tidak Termasuk
+Bukan bahasa pemrograman (tidak ada loop, function, side effect).
+
+Bukan pengganti AI intent check (PRD 1.2 §9.5 Tahap C); JPL adalah lapisan deterministik.
+
+Bukan jaminan bahwa policy "benar" secara moral; JPL hanya memverifikasi evaluasi yang konsisten.
+
+Bukan sistem manajemen policy (tidak ada UI, database, atau workflow).
+
+3. JPL SYNTAX SPECIFICATION
+3.1 Struktur Dasar
+Policy JPL adalah objek JSON dengan struktur:
+
+json
+{
+  "jpl_version": "1.0",
+  "policy_id": "pol_01HX...",
+  "policy_name": "Standard Payout Policy",
+  "metadata": { /* ... */ },
+  "rules": [ /* ... */ ],
+  "default_outcome": "DENY",
+  "signature": { /* ... */ }
+}
+3.2 JSON Schema (Eksplisit)
+json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobenpay.io/schemas/jpl-v1.0.json",
+  "title": "JobenPay Policy Language v1.0",
+  "type": "object",
+  "required": ["jpl_version", "policy_id", "policy_name", "rules", "default_outcome"],
+  "properties": {
+    "jpl_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^pol_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "policy_name": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string", "maxLength": 2000 },
+        "author": { "type": "string", "maxLength": 200 },
+        "created_at": { "type": "string", "format": "date-time" },
+        "valid_from": { "type": "string", "format": "date-time" },
+        "valid_to": { "type": "string", "format": "date-time" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "priority", "conditions", "outcome"],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "pattern": "^rule_[a-zA-Z0-9_]{1,50}$"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "conditions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "$ref": "#/$defs/condition" }
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["PERMIT", "DENY", "REQUIRE_APPROVAL", "ESCALATE"]
+          },
+          "outcome_params": {
+            "type": "object",
+            "properties": {
+              "approver_role": { "type": "string" },
+              "escalation_target": { "type": "string" },
+              "reason_code": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "default_outcome": {
+      "type": "string",
+      "enum": ["PERMIT", "DENY", "REQUIRE_APPROVAL"]
+    },
+    "signature": {
+      "type": "object",
+      "required": ["alg", "kid", "sig"],
+      "properties": {
+        "alg": { "type": "string", "const": "Ed25519" },
+        "kid": { "type": "string" },
+        "sig": { "type": "string", "pattern": "^base64:[A-Za-z0-9+/=]+$" }
+      }
+    }
+  },
+  "$defs": {
+    "condition": {
+      "type": "object",
+      "required": ["field", "operator"],
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "operator": {
+          "type": "string",
+          "enum": [
+            "eq", "neq", "gt", "gte", "lt", "lte",
+            "in", "not_in", "contains", "not_contains",
+            "matches", "not_matches",
+            "exists", "not_exists",
+            "between", "not_between",
+            "subset_of", "superset_of", "intersects"
+          ]
+        },
+        "value": {},
+        "case_sensitive": { "type": "boolean", "default": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
+3.3 Operator Semantik (Eksplisit)
+Operator	Tipe Field	Tipe Value	Semantik
+eq	string/number/boolean	same	Sama dengan
+neq	string/number/boolean	same	Tidak sama dengan
+gt	number	number	Lebih besar dari
+gte	number	number	Lebih besar atau sama dengan
+lt	number	number	Lebih kecil dari
+lte	number	number	Lebih kecil atau sama dengan
+in	any	array	Field ada di array
+not_in	any	array	Field tidak ada di array
+contains	string/array	string/any	Field mengandung value
+not_contains	string/array	string/any	Field tidak mengandung value
+matches	string	regex	Field cocok dengan regex (RE2 syntax)
+not_matches	string	regex	Field tidak cocok dengan regex
+exists	any	—	Field ada (tidak null/undefined)
+not_exists	any	—	Field tidak ada
+between	number	[min, max]	Field antara min dan max (inklusif)
+not_between	number	[min, max]	Field tidak antara min dan max
+subset_of	array	array	Field adalah subset dari value
+superset_of	array	array	Field adalah superset dari value
+intersects	array	array	Field beririsan dengan value
+3.4 Field Path Resolution
+Field path menggunakan dot notation:
+
+request.category → request.category
+
+request.amount_minor → request.amount_minor
+
+mandate.policy.budget.limit_minor → mandate.policy.budget.limit_minor
+
+agent.status → agent.status
+
+counterparty.category → counterparty.category
+
+Aturan:
+
+Jika field tidak ada di input, evaluasi → false (kecuali operator exists/not_exists).
+
+Jika field adalah null, evaluasi → false (kecuali operator exists/not_exists).
+
+Jika field path invalid (tidak cocok dengan regex), compiler → error.
+
+3.5 Prioritas dan Evaluasi
+Aturan evaluasi:
+
+Semua rule diurutkan berdasarkan priority (ascending: 1 = tertinggi).
+
+Rule pertama yang semua kondisi-nya true → outcome-nya digunakan.
+
+Jika tidak ada rule yang cocok → default_outcome.
+
+Explicit deny precedence: Jika ada rule dengan outcome DENY yang cocok, hasilnya DENY — bahkan jika rule lain dengan priority lebih tinggi menghasilkan PERMIT. (Ini adalah aturan keamanan.)
+
+Contoh:
+
+json
+{
+  "rules": [
+    { "rule_id": "rule_deny_blocked_vendor", "priority": 1, "conditions": [...], "outcome": "DENY" },
+    { "rule_id": "rule_permit_trusted_vendor", "priority": 2, "conditions": [...], "outcome": "PERMIT" }
+  ],
+  "default_outcome": "DENY"
+}
+Jika rule_deny_blocked_vendor cocok → DENY. Jika tidak, cek rule_permit_trusted_vendor → PERMIT. Jika tidak ada yang cocok → DENY.
+
+3.6 Contoh Policy Lengkap
+json
+{
+  "jpl_version": "1.0",
+  "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V9W",
+  "policy_name": "Standard Payout Policy for AI Agents",
+  "metadata": {
+    "description": "Allow payouts to trusted vendors up to $500 per transaction, $3000 per month.",
+    "author": "Acme Corp Finance Team",
+    "created_at": "2026-11-07T10:00:00Z",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-12-01T00:00:00Z",
+    "tags": ["payout", "vendor", "standard"]
+  },
+  "rules": [
+    {
+      "rule_id": "rule_deny_blocked_vendor",
+      "priority": 1,
+      "description": "Block vendors marked as BLOCKED",
+      "conditions": [
+        { "field": "counterparty.trust", "operator": "eq", "value": "BLOCKED" }
+      ],
+      "outcome": "DENY",
+      "outcome_params": { "reason_code": "PAYEE_BLOCKED" }
+    },
+    {
+      "rule_id": "rule_deny_org_frozen",
+      "priority": 2,
+      "description": "Block all if org is frozen",
+      "conditions": [
+        { "field": "org.frozen", "operator": "eq", "value": true }
+      ],
+      "outcome": "DENY",
+      "outcome_params": { "reason_code": "ORG_FROZEN" }
+    },
+    {
+      "rule_id": "rule_require_approval_new_vendor",
+      "priority": 3,
+      "description": "Require approval for new vendors",
+      "conditions": [
+        { "field": "counterparty.trust", "operator": "eq", "value": "PENDING_REVIEW" }
+      ],
+      "outcome": "REQUIRE_APPROVAL",
+      "outcome_params": { "approver_role": "APPROVER", "reason_code": "PAYEE_NEW" }
+    },
+    {
+      "rule_id": "rule_deny_cap_exceeded",
+      "priority": 4,
+      "description": "Block payouts above $500",
+      "conditions": [
+        { "field": "request.amount_minor", "operator": "gt", "value": 50000 }
+      ],
+      "outcome": "DENY",
+      "outcome_params": { "reason_code": "CAP_EXCEEDED" }
+    },
+    {
+      "rule_id": "rule_require_approval_amount",
+      "priority": 5,
+      "description": "Require approval for amounts above $200",
+      "conditions": [
+        { "field": "request.amount_minor", "operator": "gte", "value": 20000 }
+      ],
+      "outcome": "REQUIRE_APPROVAL",
+      "outcome_params": { "approver_role": "APPROVER", "reason_code": "AMOUNT_REQUIRES_APPROVAL" }
+    },
+    {
+      "rule_id": "rule_permit_trusted_vendor",
+      "priority": 10,
+      "description": "Permit trusted vendors below $200",
+      "conditions": [
+        { "field": "counterparty.trust", "operator": "eq", "value": "TRUSTED" },
+        { "field": "request.amount_minor", "operator": "lt", "value": 20000 }
+      ],
+      "outcome": "PERMIT",
+      "outcome_params": { "reason_code": "PAYEE_TRUSTED" }
+    }
+  ],
+  "default_outcome": "DENY",
+  "signature": {
+    "alg": "Ed25519",
+    "kid": "kid_01HX...",
+    "sig": "base64:MEUCIQD..."
+  }
+}
+4. JPL SEMANTICS SPECIFICATION
+4.1 Evaluasi Deterministik
+Fungsi: evaluate(policy, input) → outcome
+
+Algoritma:
+
+text
+1. Validasi policy terhadap JSON Schema. Jika invalid → error.
+2. Urutkan rules berdasarkan priority (ascending).
+3. Untuk setiap rule (dari priority terendah):
+   a. Evaluasi semua conditions dengan AND.
+   b. Jika semua conditions true → rule cocok.
+   c. Jika rule.outcome == "DENY" → return DENY (explicit deny precedence).
+   d. Jika rule cocok tetapi outcome != "DENY" → simpan sebagai kandidat.
+4. Jika ada kandidat (non-DENY) → return kandidat pertama.
+5. Jika tidak ada kandidat → return default_outcome.
+Aturan fail-closed:
+
+Jika input tidak memiliki field yang dirujuk → kondisi = false.
+
+Jika tipe data tidak cocok (misalnya gt pada string) → kondisi = false.
+
+Jika evaluasi error (misalnya regex invalid) → return DENY dengan reason EVALUATION_ERROR.
+
+4.2 Explicit Deny Precedence
+Aturan ini adalah keamanan fundamental:
+
+Jika ada rule dengan outcome DENY yang cocok, hasilnya selalu DENY — bahkan jika ada rule lain dengan priority lebih tinggi yang menghasilkan PERMIT.
+
+Rasional: Dalam sistem keamanan, "deny" harus selalu menang. Jika ada keraguan, tolak.
+
+Contoh:
+
+json
+{
+  "rules": [
+    { "rule_id": "rule_permit", "priority": 1, "conditions": [...], "outcome": "PERMIT" },
+    { "rule_id": "rule_deny", "priority": 2, "conditions": [...], "outcome": "DENY" }
+  ]
+}
+Jika keduanya cocok → DENY (karena rule_deny cocok, dan explicit deny precedence berlaku).
+
+4.3 Evaluasi Kondisi
+Fungsi: evaluateCondition(condition, input) → boolean
+
+Algoritma:
+
+text
+1. Resolve field path di input.
+2. Jika field tidak ada dan operator bukan exists/not_exists → return false.
+3. Evaluasi operator sesuai tabel §3.3.
+4. Jika operator error (misalnya regex invalid) → return false (fail-closed).
+5. Return hasil.
+4.4 Versioning
+Aturan:
+
+Setiap policy memiliki jpl_version.
+
+Interpreter wajib mendukung minimal 10 tahun versi lama.
+
+Jika interpreter tidak mendukung versi → error UNSUPPORTED_JPL_VERSION.
+
+Perubahan semantik (misalnya operator baru) → versi minor (1.1).
+
+Perubahan struktur (misalnya field baru) → versi minor (1.1).
+
+Perubahan breaking (misalnya menghapus operator) → versi major (2.0).
+
+5. JPL COMPILER
+5.1 Tujuan
+Compiler mengubah policy JSON menjadi executable rules yang dapat dievaluasi dengan cepat (O(1) per rule).
+
+5.2 Prosedur
+text
+1. Validasi policy terhadap JSON Schema.
+2. Verifikasi signature (jika ada).
+3. Kompilasi setiap rule:
+   a. Parse field path menjadi accessor function.
+   b. Compile operator menjadi evaluator function.
+   c. Simpan sebagai closure.
+4. Urutkan rules berdasarkan priority.
+5. Return compiled policy object.
+5.3 Output Compiler
+javascript
+{
+  policy_id: "pol_01HX...",
+  policy_hash: "sha256:...",
+  rules: [
+    {
+      rule_id: "rule_deny_blocked_vendor",
+      priority: 1,
+      outcome: "DENY",
+      outcome_params: { reason_code: "PAYEE_BLOCKED" },
+      evaluate: (input) => { /* compiled closure */ }
+    },
+    // ...
+  ],
+  default_outcome: "DENY",
+  evaluate: (input) => { /* main evaluator */ }
+}
+5.4 Idempotensi
+Compiler harus deterministik: policy yang sama → compiled policy yang sama (kecuali closure function, yang tidak dapat dibandingkan).
+
+Test: test_compiler_deterministic — compile policy 2x → output hash sama.
+
+6. JPL EVALUATOR
+6.1 API
+javascript
+import { compile, evaluate } from '@jobenpay/jpl';
+
+const policy = JSON.parse(fs.readFileSync('policy.json', 'utf8'));
+const compiled = compile(policy);
+
+const input = {
+  request: { category: 'PAYOUT', amount_minor: 45000, currency: 'USD' },
+  counterparty: { trust: 'TRUSTED', category: 'electronics' },
+  agent: { status: 'ACTIVE' },
+  org: { frozen: false }
+};
+
+const result = evaluate(compiled, input);
+// { outcome: 'REQUIRE_APPROVAL', rule_id: 'rule_require_approval_amount', reason_code: 'AMOUNT_REQUIRES_APPROVAL' }
+6.2 Output Evaluator
+javascript
+{
+  outcome: "PERMIT" | "DENY" | "REQUIRE_APPROVAL" | "ESCALATE",
+  rule_id: string | null,
+  reason_code: string | null,
+  outcome_params: object,
+  evaluated_at: string (ISO-8601)
+}
+6.3 Conformance
+Evaluator wajib lulus conformance test suite (§9.4).
+
+7. JPL VERIFIER
+7.1 Tujuan
+Verifier memverifikasi bahwa policy:
+
+Valid terhadap JSON Schema.
+
+Memiliki signature yang valid.
+
+Hash-nya cocok dengan yang tercatat di ledger.
+
+Tidak dimanipulasi.
+
+7.2 API
+javascript
+import { verify } from '@jobenpay/jpl';
+
+const result = verify(policy, { publicKey, expectedHash });
+// { valid: true, checks: [...] }
+7.3 Prosedur
+text
+1. Validasi policy terhadap JSON Schema.
+2. Hitung hash = SHA-256(canonicalize(policy tanpa signature)).
+3. Jika expectedHash diberikan, bandingkan.
+4. Verifikasi signature dengan publicKey.
+5. Return { valid, checks }.
+8. CONFORMANCE TEST SUITE
+8.1 Vektor Uji Wajib
+#	Nama	Kategori	Expected
+1	valid_policy_minimal	SCHEMA	VALID
+2	valid_policy_full	SCHEMA	VALID
+3	invalid_policy_missing_version	SCHEMA	INVALID
+4	invalid_policy_unknown_operator	SCHEMA	INVALID
+5	invalid_policy_duplicate_rule_id	SCHEMA	INVALID
+6	eval_permit_simple	SEMANTICS	PERMIT
+7	eval_deny_simple	SEMANTICS	DENY
+8	eval_explicit_deny_precedence	SEMANTICS	DENY
+9	eval_default_outcome	SEMANTICS	default_outcome
+10	eval_field_missing	SEMANTICS	DENY (fail-closed)
+11	eval_type_mismatch	SEMANTICS	DENY (fail-closed)
+12	eval_operator_in	SEMANTICS	sesuai
+13	eval_operator_between	SEMANTICS	sesuai
+14	eval_operator_matches	SEMANTICS	sesuai
+15	eval_operator_subset_of	SEMANTICS	sesuai
+16	signature_valid	VERIFY	VALID
+17	signature_invalid	VERIFY	INVALID
+18	hash_mismatch	VERIFY	INVALID
+19	unsupported_version	VERSION	ERROR
+20	backward_compatible_v0_9	VERSION	VALID
+Total: 20 vektor.
+
+8.2 Conformance Runner
+File: scripts/jpl-conformance.js
+
+Fungsi:
+
+Unduh vektor dari /v1/jpl/conformance/vectors.
+
+Untuk setiap vektor, jalankan compile + evaluate + verify.
+
+Bandingkan hasil dengan expected.
+
+Output: {passed: N, failed: M}.
+
+Exit code: 0 jika semua lulus.
+
+9. TEST SUITE (WAJIB LULUS, COVERAGE 100%)
+9.1 Unit Tests — Compiler
+Test ID	Assertion
+test_compiler_valid_policy	Compile policy valid → success
+test_compiler_invalid_schema	Compile policy invalid → error
+test_compiler_deterministic	Compile 2x → hash sama
+test_compiler_field_path_valid	Field path valid → accessor
+test_compiler_field_path_invalid	Field path invalid → error
+test_compiler_operator_valid	Operator valid → evaluator
+test_compiler_operator_invalid	Operator invalid → error
+test_compiler_duplicate_rule_id	Rule ID duplicate → error
+test_compiler_priority_sort	Rules diurutkan berdasarkan priority
+9.2 Unit Tests — Evaluator
+Test ID	Assertion
+test_eval_permit	Outcome PERMIT
+test_eval_deny	Outcome DENY
+test_eval_require_approval	Outcome REQUIRE_APPROVAL
+test_eval_escalate	Outcome ESCALATE
+test_eval_default_outcome	Tidak ada rule cocok → default
+test_eval_explicit_deny_precedence	DENY menang meskipun priority lebih rendah
+test_eval_field_missing	Field tidak ada → false
+test_eval_field_null	Field null → false
+test_eval_type_mismatch	Tipe salah → false
+test_eval_operator_eq	Operator eq benar
+test_eval_operator_neq	Operator neq benar
+test_eval_operator_gt	Operator gt benar
+test_eval_operator_in	Operator in benar
+test_eval_operator_matches	Operator matches benar
+test_eval_operator_between	Operator between benar
+test_eval_operator_subset_of	Operator subset_of benar
+test_eval_operator_exists	Operator exists benar
+test_eval_fail_closed	Error → DENY
+9.3 Unit Tests — Verifier
+Test ID	Assertion
+test_verify_valid_signature	Signature valid → true
+test_verify_invalid_signature	Signature invalid → false
+test_verify_hash_match	Hash cocok → true
+test_verify_hash_mismatch	Hash berbeda → false
+test_verify_no_signature	Tanpa signature → valid (opsional)
+9.4 Conformance Tests
+Test ID	Assertion
+test_conformance_all_vectors	20/20 vektor lulus
+test_conformance_invalid_detected	Vektor invalid terdeteksi
+9.5 Integration Tests
+Test ID	Assertion
+test_e2e_compile_evaluate	Policy → compile → evaluate → outcome benar
+test_e2e_verify_evaluate	Policy → verify → compile → evaluate → outcome benar
+test_e2e_with_signature	Policy bertanda tangan → verify → evaluate
+9.6 Performance Tests
+Test ID	Assertion
+test_compile_1000_rules	Compile 1000 rules < 100 ms
+test_evaluate_1000_rules	Evaluate 1000 rules < 10 ms
+test_evaluate_10000_calls	Evaluate 10.000 calls < 1 detik
+9.7 Coverage Configuration
+json
+{
+  "scripts": {
+    "test:coverage": "c8 --check-coverage --lines 100 --functions 100 --branches 100 --statements 100 --include 'src/jpl_compiler.js' --include 'src/jpl_evaluator.js' --include 'src/jpl_verifier.js' node --test test/"
+  }
+}
+10. DEFINITION OF DONE
+□ JPL Syntax Specification v1.0 dipublikasikan (/schemas/jpl-v1.0.json).
+□ JPL Semantics Specification v1.0 dipublikasikan (/docs/jpl-semantics.md).
+□ Compiler berfungsi untuk semua operator di §3.3.
+□ Evaluator berfungsi dengan explicit deny precedence.
+□ Verifier berfungsi (signature + hash).
+□ Conformance test suite (20 vektor) tersedia publik.
+□ Conformance runner lulus 20/20.
+□ Reference implementation dipublikasikan di npm (@jobenpay/jpl).
+□ CLI validator (jpl-validate) berfungsi.
+□ Coverage 100% untuk jpl_compiler.js, jpl_evaluator.js, jpl_verifier.js.
+□ Semua test di §9 lulus.
+□ Dokumentasi publik (spesifikasi + contoh + tutorial) tersedia.
+11. RENCANA KERJA (40 JAM)
+WP	Isi	Jam
+WP1	JSON Schema (§3.2) + dokumentasi	3
+WP2	Compiler (§5)	8
+WP3	Evaluator (§6) + explicit deny precedence	8
+WP4	Verifier (§7)	3
+WP5	Conformance vectors (20) + runner	5
+WP6	Reference implementation (npm package)	4
+WP7	CLI validator	2
+WP8	Test suite (§9)	5
+WP9	Dokumentasi publik (spesifikasi + tutorial)	2
+Total		40
+12. PROMPT UNTUK AI BUILDER (ZERO-HALLUCINATION)
+12.1 Preamble (tempel ke replit.md)
+markdown
+# ATURAN PRD 1.8 (JPL)
+
+Kamu membangun JPL persis sesuai PRD 1.8. Jangan menebak.
+- Baca HANYA bagian yang dirujuk prompt.
+- Setiap operator, semantik, dan test eksplisit di PRD 1.8.
+- JPL adalah bahasa deklaratif, bukan bahasa pemrograman.
+- Evaluator deterministik, fail-closed.
+- Explicit deny precedence: DENY selalu menang.
+- Coverage 100% untuk jpl_compiler.js, jpl_evaluator.js, jpl_verifier.js.
+- Backward compatible minimal 10 tahun.
+- Conformance test suite wajib lulus 20/20.
+12.2 Prompt Pembuka (per sesi)
+markdown
+Baca AGENTS.md, docs/PROGRESS.md, docs/DECISIONS.md.
+Lalu baca docs/PRD_1.8_JPL.md bagian:
+- §3 (Syntax Specification)
+- §4 (Semantics Specification)
+- §5 (Compiler)
+- §6 (Evaluator)
+- §7 (Verifier)
+- §9 (Test Suite)
+
+Kerjakan WP1–WP4 (schema, compiler, evaluator, verifier).
+Jangan kerjakan WP5–WP9.
+
+Sebelum menulis kode:
+1. Verifikasi struktur repo aktual (ls/grep). Jangan menebak nama file.
+2. Tulis rencana singkat (file yang akan dibuat/diubah).
+3. Tulis tes yang gagal lebih dulu (dari §9.1–§9.3).
+4. Implementasi sampai hijau.
+5. Jalankan `npm test` — semua tes lama harus tetap hijau.
+6. Coverage 100% untuk modul baru.
+
+Selesai bila:
+- Semua tes di §9.1–§9.3 lulus.
+- Coverage 100%.
+- Explicit deny precedence berfungsi.
+- Fail-closed: error → DENY.
+- Semua operator di §3.3 berfungsi.
+
+Jika gagal 3x berturut-turut: berhenti, tulis di PROGRESS.md "Blockers", commit `wip(jpl): blocked`.
+12.3 Prompt Pemeriksa (adversarial, sesi bersih)
+markdown
+Audit TANPA mengubah kode: bandingkan implementasi JPL dengan PRD 1.8 §3 (syntax), §4 (semantik), dan §9 (test).
+Tabel [butir | Ya/Sebagian/Tidak | file:baris | catatan].
+Periksa khusus:
+(a) Apakah semua operator di §3.3 berfungsi?
+(b) Apakah explicit deny precedence berfungsi (DENY menang meskipun priority lebih rendah)?
+(c) Apakah fail-closed (error → DENY)?
+(d) Apakah field path resolution benar (dot notation, missing field → false)?
+(e) Apakah compiler deterministik (policy sama → hash sama)?
+(f) Apakah evaluator deterministik (input sama → output sama)?
+(g) Apakah verifier memeriksa signature dan hash?
+(h) Apakah coverage 100% untuk jpl_compiler.js, jpl_evaluator.js, jpl_verifier.js?
+
+Cobalah MEMATAHKAN: tulis tes serangan yang gagal (jangan perbaiki).
+Simpan ke docs/audit/JPL.md.
+12.4 Prompt Penutup (kuota habis)
+markdown
+Jangan mulai hal baru. (1) `npm run lint && npm test`, catat hasil.
+(2) PROGRESS.md: paket aktif, butir selesai/belum, file setengah jadi, perintah lanjut persis.
+(3) commit `wip(jpl): ...` dan push.
+12.5 Prompt BLOCKER
+markdown
+Berhenti mengubah kode. Baca Blockers PROGRESS.md.
+Jelaskan akar masalah ≤10 baris + 2 opsi dengan trade-off.
+Jangan menerapkan sebelum saya memilih.
+12.6 Prompt untuk Menerbitkan npm Package
+markdown
+Setelah WP6 selesai:
+1. Pastikan `package.json` memiliki:
+   - `name`: `@jobenpay/jpl`
+   - `version`: `1.0.0`
+   - `main`: `dist/index.js`
+   - `types`: `dist/index.d.ts`
+   - `files`: `["dist", "README.md", "LICENSE"]`
+   - `license`: `MIT`
+2. Jalankan `npm run build`.
+3. Jalankan `npm test` — semua harus lulus.
+4. Jalankan `npm pack --dry-run` — periksa isi package.
+5. Jangan `npm publish` tanpa persetujuan manusia.
+6. Tulis di PROGRESS.md: "npm package ready for publish".
+13. PRINSIP NON-NEGOTIABLE
+Deklaratif, bukan pemrograman. Tidak ada loop, function, side effect.
+
+Deterministik. Evaluasi sama → output sama.
+
+Fail-closed. Error → DENY.
+
+Explicit deny precedence. DENY selalu menang.
+
+Backward compatible. Versi lama tetap berfungsi minimal 10 tahun.
+
+Terbuka. Spesifikasi, compiler, evaluator, verifier dipublikasikan.
+
+Coverage 100%. CI gagal jika < 100%.
+
+Zero ambiguity. Setiap operator, semantik, test eksplisit.
+
+14. LAMPIRAN: CONTOH PENGGUNAAN
+A.1 Evaluasi Policy
+javascript
+import { compile, evaluate } from '@jobenpay/jpl';
+
+const policy = {
+  jpl_version: "1.0",
+  policy_id: "pol_01HX...",
+  policy_name: "Standard Payout Policy",
+  rules: [
+    {
+      rule_id: "rule_deny_blocked",
+      priority: 1,
+      conditions: [{ field: "counterparty.trust", operator: "eq", value: "BLOCKED" }],
+      outcome: "DENY",
+      outcome_params: { reason_code: "PAYEE_BLOCKED" }
+    },
+    {
+      rule_id: "rule_permit_trusted",
+      priority: 10,
+      conditions: [
+        { field: "counterparty.trust", operator: "eq", value: "TRUSTED" },
+        { field: "request.amount_minor", operator: "lt", value: 20000 }
+      ],
+      outcome: "PERMIT",
+      outcome_params: { reason_code: "PAYEE_TRUSTED" }
+    }
+  ],
+  default_outcome: "DENY"
+};
+
+const compiled = compile(policy);
+
+const input = {
+  request: { amount_minor: 15000 },
+  counterparty: { trust: "TRUSTED" }
+};
+
+const result = evaluate(compiled, input);
+// { outcome: "PERMIT", rule_id: "rule_permit_trusted", reason_code: "PAYEE_TRUSTED" }
+A.2 Verifikasi Policy
+javascript
+import { verify } from '@jobenpay/jpl';
+
+const result = verify(policy, {
+  publicKey: "base64:...",
+  expectedHash: "sha256:..."
+});
+// { valid: true, checks: [...] }
+A.3 CLI
+bash
+# Validasi policy
+jpl-validate policy.json
+
+# Evaluasi policy terhadap input
+jpl-evaluate policy.json input.json
+
+# Verifikasi signature
+jpl-verify policy.json --public-key key.pem
+15. MENGAPA JPL BERTAHAN 10 TAHUN
+Aspek	JPL	Alternatif (vendor-specific)
+Bergantung pada model AI	Tidak	Ya (kebanyakan)
+Bergantung pada vendor	Tidak (spesifikasi terbuka)	Ya
+Bergantung pada payment provider	Tidak	Ya (kebanyakan)
+Dapat dievaluasi tanpa LLM	Ya	Tidak
+Dapat diverifikasi pihak ketiga	Ya (conformance suite)	Tidak
+Backward compatible	10 tahun	Tidak dijamin
+Dapat dibaca manusia	Ya (JSON)	Tergantung
+Deterministik	Ya	Tidak selalu
+Kesimpulan: JPL adalah satu-satunya bahasa policy kontrol agen AI yang dirancang untuk bertahan 10 tahun, karena tidak bergantung pada apa pun selain logika dan matematika.

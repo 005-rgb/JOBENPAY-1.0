@@ -1,0 +1,60 @@
+{
+  "vector_name": "valid_policy_full",
+  "category": "SCHEMA",
+  "expected_result": "VALID",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V02",
+    "policy_name": "Full Payout Policy",
+    "metadata": {
+      "description": "Comprehensive test policy",
+      "author": "Compliance Team",
+      "created_at": "2026-11-07T10:00:00Z",
+      "tags": [
+        "payout",
+        "conformance"
+      ]
+    },
+    "rules": [
+      {
+        "rule_id": "rule_deny_blocked",
+        "priority": 1,
+        "description": "Block payees that are marked BLOCKED",
+        "conditions": [
+          {
+            "field": "counterparty.trust",
+            "operator": "eq",
+            "value": "BLOCKED"
+          }
+        ],
+        "outcome": "DENY",
+        "outcome_params": {
+          "reason_code": "PAYEE_BLOCKED"
+        }
+      },
+      {
+        "rule_id": "rule_permit_trusted",
+        "priority": 10,
+        "description": "Permit trusted payees",
+        "conditions": [
+          {
+            "field": "counterparty.trust",
+            "operator": "eq",
+            "value": "TRUSTED"
+          }
+        ],
+        "outcome": "PERMIT",
+        "outcome_params": {
+          "reason_code": "PAYEE_TRUSTED"
+        }
+      }
+    ],
+    "default_outcome": "DENY",
+    "signature": {
+      "alg": "Ed25519",
+      "kid": "kid_test_key_01",
+      "sig": "base64:CoO1c3CuKjQbbAVmo9gC5f2ItakOyFb73gcyORyF9aYo2QoCVLnFkb5SCTIPGWIV5rp1ZNxZVkvGjJl+8C0+CQ=="
+    }
+  },
+  "public_key": "MCowBQYDK2VwAyEAe1HtD5iOqovgZzXYNJzscI19JocV7KsstCztndlAZxA="
+}

@@ -1,0 +1,30 @@
+{
+  "vector_name": "eval_default_outcome",
+  "category": "SEMANTICS",
+  "expected_result": "REQUIRE_APPROVAL",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V09",
+    "policy_name": "Default Outcome Policy",
+    "rules": [
+      {
+        "rule_id": "rule_no_match",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "eq",
+            "value": "FINANCING"
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "REQUIRE_APPROVAL"
+  },
+  "input": {
+    "request": {
+      "category": "DEBIT"
+    }
+  }
+}

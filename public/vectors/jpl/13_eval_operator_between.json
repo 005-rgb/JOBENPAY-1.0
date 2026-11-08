@@ -1,0 +1,33 @@
+{
+  "vector_name": "eval_operator_between",
+  "category": "SEMANTICS",
+  "expected_result": "PERMIT",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V13",
+    "policy_name": "Between Operator Policy",
+    "rules": [
+      {
+        "rule_id": "rule_between_range",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.amount_minor",
+            "operator": "between",
+            "value": [
+              1000,
+              50000
+            ]
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  },
+  "input": {
+    "request": {
+      "amount_minor": 25000
+    }
+  }
+}

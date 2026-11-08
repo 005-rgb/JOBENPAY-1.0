@@ -1,0 +1,24 @@
+{
+  "vector_name": "invalid_policy_missing_version",
+  "category": "SCHEMA",
+  "expected_result": "INVALID",
+  "policy": {
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V03",
+    "policy_name": "Missing Version Policy",
+    "rules": [
+      {
+        "rule_id": "rule_1",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "eq",
+            "value": "PAYOUT"
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  }
+}

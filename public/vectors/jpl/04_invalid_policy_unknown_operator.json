@@ -1,0 +1,25 @@
+{
+  "vector_name": "invalid_policy_unknown_operator",
+  "category": "SCHEMA",
+  "expected_result": "INVALID",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V04",
+    "policy_name": "Unknown Operator Policy",
+    "rules": [
+      {
+        "rule_id": "rule_1",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "unknown_magic_op",
+            "value": "PAYOUT"
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  }
+}

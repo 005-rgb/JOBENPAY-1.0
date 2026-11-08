@@ -1,0 +1,31 @@
+{
+  "vector_name": "signature_invalid",
+  "category": "VERIFY",
+  "expected_result": "INVALID",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V17",
+    "policy_name": "Invalid Signature Policy",
+    "rules": [
+      {
+        "rule_id": "rule_1",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "request.category",
+            "operator": "eq",
+            "value": "PAYOUT"
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY",
+    "signature": {
+      "alg": "Ed25519",
+      "kid": "kid_test_key_01",
+      "sig": "base64:CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQ=="
+    }
+  },
+  "public_key": "MCowBQYDK2VwAyEAe1HtD5iOqovgZzXYNJzscI19JocV7KsstCztndlAZxA="
+}

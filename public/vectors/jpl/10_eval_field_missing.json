@@ -1,0 +1,30 @@
+{
+  "vector_name": "eval_field_missing",
+  "category": "SEMANTICS",
+  "expected_result": "DENY",
+  "policy": {
+    "jpl_version": "1.0",
+    "policy_id": "pol_01HX4Z8K9M2N3P4Q5R6S7T8V10",
+    "policy_name": "Missing Field Fail Closed Policy",
+    "rules": [
+      {
+        "rule_id": "rule_on_missing_field",
+        "priority": 1,
+        "conditions": [
+          {
+            "field": "unresolved.deeply.nested.field",
+            "operator": "eq",
+            "value": "test"
+          }
+        ],
+        "outcome": "PERMIT"
+      }
+    ],
+    "default_outcome": "DENY"
+  },
+  "input": {
+    "request": {
+      "category": "PAYOUT"
+    }
+  }
+}
