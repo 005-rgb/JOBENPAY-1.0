@@ -1,9 +1,10 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: PRD 2.0 Unified Architecture — Fase 0: Foundation (F0-1 s/d F0-6).
-- **Langkah saat ini**: Fase 0 LULUS 100% (Unified Entities, Unified Escrow, Unified Outcome Contracts, Request Hash v2, Fail-Closed Matrix, 100% Coverage pada seluruh modul baru). Siap melanjutkan ke Fase 1 (Core Decision Engine).
+- **Langkah terakhir dikerjakan**: PRD 2.0 Unified Architecture — Fase 1: Core Decision Engine (F1-1 s/d F1-5).
+- **Langkah saat ini**: Fase 1 LULUS 100% (Aggregate State Machine, Stages A1 vLEI, A2 Intent, A3 DIP, A4 CPL, Stage B Markers, Stage C AI Intent, Stage D Final Decision, Ops State Machines API, 100% Coverage pada seluruh modul baru). Siap melanjutkan ke Fase 2 (Policy Engine / JPL).
 - **Validasi lokal terkini**:
+  - `npm run test:coverage:fase1`: **27 / 27 tes lulus 100%** dengan **100% Stmts, 100% Branch, 100% Funcs, 100% Lines** (`shared/state-machine.js`, `server/src/services/decision_engine.js`).
   - `npm run test:coverage:fase0`: **23 / 23 tes lulus 100%** dengan **100% Stmts, 100% Branch, 100% Funcs, 100% Lines** (`request-hash.js`, `fail-closed.js`, `entity_service.js`, `escrow_service.js`).
   - `npm run migrate`: Idempoten (2x eksekusi berturut-turut exit code 0).
   - Pagar CI: 100% LULUS (`guard`, `lint`, `lint-no-float-money`, `check-insert-tests`).

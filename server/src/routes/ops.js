@@ -10,6 +10,7 @@ import {
   getEscrowHandler,
   postEscrowHandler,
   getFailClosedMatrixHandler,
+  getStateMachinesHandler,
 } from '../controllers/ops_unified_controller.js';
 
 export function createOpsRouter({ requireSession } = {}) {
@@ -33,6 +34,7 @@ export function createOpsRouter({ requireSession } = {}) {
   router.get('/ops/escrow/:escrow_id', (req, res, next) => getEscrowHandler(req, res, next));
   router.post('/ops/escrow', (req, res, next) => postEscrowHandler(req, res, next));
   router.get('/ops/fail-closed-matrix', (req, res) => getFailClosedMatrixHandler(req, res));
+  router.get('/ops/state-machines', (req, res) => getStateMachinesHandler(req, res));
 
   return router;
 }

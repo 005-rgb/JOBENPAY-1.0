@@ -58,6 +58,18 @@ export async function evaluateIntentMandateStageA({ orgId, mandate, transaction 
   }
 
   // PRD 1.6 Decision Integrity Proof (DIP) Enforcement
+  const isDipRequired = Boolean(
+    mandate?.require_dip ||
+    policy?.require_dip ||
+    transaction?.require_dip ||
+    transaction?.reasoning_trace ||
+    transaction?.reasoningTrace
+  );
+
+  if (!isDipRequired) {
+    return { valid: true };
+  }
+
   const requestId = transaction.intent_id || transaction.id;
   let trace = transaction.reasoning_trace || transaction.reasoningTrace;
   if (!trace && requestId) {

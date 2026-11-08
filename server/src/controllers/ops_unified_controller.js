@@ -2,6 +2,7 @@
 import { listEntities, registerEntity } from '../services/entity_service.js';
 import { createEscrow, getEscrow } from '../services/escrow_service.js';
 import { FAIL_CLOSED_MATRIX } from '../../../shared/fail-closed.js';
+import { AGGREGATE_STATES, AGGREGATE_TRANSITIONS } from '../../../shared/state-machine.js';
 import { AppError } from '../lib/errors.js';
 
 export function resolveOrgId(req) {
@@ -88,4 +89,11 @@ export async function postEscrowHandler(req, res, next) {
 
 export function getFailClosedMatrixHandler(_req, res) {
   res.status(200).json({ matrix: FAIL_CLOSED_MATRIX });
+}
+
+export function getStateMachinesHandler(_req, res) {
+  res.status(200).json({
+    states: AGGREGATE_STATES,
+    transitions: AGGREGATE_TRANSITIONS,
+  });
 }

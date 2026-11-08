@@ -152,10 +152,10 @@ export async function fundEscrow(contractId, orgId, dbClient = null) {
     // 2. Insert into escrow_accounts
     const priceMinor = BigInt(contract.price_minor);
     const escRes = await client.query(
-      `INSERT INTO escrow_accounts (contract_id, held_minor, released_minor, slashed_minor, status)
-       VALUES ($1, $2, 0, 0, 'FUNDED')
+      `INSERT INTO escrow_accounts (org_id, escrow_type, contract_id, held_minor, released_minor, slashed_minor, status)
+       VALUES ($1, 'PACT', $2, $3, 0, 0, 'FUNDED')
        RETURNING escrow_id, held_minor, released_minor, slashed_minor, status`,
-      [contractId, priceMinor.toString()],
+      [contract.org_id, contractId, priceMinor.toString()],
     );
     const escrow = escRes.rows[0];
 
