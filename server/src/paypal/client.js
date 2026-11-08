@@ -6,6 +6,14 @@ import pool from '../db/pool.js';
 import { env } from '../config.js';
 import { getPaypalCredentials } from '../repositories/paypalConnections.js';
 import { PAYPAL_API_BASE } from './constants.js';
+import { getCircuitBreaker } from '../lib/circuit-breaker.js';
+
+export const paypalBreaker = getCircuitBreaker('paypal', {
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeout: 30000,
+  resetTimeout: 60000,
+});
 
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -97,47 +105,49 @@ async function waitBeforeRetry(attempt) {
 }
 
 async function fetchWithRetry(url, options, secrets, { retryable = true, includeStatus = false } = {}) {
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    let response;
-    let text;
-    try {
-      response = await fetch(url, {
-        ...options,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      text = await response.text();
-    } catch (error) {
-      if (!isRetryableNetworkError(error) || attempt === MAX_ATTEMPTS) {
-        if (isRetryableNetworkError(error)) {
+  return paypalBreaker.execute(async () => {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      let response;
+      let text;
+      try {
+        response = await fetch(url, {
+          ...options,
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+        text = await response.text();
+      } catch (error) {
+        if (!isRetryableNetworkError(error) || attempt === MAX_ATTEMPTS) {
+          if (isRetryableNetworkError(error)) {
+            const networkError = new AppError('PAYPAL_NETWORK_ERROR', 'Could not reach PayPal sandbox.');
+            networkError.statusCode = 503;
+            throw networkError;
+          }
+          throw error;
+        }
+        if (!retryable) {
           const networkError = new AppError('PAYPAL_NETWORK_ERROR', 'Could not reach PayPal sandbox.');
           networkError.statusCode = 503;
           throw networkError;
         }
-        throw error;
+        await waitBeforeRetry(attempt);
+        continue;
       }
-      if (!retryable) {
-        const networkError = new AppError('PAYPAL_NETWORK_ERROR', 'Could not reach PayPal sandbox.');
-        networkError.statusCode = 503;
-        throw networkError;
+
+      const body = parseResponse(text);
+      if (response.ok) {
+        return includeStatus ? { body, status: response.status } : body;
       }
-      await waitBeforeRetry(attempt);
-      continue;
+      if (retryable && (response.status === 429 || response.status >= 500) && attempt < MAX_ATTEMPTS) {
+        await waitBeforeRetry(attempt);
+        continue;
+      }
+      throw classifyError(response.status, body, secrets);
     }
 
-    const body = parseResponse(text);
-    if (response.ok) {
-      return includeStatus ? { body, status: response.status } : body;
-    }
-    if (retryable && (response.status === 429 || response.status >= 500) && attempt < MAX_ATTEMPTS) {
-      await waitBeforeRetry(attempt);
-      continue;
-    }
-    throw classifyError(response.status, body, secrets);
-  }
-
-  const networkError = new AppError('PAYPAL_NETWORK_ERROR', 'Could not reach PayPal sandbox.');
-  networkError.statusCode = 503;
-  throw networkError;
+    const networkError = new AppError('PAYPAL_NETWORK_ERROR', 'Could not reach PayPal sandbox.');
+    networkError.statusCode = 503;
+    throw networkError;
+  });
 }
 
 function getCachedToken(orgId) {

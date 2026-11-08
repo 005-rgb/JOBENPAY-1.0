@@ -11,6 +11,14 @@ import { AiError, toAiError } from './errors.js';
 import { generateAnthropic } from './anthropic.js';
 import { generateOpenAI } from './openai.js';
 import { reserveAiUsage } from './usage.js';
+import { getCircuitBreaker } from '../lib/circuit-breaker.js';
+
+export const aiBreaker = getCircuitBreaker('ai', {
+  failureThreshold: 3,
+  successThreshold: 2,
+  timeout: 60000,
+  resetTimeout: 120000,
+});
 
 const RECORDINGS_DIRECTORY = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -67,49 +75,51 @@ export async function generateStructured({
   runProvider,
   recordingsDirectory,
 } = {}) {
-  let reservation;
-  let resultUsage = { inputTokens: 0, outputTokens: 0 };
-  let settled = false;
-  try {
-    if (process.env.AI_RECORD === '1' && env.NODE_ENV !== 'development') {
-      throw new AiError('RECORDING_DISABLED', 'AI recording is only allowed in development.');
-    }
-    const promptDefinition = assertTask(task);
-    if (!schema || typeof schema.safeParse !== 'function') {
-      throw new AiError('SCHEMA', 'A Zod schema is required for structured AI output.');
-    }
-    const prompt = promptDefinition.buildPrompt(sanitizeAiInput(input));
-    const promptBytes = Buffer.byteLength(`${prompt.system}\n${prompt.user}`, 'utf8');
-    reservation = await reserveUsage(orgId, task, promptBytes);
-
-    const response = provider === 'replay'
-      ? await replayStructured(task, input, { recordingsDirectory })
-      : runProvider
-        ? await runProvider({ provider, prompt, task, input })
-        : await providerFor(provider)(prompt);
-    resultUsage = response.usage || resultUsage;
-    const value = decodeJson(response.content);
-    const parsed = schema.safeParse(value);
-    if (!parsed.success) {
-      throw new AiError('INVALID_OUTPUT', 'AI output did not match the required schema.', {
-        cause: parsed.error,
-      });
-    }
-    await writeRecording(task, input, parsed.data, resultUsage);
-    await reservation.settle(resultUsage);
-    settled = true;
-    return parsed.data;
-  } catch (error) {
-    const aiError = toAiError(error);
-    if (reservation && !settled) {
-      try {
-        await reservation.settle(resultUsage);
-      } catch (settleError) {
-        throw toAiError(settleError);
+  return aiBreaker.execute(async () => {
+    let reservation;
+    let resultUsage = { inputTokens: 0, outputTokens: 0 };
+    let settled = false;
+    try {
+      if (process.env.AI_RECORD === '1' && env.NODE_ENV !== 'development') {
+        throw new AiError('RECORDING_DISABLED', 'AI recording is only allowed in development.');
       }
+      const promptDefinition = assertTask(task);
+      if (!schema || typeof schema.safeParse !== 'function') {
+        throw new AiError('SCHEMA', 'A Zod schema is required for structured AI output.');
+      }
+      const prompt = promptDefinition.buildPrompt(sanitizeAiInput(input));
+      const promptBytes = Buffer.byteLength(`${prompt.system}\n${prompt.user}`, 'utf8');
+      reservation = await reserveUsage(orgId, task, promptBytes);
+
+      const response = provider === 'replay'
+        ? await replayStructured(task, input, { recordingsDirectory })
+        : runProvider
+          ? await runProvider({ provider, prompt, task, input })
+          : await providerFor(provider)(prompt);
+      resultUsage = response.usage || resultUsage;
+      const value = decodeJson(response.content);
+      const parsed = schema.safeParse(value);
+      if (!parsed.success) {
+        throw new AiError('INVALID_OUTPUT', 'AI output did not match the required schema.', {
+          cause: parsed.error,
+        });
+      }
+      await writeRecording(task, input, parsed.data, resultUsage);
+      await reservation.settle(resultUsage);
+      settled = true;
+      return parsed.data;
+    } catch (error) {
+      const aiError = toAiError(error);
+      if (reservation && !settled) {
+        try {
+          await reservation.settle(resultUsage);
+        } catch (settleError) {
+          throw toAiError(settleError);
+        }
+      }
+      throw aiError;
     }
-    throw aiError;
-  }
+  });
 }
 
 export { AiError, recordingHash };
