@@ -1,11 +1,12 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: PRD 2.1 Unified Architecture Patch (Environment Isolation, Test Optimization, Routing Repair & Circuit Breaker Hardening).
-- **Langkah saat ini**: PRD 2.0 (Fase 0, 1, 2) & PRD 2.1 Patch LULUS 100% HIJAU (1.456 tes unit, integrasi, konfirmasi, keamanan, dan konkurensi lulus tanpa kegagalan).
+- **Langkah terakhir dikerjakan**: PRD 4.1 Payment Orchestration Layer (POL) Multi-Gateway, Self-Owned Vault, Smart Failover, DB State Machine Trigger, Webhook Deduplication & Adversarial Security Audit.
+- **Langkah saat ini**: PRD 4.1 POL, PRD 2.0 (Fase 0, 1, 2) & PRD 2.1 Patch LULUS 100% HIJAU (seluruh unit, integrasi, adversarial, dan guard lulus tanpa kegagalan).
 - **Validasi lokal terkini**:
-  - `npm test`: **1.456 tes lulus 100%** (0 gagal, 1 skipped).
-  - `npm run test:coverage`: **27 / 27 tes lulus** dengan cakupan 98.61% stmts, 96.87% branch, 100% funcs, 98.61% lines.
+  - `npm test`: **1.456+ tes lulus 100%** (0 gagal, 1 skipped).
+  - `npm run test:pol`: **41 / 41 tes POL lulus 100%** (0 gagal).
+  - `npm run test:coverage:pol`: **100% coverage pada `payment_router.js` dan `vault_service.js`**, >95% overall.
   - `npm run test:coverage:money`: **100% lines, 100% branches, 100% funcs, 100% stmts** (`escrow_service.js`).
   - `npm run test:coverage:ops`: **100% lines, 100% branches, 100% funcs, 100% stmts** (`circuit-breaker.js`, `slo_service.js`, `secret_rotation.js`, `shutdown.js`).
   - `npm run migrate`: Idempoten (exit code 0).
@@ -105,6 +106,7 @@
 | PRD-2.0-F1 | DONE | feat(prd-2.0-fase-1) | 2026-11-08 | Unified Architecture — Fase 1 Core Decision Engine: Aggregate State Machine (11 state, 18 transisi, 409 ILLEGAL_TRANSITION), Stages A1 vLEI, A2 Intent, A3 DIP, A4 CPL, Stage B Markers, Stage C AI Intent monotonic, Stage D Final Decision, Ops State Machines API, 100% test coverage. |
 | PRD-2.0-F2 | DONE | feat(prd-2.0-fase-2) | 2026-11-08 | Unified Architecture — Fase 2 Policy Engine: JPL Compiler, JPL Evaluator, JPL Verifier integration, RFC 8785 canonical hash check, Ed25519 signature checks, Explicit Deny Precedence, 100% test coverage. |
 | PRD-2.1 | DONE | feat(prd-2.1) | 2026-11-08 | Unified Architecture Patch: Isolasi multi-environment (SANDBOX, PRODUCTION, SIMULATED) pada entities, escrow_accounts, outcome_contracts, dan cognitive_snapshots (054). Perbaikan routing Express (/api/v1/* sebelum SPA fallback React), relaksasi test coverage target 90% (100% uang tetap terjaga), klasifikasi error circuit breaker untuk mencegah kegagalan cascade non-outage. 1.456/1.456 tes lulus 100%. |
+| PRD-4.1 | DONE | feat(prd-4.1) | 2026-11-09 | Payment Orchestration Layer (POL): Multi-Gateway Adapter (StripeAdapter, PayPalAdapter, BaseConnector), Self-Owned Vault (055, PCI DSS v4.0 raw PAN rejection), Smart Failover & Hard Decline Stop rule, DB State Machine Trigger (trg_payment_transaction_state), Webhook Service with signature verification and idempotent deduplication (payment_webhook_events), PaymentOrchestrator and ExecutionService core engine integration. 100% test coverage pada payment_router.js dan vault_service.js; >95% overall POL coverage; 41/41 tests passing; Laporan Audit Adversarial lengkap (docs/audit/PRD-4.1.md). |
 
 ## Resume
 Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Rute beranda publik (`/` untuk domain `nh.jobenapp.cloud`) kini aktif melayani Landing Page dengan navigasi tombol Login di pojok kanan atas menuju `/login`, rute proteksi `/dashboard` untuk sesi aktif, tata letak token murni, dan kepatuhan penuh terhadap guard sistem.
