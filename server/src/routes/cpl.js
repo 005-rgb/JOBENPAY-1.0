@@ -1,5 +1,6 @@
 // @ts-check
 import { Router } from 'express';
+import { query } from '../db/pool.js';
 import { AppError } from '../lib/errors.js';
 import { getCognitiveSnapshot, listCognitiveSnapshots } from '../services/snapshot_service.js';
 import {
@@ -11,9 +12,34 @@ function resolveOrgId(req) {
   return req.org?.id || req.session?.current_org_id || req.user?.org_id || req.body?.org_id;
 }
 
-export function createCplRouter({ requireSession } = {}) {
+async function assertRequestBelongsToOrg(requestId, orgId) {
+  const reqRes = await query(
+    'SELECT org_id FROM payment_requests WHERE id = $1',
+    [requestId],
+  );
+  if (reqRes.rows.length > 0) {
+    if (reqRes.rows[0].org_id !== orgId) {
+      throw new AppError('REQUEST_NOT_FOUND', 404, `Payment request not found: ${requestId}`);
+    }
+    return;
+  }
+  const snapRes = await query(
+    'SELECT org_id FROM cognitive_snapshots WHERE request_id = $1',
+    [requestId],
+  );
+  if (snapRes.rows.length > 0) {
+    if (snapRes.rows[0].org_id !== orgId) {
+      throw new AppError('REQUEST_NOT_FOUND', 404, `Payment request not found: ${requestId}`);
+    }
+    return;
+  }
+  throw new AppError('REQUEST_NOT_FOUND', 404, `Payment request not found: ${requestId}`);
+}
+
+export function createCplRouter({ requireSession, requireCsrf } = {}) {
   const router = Router();
   const sessionAuth = requireSession || ((req, res, next) => next());
+  const csrfMiddleware = requireCsrf || function requireCsrf(req, res, next) { next(); };
 
   // 0. GET /api/v1/cpl/snapshots - List snapshots for org
   router.get('/cpl/snapshots', sessionAuth, async (req, res, next) => {
@@ -39,6 +65,7 @@ export function createCplRouter({ requireSession } = {}) {
       if (!orgId) {
         throw new AppError('UNAUTHORIZED', 401, 'Organization context required');
       }
+      await assertRequestBelongsToOrg(req.params.id, orgId);
 
       const snapshot = await getCognitiveSnapshot(req.params.id, orgId);
       if (!snapshot) {
@@ -52,12 +79,13 @@ export function createCplRouter({ requireSession } = {}) {
   });
 
   // 2. POST /api/v1/requests/:id/replay (PRD 1.7 §8.2)
-  router.post('/requests/:id/replay', sessionAuth, async (req, res, next) => {
+  router.post('/requests/:id/replay', sessionAuth, csrfMiddleware, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       if (!orgId) {
         throw new AppError('UNAUTHORIZED', 401, 'Organization context required');
       }
+      await assertRequestBelongsToOrg(req.params.id, orgId);
 
       const evalResult = await evaluateCplForRequest(req.params.id, orgId, req.body || {});
       if (!evalResult.available) {
@@ -89,6 +117,7 @@ export function createCplRouter({ requireSession } = {}) {
       if (!orgId) {
         throw new AppError('UNAUTHORIZED', 401, 'Organization context required');
       }
+      await assertRequestBelongsToOrg(req.params.id, orgId);
 
       const latest = await getLatestReplayResult(req.params.id, orgId);
       if (latest) {

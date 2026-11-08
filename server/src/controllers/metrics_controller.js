@@ -3,7 +3,12 @@ import { getTenantMetrics } from '../services/metrics_service.js';
 
 export async function getTenantMetricsHandler(req, res) {
   try {
-    const orgId = req.params.org_id || req.query.org_id || req.orgId;
+    const callerOrgId = req.org?.id || req.session?.current_org_id || req.orgId;
+    const requestedOrgId = req.params.org_id || req.query.org_id || callerOrgId;
+    if (callerOrgId && requestedOrgId && callerOrgId !== requestedOrgId) {
+      return res.status(404).json({ error: 'ORG_NOT_FOUND' });
+    }
+    const orgId = requestedOrgId;
     if (!orgId) {
       return res.status(400).json({ error: 'ORG_ID_REQUIRED' });
     }

@@ -47,8 +47,9 @@ import { createDipRouter } from './routes/dip.js';
 import { createCplRouter } from './routes/cpl.js';
 import { createJplRouter } from './routes/jpl.js';
 import { createOpsRouter } from './routes/ops.js';
-import agentsRouter from './routes/agents.js';
-import orgRouter from './routes/org.js';
+import { environmentMiddleware } from './middleware/environment.js';
+import { createAgentsRouter } from './routes/agents.js';
+import { createOrgRouter } from './routes/org.js';
 import { handleAgentTransaction } from './controllers/dip_controller.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
@@ -505,6 +506,7 @@ export function createApp() {
   app.use(cookieParser());
   app.use('/webhooks/paypal', express.raw({ type: 'application/json', limit: '1mb' }));
   app.use(express.json({ limit: '1mb' }));
+  app.use(environmentMiddleware);
   if (!existsSync(WEB_INDEX_FILE)) {
     app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
     app.get('/', (_req, res) => {
@@ -639,11 +641,11 @@ export function createApp() {
   api.use(createMembersRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createTenantProofsRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createDipRouter({ requireSession, requireCsrf, agentAuth }));
-  api.use(createCplRouter({ requireSession }));
-  api.use(createJplRouter({ requireSession }));
+  api.use(createCplRouter({ requireSession, requireCsrf }));
+  api.use(createJplRouter({ requireSession, requireCsrf }));
   api.use(createOpsRouter({ requireSession }));
-  api.use(agentsRouter);
-  api.use(orgRouter);
+  api.use(createAgentsRouter({ requireSession }));
+  api.use(createOrgRouter({ requireSession }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,
@@ -2253,6 +2255,17 @@ export function createApp() {
   app.get('/protocol', getProtocolHtml);
   app.get('/proof/:proof_id', getProofHandler);
   app.use('/api/v1', api);
+
+  // Catch-all 404 for unhandled API requests (PRD 2.1 §4 - MUST return JSON, never HTML)
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'Endpoint not found', code: 'NOT_FOUND' });
+  });
+
+  // JSON Error handler for API routes (PRD 2.1 §4)
+  app.use('/api', (err, _req, res, next) => {
+    errorHandler(err, _req, res, next);
+  });
+
   if (existsSync(WEB_INDEX_FILE)) {
     app.use(express.static(WEB_BUILD_DIRECTORY, {
       index: false,
@@ -2282,6 +2295,9 @@ export function createApp() {
     });
   }
   app.use((err, req, res, next) => {
+    if (res.headersSent) {
+      return next(err);
+    }
     errorHandler(err, req, res, next);
   });
 

@@ -37,7 +37,9 @@ export class CircuitBreaker {
       return result;
     } catch (err) {
       if (timerId) clearTimeout(timerId);
-      this.onFailure();
+      if (!err?.isCircuitBreakerIgnored) {
+        this.onFailure();
+      }
       throw err;
     }
   }

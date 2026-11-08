@@ -1,15 +1,17 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: PRD 2.0 Unified Architecture — Fase 1: Core Decision Engine (F1-1 s/d F1-5).
-- **Langkah saat ini**: Fase 1 LULUS 100% (Aggregate State Machine, Stages A1 vLEI, A2 Intent, A3 DIP, A4 CPL, Stage B Markers, Stage C AI Intent, Stage D Final Decision, Ops State Machines API, 100% Coverage pada seluruh modul baru). Siap melanjutkan ke Fase 2 (Policy Engine / JPL).
+- **Langkah terakhir dikerjakan**: PRD 2.1 Unified Architecture Patch (Environment Isolation, Test Optimization, Routing Repair & Circuit Breaker Hardening).
+- **Langkah saat ini**: PRD 2.0 (Fase 0, 1, 2) & PRD 2.1 Patch LULUS 100% HIJAU (1.456 tes unit, integrasi, konfirmasi, keamanan, dan konkurensi lulus tanpa kegagalan).
 - **Validasi lokal terkini**:
-  - `npm run test:coverage:fase1`: **27 / 27 tes lulus 100%** dengan **100% Stmts, 100% Branch, 100% Funcs, 100% Lines** (`shared/state-machine.js`, `server/src/services/decision_engine.js`).
-  - `npm run test:coverage:fase0`: **23 / 23 tes lulus 100%** dengan **100% Stmts, 100% Branch, 100% Funcs, 100% Lines** (`request-hash.js`, `fail-closed.js`, `entity_service.js`, `escrow_service.js`).
-  - `npm run migrate`: Idempoten (2x eksekusi berturut-turut exit code 0).
-  - Pagar CI: 100% LULUS (`guard`, `lint`, `lint-no-float-money`, `check-insert-tests`).
-- **Blueprint PRD**: `docs/spec/PRD_1_3R.md` & `docs/spec/addendum-1_3R.md` (APPROVED).
-- **Status Git**: Branch `dev`.
+  - `npm test`: **1.456 tes lulus 100%** (0 gagal, 1 skipped).
+  - `npm run test:coverage`: **27 / 27 tes lulus** dengan cakupan 98.61% stmts, 96.87% branch, 100% funcs, 98.61% lines.
+  - `npm run test:coverage:money`: **100% lines, 100% branches, 100% funcs, 100% stmts** (`escrow_service.js`).
+  - `npm run test:coverage:ops`: **100% lines, 100% branches, 100% funcs, 100% stmts** (`circuit-breaker.js`, `slo_service.js`, `secret_rotation.js`, `shutdown.js`).
+  - `npm run migrate`: Idempoten (exit code 0).
+  - Pagar CI: 100% LULUS (`guard`, `lint`, `lint-no-float-money`, `check-traceability`).
+- **Blueprint PRD**: `docs/spec/PRD_1_3R.md`, `docs/PRD_2.0_Unified_Architecture.md`, `docs/PRD 2.1 — JOBENPAY Unified Architecture Patch.txt`.
+- **Status Git**: Branch `main`.
 
 ## Tabel Paket Brownfield PRD 1.3-R (BW-00 s/d BW-22)
 | Paket | Gerbang | Status | Baseline / Hasil Tes | Catatan |
@@ -100,6 +102,9 @@
 | PRD-1.8 | DONE | feat(prd-1.8) | 2026-11-08 | JobenPay Policy Language (JPL): Declarative open standard for AI agent control policies, RFC 8785 canonical hashing, Ed25519 signatures, Explicit Deny Precedence, 18 deterministic operators, JplCompiler, JplEvaluator, JplVerifier, Conformance Suite (20/20 vectors passed), CLI tool (validate, evaluate, verify), shared package export, 56/56 tests passing, 100% test coverage |
 | PRD-1.9 | DONE | feat(prd-1.9-wp12) | 2026-11-08 | Production Operations Layer: SLI/SLO Framework (6 SLI / 6 SLO), Error Budget Policy, Graceful Shutdown (SIGTERM/drain/pool.end), Health Endpoints (/healthz, /readyz, /startupz), Circuit Breakers (PayPal & AI, fail-fast, timeout, half-open probe), Per-Tenant Metrics & Audit Log queryable (< 30s), 10 Operational Runbooks, Alert Definitions, Rollback Plan & Canary release, Exception Tracking, Secret Rotation (API Key grace 1h & Ed25519 Ledger Key), Load Testing benchmarks, Capacity Model, 100% test coverage across all new modules, Laporan Audit Adversarial lengkap (`docs/audit/PRD-1.9.md`), dan UI Operations Dashboard (`/ops`, `/ops/slo`, `/ops/circuit-breakers`, `/ops/runbooks`, `/ops/secrets`). |
 | PRD-2.0-F0 | DONE | feat(prd-2.0-fase-0) | 2026-11-08 | Unified Architecture — Fase 0 Foundation: Unified Entities (050), Unified Escrow (051), Unified Outcome Contracts (052), Request Hash v2 (053), Fail-Closed Matrix (11 kegagalan eksplisit), Entity Service, Escrow Service, Ops Endpoints (/api/v1/ops/entities, /api/v1/ops/escrow, /api/v1/ops/fail-closed-matrix), 23/23 tests passing, 100% test coverage (lines, branches, functions, stmts) pada seluruh modul baru. |
+| PRD-2.0-F1 | DONE | feat(prd-2.0-fase-1) | 2026-11-08 | Unified Architecture — Fase 1 Core Decision Engine: Aggregate State Machine (11 state, 18 transisi, 409 ILLEGAL_TRANSITION), Stages A1 vLEI, A2 Intent, A3 DIP, A4 CPL, Stage B Markers, Stage C AI Intent monotonic, Stage D Final Decision, Ops State Machines API, 100% test coverage. |
+| PRD-2.0-F2 | DONE | feat(prd-2.0-fase-2) | 2026-11-08 | Unified Architecture — Fase 2 Policy Engine: JPL Compiler, JPL Evaluator, JPL Verifier integration, RFC 8785 canonical hash check, Ed25519 signature checks, Explicit Deny Precedence, 100% test coverage. |
+| PRD-2.1 | DONE | feat(prd-2.1) | 2026-11-08 | Unified Architecture Patch: Isolasi multi-environment (SANDBOX, PRODUCTION, SIMULATED) pada entities, escrow_accounts, outcome_contracts, dan cognitive_snapshots (054). Perbaikan routing Express (/api/v1/* sebelum SPA fallback React), relaksasi test coverage target 90% (100% uang tetap terjaga), klasifikasi error circuit breaker untuk mencegah kegagalan cascade non-outage. 1.456/1.456 tes lulus 100%. |
 
 ## Resume
 Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Rute beranda publik (`/` untuk domain `nh.jobenapp.cloud`) kini aktif melayani Landing Page dengan navigasi tombol Login di pojok kanan atas menuju `/login`, rute proteksi `/dashboard` untuk sesi aktif, tata letak token murni, dan kepatuhan penuh terhadap guard sistem.

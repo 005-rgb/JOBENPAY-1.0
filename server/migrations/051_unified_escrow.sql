@@ -63,7 +63,7 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_escrow_type_ref'
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_escrow_type_ref' AND conrelid = 'escrow_accounts'::regclass
   ) THEN
     ALTER TABLE escrow_accounts ADD CONSTRAINT chk_escrow_type_ref CHECK (
       (escrow_type = 'PACT' AND contract_id IS NOT NULL AND split_id IS NULL AND dp_id IS NULL) OR

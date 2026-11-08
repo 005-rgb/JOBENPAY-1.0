@@ -26,7 +26,12 @@ export function createOpsRouter({ requireSession } = {}) {
 
   // WP4: Per-tenant metrics + audit log
   router.get('/ops/tenants/:org_id/metrics', (req, res, next) => getTenantMetricsHandler(req, res, next));
-  router.get('/audit', (req, res, next) => getAuditLog(req, res, next));
+  router.get('/audit', (req, res, next) => {
+    if (req.cookies?.jp_sid && requireSession) {
+      return requireSession(req, res, () => getAuditLog(req, res, next));
+    }
+    return getAuditLog(req, res, next);
+  });
 
   // PRD 2.0 Unified Ops Endpoints (§4)
   router.get('/ops/entities', (req, res, next) => getEntitiesHandler(req, res, next));

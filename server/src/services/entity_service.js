@@ -9,9 +9,10 @@ function isValidUuid(val) {
 }
 
 /**
- * Register a new entity in the unified entity registry (PRD 2.0 §2.3, §4.2)
+ * Register a new entity in the unified entity registry (PRD 2.0 §2.3, §4.2, PRD 2.1 §2)
  * @param {string} orgId
  * @param {object} params
+ * @param {string} [params.environment='SANDBOX']
  * @param {object} [dbClient]
  * @returns {Promise<object>}
  */
@@ -28,6 +29,7 @@ export async function registerEntity(orgId, params, dbClient = null) {
     verification_tier = null,
     attestation_jwks_uri = null,
     reputation_score = 50,
+    environment = 'SANDBOX',
   } = params;
 
   if (!['ISSUER', 'VERIFIER', 'BOTH'].includes(entity_type)) {
@@ -44,9 +46,9 @@ export async function registerEntity(orgId, params, dbClient = null) {
     const result = await runQuery(
       `INSERT INTO entities (
         org_id, entity_type, display_name, legal_entity_lei, public_key_jwk,
-        verification_tier, attestation_jwks_uri, reputation_score, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ACTIVE')
-      RETURNING entity_id, entity_type, org_id, display_name, legal_entity_lei, status, reputation_score, created_at`,
+        verification_tier, attestation_jwks_uri, reputation_score, environment, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ACTIVE')
+      RETURNING entity_id, entity_type, org_id, display_name, legal_entity_lei, status, reputation_score, environment, created_at`,
       [
         orgId,
         entity_type,
@@ -56,26 +58,28 @@ export async function registerEntity(orgId, params, dbClient = null) {
         verification_tier,
         attestation_jwks_uri,
         reputation_score,
+        environment,
       ],
     );
 
     return result.rows[0];
   } catch (err) {
     if (err && typeof err === 'object' && 'code' in err && err.code === '23505') {
-      throw new AppError('ENTITY_ALREADY_EXISTS', 409, `Entity of type ${entity_type} already registered for org`);
+      throw new AppError('ENTITY_ALREADY_EXISTS', 409, `Entity of type ${entity_type} already registered for org in environment ${environment}`);
     }
     throw err;
   }
 }
 
 /**
- * Get an entity by ID
+ * Get an entity by ID with environment filtering (PRD 2.1 §2)
  * @param {string} orgId
  * @param {string} entityId
+ * @param {string|object} [environmentOrClient='SANDBOX']
  * @param {object} [dbClient]
  * @returns {Promise<object>}
  */
-export async function getEntity(orgId, entityId, dbClient = null) {
+export async function getEntity(orgId, entityId, environmentOrClient = 'SANDBOX', dbClient = null) {
   if (!orgId || !isValidUuid(orgId)) {
     throw new AppError('INVALID_ORG_ID', 400, 'Invalid or missing orgId');
   }
@@ -83,15 +87,26 @@ export async function getEntity(orgId, entityId, dbClient = null) {
     throw new AppError('INVALID_ENTITY_ID', 400, 'Invalid or missing entityId');
   }
 
-  const runQuery = dbClient ? dbClient.query.bind(dbClient) : query;
+  let environment = 'SANDBOX';
+  let client = dbClient;
+
+  if (typeof environmentOrClient === 'string') {
+    environment = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient.query === 'function') {
+    client = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient === 'object' && environmentOrClient.environment) {
+    environment = environmentOrClient.environment;
+  }
+
+  const runQuery = client ? client.query.bind(client) : query;
 
   const result = await runQuery(
     `SELECT entity_id, entity_type, org_id, display_name, legal_entity_lei,
             public_key_jwk, verification_tier, attestation_jwks_uri, status,
-            reputation_score, created_at, updated_at
+            reputation_score, environment, created_at, updated_at
      FROM entities
-     WHERE org_id = $1 AND entity_id = $2`,
-    [orgId, entityId],
+     WHERE org_id = $1 AND entity_id = $2 AND environment = $3`,
+    [orgId, entityId, environment],
   );
 
   if (result.rows.length === 0) {
@@ -102,7 +117,7 @@ export async function getEntity(orgId, entityId, dbClient = null) {
 }
 
 /**
- * List entities for an organization (PRD 2.0 §4.1)
+ * List entities for an organization with environment filtering (PRD 2.0 §4.1, PRD 2.1 §2)
  * @param {string} orgId
  * @param {object} [options]
  * @param {object} [dbClient]
@@ -113,12 +128,12 @@ export async function listEntities(orgId, options = {}, dbClient = null) {
     throw new AppError('INVALID_ORG_ID', 400, 'Invalid or missing orgId');
   }
 
-  const { limit = 50, entity_type, status, cursor } = options;
+  const { limit = 50, entity_type, status, cursor, environment = 'SANDBOX' } = options;
   const runQuery = dbClient ? dbClient.query.bind(dbClient) : query;
 
-  const conditions = ['org_id = $1'];
-  const values = [orgId];
-  let paramIdx = 2;
+  const conditions = ['org_id = $1', 'environment = $2'];
+  const values = [orgId, environment];
+  let paramIdx = 3;
 
   if (entity_type) {
     conditions.push(`entity_type = $${paramIdx++}`);
@@ -141,7 +156,7 @@ export async function listEntities(orgId, options = {}, dbClient = null) {
   const sql = `
     SELECT entity_id, entity_type, org_id, display_name, legal_entity_lei,
            public_key_jwk, verification_tier, attestation_jwks_uri, status,
-           reputation_score, created_at
+           reputation_score, environment, created_at
     FROM entities
     WHERE ${conditions.join(' AND ')}
     ORDER BY entity_id ASC
@@ -162,26 +177,38 @@ export async function listEntities(orgId, options = {}, dbClient = null) {
 }
 
 /**
- * Update entity status (ACTIVE, SUSPENDED, REVOKED)
+ * Update entity status (ACTIVE, SUSPENDED, REVOKED) with environment filtering (PRD 2.1 §2)
  * @param {string} orgId
  * @param {string} entityId
  * @param {string} status
+ * @param {string|object} [environmentOrClient='SANDBOX']
  * @param {object} [dbClient]
  * @returns {Promise<object>}
  */
-export async function updateEntityStatus(orgId, entityId, status, dbClient = null) {
+export async function updateEntityStatus(orgId, entityId, status, environmentOrClient = 'SANDBOX', dbClient = null) {
   if (!['ACTIVE', 'SUSPENDED', 'REVOKED'].includes(status)) {
     throw new AppError('INVALID_STATUS', 400, 'Status must be ACTIVE, SUSPENDED, or REVOKED');
   }
 
-  const runQuery = dbClient ? dbClient.query.bind(dbClient) : query;
+  let environment = 'SANDBOX';
+  let client = dbClient;
+
+  if (typeof environmentOrClient === 'string') {
+    environment = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient.query === 'function') {
+    client = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient === 'object' && environmentOrClient.environment) {
+    environment = environmentOrClient.environment;
+  }
+
+  const runQuery = client ? client.query.bind(client) : query;
 
   const result = await runQuery(
     `UPDATE entities
      SET status = $1, updated_at = now()
-     WHERE org_id = $2 AND entity_id = $3
+     WHERE org_id = $2 AND entity_id = $3 AND environment = $4
      RETURNING entity_id, status, updated_at`,
-    [status, orgId, entityId],
+    [status, orgId, entityId, environment],
   );
 
   if (result.rows.length === 0) {
@@ -192,26 +219,38 @@ export async function updateEntityStatus(orgId, entityId, status, dbClient = nul
 }
 
 /**
- * Update entity reputation score (0 - 100)
+ * Update entity reputation score (0 - 100) with environment filtering (PRD 2.1 §2)
  * @param {string} orgId
  * @param {string} entityId
  * @param {number} score
+ * @param {string|object} [environmentOrClient='SANDBOX']
  * @param {object} [dbClient]
  * @returns {Promise<object>}
  */
-export async function updateReputationScore(orgId, entityId, score, dbClient = null) {
+export async function updateReputationScore(orgId, entityId, score, environmentOrClient = 'SANDBOX', dbClient = null) {
   if (typeof score !== 'number' || score < 0 || score > 100) {
     throw new AppError('INVALID_SCORE', 400, 'Reputation score must be an integer between 0 and 100');
   }
 
-  const runQuery = dbClient ? dbClient.query.bind(dbClient) : query;
+  let environment = 'SANDBOX';
+  let client = dbClient;
+
+  if (typeof environmentOrClient === 'string') {
+    environment = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient.query === 'function') {
+    client = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient === 'object' && environmentOrClient.environment) {
+    environment = environmentOrClient.environment;
+  }
+
+  const runQuery = client ? client.query.bind(client) : query;
 
   const result = await runQuery(
     `UPDATE entities
      SET reputation_score = $1, updated_at = now()
-     WHERE org_id = $2 AND entity_id = $3
+     WHERE org_id = $2 AND entity_id = $3 AND environment = $4
      RETURNING entity_id, reputation_score, updated_at`,
-    [score, orgId, entityId],
+    [score, orgId, entityId, environment],
   );
 
   if (result.rows.length === 0) {

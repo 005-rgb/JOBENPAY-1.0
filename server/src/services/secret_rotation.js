@@ -5,6 +5,7 @@ import { logger } from '../lib/logger.js';
 import { encrypt } from '../lib/crypto.js';
 import { createAgentApiKey, hashAgentApiKey } from '../lib/agentApiKeys.js';
 import { env } from '../config.js';
+import { AppError } from '../lib/errors.js';
 
 const ROTATION_GRACE_PERIOD_MS = 3600000; // 1 hour
 
@@ -17,6 +18,15 @@ export async function rotateAgentApiKey(agentId, orgId, userId) {
 
   try {
     await client.query('BEGIN');
+
+    // 0. Verify agent exists and belongs to orgId
+    const agentCheck = await client.query(
+      'SELECT id FROM agents WHERE id = $1 AND org_id = $2',
+      [agentId, orgId],
+    );
+    if (agentCheck.rowCount === 0) {
+      throw new AppError('AGENT_NOT_FOUND', 404, `Agent ${agentId} not found`);
+    }
 
     // 1. Generate key baru
     const { prefix, apiKey } = createAgentApiKey();

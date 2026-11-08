@@ -26,7 +26,8 @@ export async function getEntitiesHandler(req, res, next) {
     }
     const limit = parseInt(req.query.limit, 10) || 20;
     const cursor = req.query.cursor || null;
-    const result = await listEntities(orgId, { cursor, limit });
+    const environment = req.environment || req.headers?.['x-environment'] || 'SANDBOX';
+    const result = await listEntities(orgId, { cursor, limit, environment });
     res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -39,7 +40,8 @@ export async function postEntityHandler(req, res, next) {
     if (!orgId) {
       throw new AppError('UNAUTHORIZED', 401, 'Organization context required');
     }
-    const entity = await registerEntity(orgId, req.body);
+    const environment = req.environment || req.body?.environment || req.headers?.['x-environment'] || 'SANDBOX';
+    const entity = await registerEntity(orgId, { ...req.body, environment });
     res.status(201).json({
       entity_id: entity.entity_id,
       status: entity.status,
@@ -57,7 +59,8 @@ export async function getEscrowHandler(req, res, next) {
       throw new AppError('UNAUTHORIZED', 401, 'Organization context required');
     }
     const escrowId = req.params.escrow_id;
-    const escrow = await getEscrow(orgId, escrowId);
+    const environment = req.environment || req.headers?.['x-environment'] || 'SANDBOX';
+    const escrow = await getEscrow(orgId, escrowId, environment);
     res.status(200).json(escrow);
   } catch (err) {
     next(err);
@@ -70,12 +73,14 @@ export async function postEscrowHandler(req, res, next) {
     if (!orgId) {
       throw new AppError('UNAUTHORIZED', 401, 'Organization context required');
     }
+    const environment = req.environment || req.body?.environment || req.headers?.['x-environment'] || 'SANDBOX';
     const result = await createEscrow(orgId, {
       escrowType: req.body?.escrow_type,
       contractId: req.body?.contract_id,
       splitId: req.body?.split_id,
       dpId: req.body?.dp_id,
       heldMinor: req.body?.held_minor,
+      environment,
     });
     res.status(201).json({
       escrow_id: result.escrow_id,

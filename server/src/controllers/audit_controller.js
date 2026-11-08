@@ -3,7 +3,7 @@ import { queryAuditLog } from '../services/audit_service.js';
 
 export async function getAuditLog(req, res) {
   try {
-    const orgId = req.query.org_id || req.orgId || req.user?.org_id;
+    const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.query.org_id || req.orgId || req.user?.org_id;
     if (!orgId) {
       return res.status(400).json({ error: 'ORG_ID_REQUIRED' });
     }

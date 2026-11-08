@@ -90,6 +90,18 @@ test('secret_rotation unit tests', async (t) => {
     assert.equal(lKeys2.rows[1].status, 'ROTATED');
   });
 
+  await t.test('test_secret_rotation_agent_not_found', async () => {
+    const nonExistentAgentId = crypto.randomUUID();
+    await assert.rejects(
+      async () => rotateAgentApiKey(nonExistentAgentId, orgId, userId),
+      (err) => {
+        assert.equal(err.code, 'AGENT_NOT_FOUND');
+        assert.equal(err.statusCode, 404);
+        return true;
+      },
+    );
+  });
+
   await t.test('test_secret_rotation_error_handling', async () => {
     // Pass invalid UUID to trigger PostgreSQL error and verify ROLLBACK and release
     await assert.rejects(

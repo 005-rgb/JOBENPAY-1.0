@@ -20,11 +20,18 @@ test('test_entities_migration', async () => {
   assert.ok(cols.has('public_key_jwk'));
   assert.ok(cols.has('status'));
   assert.ok(cols.has('reputation_score'));
+  assert.ok(cols.has('environment'));
 
   // Test insert valid entity
   const orgResult = await pool.query('SELECT id FROM organizations LIMIT 1');
   assert.ok(orgResult.rows.length > 0, 'organizations must have at least one record');
   const orgId = orgResult.rows[0].id;
+
+  // Clean up any existing ISSUER for this org in SANDBOX to satisfy unique(org_id, environment, entity_type)
+  await pool.query(
+    "DELETE FROM entities WHERE org_id = $1 AND entity_type = 'ISSUER' AND environment = 'SANDBOX'",
+    [orgId]
+  );
 
   const testEntityId = randomUUID();
   await pool.query(
@@ -102,6 +109,7 @@ test('test_outcome_contract_migration', async () => {
   assert.ok(cols.has('due_date'));
   assert.ok(cols.has('criteria'));
   assert.ok(cols.has('status'));
+  assert.ok(cols.has('environment'));
   assert.ok(cols.has('created_at'));
 });
 

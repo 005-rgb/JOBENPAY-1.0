@@ -52,10 +52,12 @@ export function createPublicProtocolRouter() {
  */
 export function createTenantProofsRouter({ requireSession, requireRole, requireCsrf }) {
   const router = express.Router();
+  const csrfMiddleware = requireCsrf || function requireCsrf(req, res, next) { next(); };
 
   router.post(
     '/proofs',
     requireSession,
+    csrfMiddleware,
     requireRole('OWNER', 'ADMIN', 'OPERATOR', 'APPROVER'),
     createProofHandler,
   );
@@ -70,6 +72,7 @@ export function createTenantProofsRouter({ requireSession, requireRole, requireC
   router.delete(
     '/proofs/:proof_id',
     requireSession,
+    csrfMiddleware,
     requireRole('OWNER', 'ADMIN'),
     revokeProofHandler,
   );

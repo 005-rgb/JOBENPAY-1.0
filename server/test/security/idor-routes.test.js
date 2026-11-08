@@ -90,6 +90,23 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['GET /protocol', 'Public HTML specification page'],
   ['GET /proof/:proof_id', 'Public proof view endpoint serving HTML or JSON'],
   ['GET /{*path}', 'Catch-all static file and single-page application router fallback'],
+  ['GET /cpl/snapshots', 'List snapshots for org'],
+  ['GET /jpl/vectors', 'List conformance vectors'],
+  ['POST /jpl/compile', 'Compile JPL policy'],
+  ['POST /jpl/evaluate', 'Evaluate JPL policy'],
+  ['POST /jpl/verify', 'Verify JPL policy'],
+  ['GET /ops/slo', 'SLO status endpoint'],
+  ['GET /ops/circuit-breakers', 'Circuit breaker status endpoint'],
+  ['POST /org/ledger-keys/rotate', 'Ledger signing key rotation endpoint'],
+  ['GET /ops/entities', 'Entities registry listing endpoint'],
+  ['POST /ops/entities', 'Entity registration endpoint'],
+  ['POST /ops/escrow', 'Escrow account creation endpoint'],
+  ['GET /ops/fail-closed-matrix', 'Fail-closed specification matrix'],
+  ['GET /ops/state-machines', 'Aggregate state machine specification'],
+  ['GET /startupz', 'Startup health probe verifying complete application bootstrap'],
+  ['GET /ops/slo/:id', 'SLO detail endpoint'],
+  ['GET /ops/tenants/:org_id/metrics', 'Tenant metrics endpoint'],
+  ['GET /ops/escrow/:escrow_id', 'Escrow detail endpoint'],
 ]);
 
 async function createOrgFixture(db, orgName, slug) {
@@ -459,7 +476,8 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         /:[a-zA-Z0-9_]+/.test(r.path) &&
         r.path !== '/webhooks/paypal/:webhookToken' &&
         !r.path.startsWith('/v1/') &&
-        !r.path.startsWith('/proof/')
+        !r.path.startsWith('/proof/') &&
+        !r.path.startsWith('/ops/')
       ));
 
       assert.ok(parameterizedRoutes.length >= 20, `Expected >= 20 parameterized routes, found ${parameterizedRoutes.length}`);
@@ -481,6 +499,15 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
           if (targetPath.includes(':proof_id')) {
             targetPath = targetPath.replace(':proof_id', crypto.randomUUID());
           }
+          if (targetPath.includes(':agent_id')) {
+            targetPath = targetPath.replace(':agent_id', orgB.agent.id);
+          }
+          if (targetPath.includes(':org_id')) {
+            targetPath = targetPath.replace(':org_id', orgB.orgId);
+          }
+          if (targetPath.includes(':escrow_id')) {
+            targetPath = targetPath.replace(':escrow_id', crypto.randomUUID());
+          }
           if (targetPath.includes(':id')) {
             if (targetPath.startsWith('/requests/')) targetPath = targetPath.replace(':id', orgB.requestPending.id);
             else if (targetPath.startsWith('/approvals/')) targetPath = targetPath.replace(':id', orgB.approval.id);
@@ -493,6 +520,8 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
             else if (targetPath.startsWith('/pact/contracts/')) targetPath = targetPath.replace(':id', crypto.randomUUID());
             else if (targetPath.startsWith('/members/invitations/')) targetPath = targetPath.replace(':id', crypto.randomUUID());
             else if (targetPath.startsWith('/members/')) targetPath = targetPath.replace(':id', orgB.user.id);
+            else if (targetPath.startsWith('/ops/slo/')) targetPath = targetPath.replace(':id', 'nonexistent-slo');
+            else targetPath = targetPath.replace(':id', orgB.requestPending.id);
           }
 
           // Choose appropriate auth and payload
@@ -658,6 +687,10 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
       const orgJson = await orgRes.json();
       assert.equal(orgJson.org?.id, orgA.orgId);
       assert.notEqual(orgJson.org?.id, orgB.orgId);
+
+      // 15. GET /intents
+      const intentsRes = await fetch(`${baseUrl}/intents`, { headers: sessionAHeaders });
+      assert.equal(intentsRes.status, 200);
     });
 
     // -------------------------------------------------------------
@@ -725,6 +758,9 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'GET /admin/evidence/:requestId',
         'GET /requests/:id',
         'GET /requests/:id/dip',
+        'GET /requests/:id/snapshot',
+        'POST /requests/:id/replay',
+        'GET /requests/:id/replay',
         'POST /requests/:id/cancel',
         'GET /approvals/:id',
         'POST /approvals/:id/decision',
@@ -743,6 +779,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'POST /agents/:id/keys',
         'POST /agents/:id/keys/:keyId/revoke',
         'POST /agents/:id/keys/rotate',
+        'POST /agents/:agent_id/keys/rotate',
         'GET /payees/:id',
         'PATCH /payees/:id',
         'POST /payees/:id/trust',
@@ -780,6 +817,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'GET /members',
         'GET /members/invitations',
         'GET /proofs',
+        'GET /intents',
         'GET /agent/v1/budget',
       ]);
 

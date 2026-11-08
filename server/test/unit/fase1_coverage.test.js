@@ -609,5 +609,60 @@ test('Fase 1 100% Coverage Suite', async (t) => {
       intentMatchClient,
     );
     assert.equal(intentInferredPass.decision, 'APPROVE');
+
+    // 9. Tahap B REJECT branches (lines 454-456, 473-475, 487-489)
+    // 9a. DIP REQUIRE_APPROVAL + Tahap B REJECT
+    const dipReqApprBReject = await evaluateUnifiedDecision(
+      testOrgId,
+      {
+        require_vlei: false,
+        require_intent: false,
+        dip_score: 65,
+      },
+      {
+        policy: 'INVALID JPL SYNTAX POLICY ERROR',
+      },
+    );
+    assert.equal(dipReqApprBReject.decision, 'REJECT');
+
+    // 9b. CPL REQUIRE_APPROVAL + Tahap B REJECT
+    const cplReqApprBReject = await evaluateUnifiedDecision(
+      testOrgId,
+      {
+        require_vlei: false,
+        require_intent: false,
+        dip_score: 90,
+        cpl_score: 80,
+      },
+      {
+        policy: 'INVALID JPL SYNTAX POLICY ERROR',
+      },
+    );
+    assert.equal(cplReqApprBReject.decision, 'REJECT');
+
+    // 9c. Tahap A PASS + Tahap B REJECT
+    const passBReject = await evaluateUnifiedDecision(
+      testOrgId,
+      {
+        require_vlei: false,
+        require_intent: false,
+        dip_score: 95,
+        cpl_score: 95,
+      },
+      {
+        policy: 'INVALID JPL SYNTAX POLICY ERROR',
+      },
+    );
+    assert.equal(passBReject.decision, 'REJECT');
+
+    // 9d. finalDecision directly with tahapB.code and distinct reason_code
+    const bRejectDirect = finalDecision(
+      { decision: 'PASS' },
+      { decision: 'REJECT', code: 'JPL_ERR_CODE', reason_code: 'JPL_DISTINCT_REASON' },
+      null,
+    );
+    assert.equal(bRejectDirect.decision, 'REJECT');
+    assert.ok(bRejectDirect.reason_codes.includes('JPL_ERR_CODE'));
+    assert.ok(bRejectDirect.reason_codes.includes('JPL_DISTINCT_REASON'));
   });
 });

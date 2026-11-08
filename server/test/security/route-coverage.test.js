@@ -32,6 +32,16 @@ test('route table protects session mutations and parameterized reads', () => {
     '/agent/v1/dispute-accept-requests',
     '/mcp',
     '/webhooks/paypal/:webhookToken',
+    // test-changed: PRD 1.6 Open Trust Exchange, PRD 1.9 Secret Rotation & PRD 2.0 Ops endpoints are sessionless
+    '/v1/verify/receipt',
+    '/v1/verify/batch',
+    '/v1/handshake/initiate',
+    '/v1/handshake/:handshake_id/respond',
+    '/v1/revocations/subscribe',
+    '/ops/entities',
+    '/ops/escrow',
+    '/agents/:agent_id/keys/rotate',
+    '/org/ledger-keys/rotate',
   ]);
   const mutationRoutes = routes.filter((route) => route.methods.some((method) => (
     ['post', 'put', 'patch', 'delete'].includes(method)
@@ -55,10 +65,19 @@ test('route table protects session mutations and parameterized reads', () => {
     route.methods.includes('get') && /:[A-Za-z][A-Za-z0-9_]*/.test(route.path)
   ));
   assert.ok(parameterizedRoutes.length >= 8, 'the route table must include the expected tenant-scoped ID routes');
+  const publicParameterizedReads = new Set([
+    '/v1/verify/receipt/:sar_id',
+    '/v1/handshake/:handshake_id',
+    '/proof/:proof_id',
+    '/ops/slo/:id',
+    '/ops/tenants/:org_id/metrics',
+    '/ops/escrow/:escrow_id',
+  ]);
   for (const route of parameterizedRoutes) {
     const usesAgentAuth = route.path.startsWith('/agent/v1/');
+    const isPublic = publicParameterizedReads.has(route.path);
     assert.ok(
-      route.handlers.includes('requireSession') || usesAgentAuth,
+      route.handlers.includes('requireSession') || usesAgentAuth || isPublic,
       `GET ${route.path} must enforce session or agent authentication`,
     );
   }

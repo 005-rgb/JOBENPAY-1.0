@@ -136,6 +136,14 @@ test('test_circuit_breaker_timeout_and_registry', async () => {
   );
   assert.equal(breaker.failures, 1);
 
+  // Test ignored errors do not increment failure count
+  const ignoredBreaker = new CircuitBreaker('test_ignored', { failureThreshold: 2 });
+  const ignoredErr = new Error('Client error 400');
+  // @ts-ignore
+  ignoredErr.isCircuitBreakerIgnored = true;
+  await assert.rejects(async () => ignoredBreaker.execute(async () => { throw ignoredErr; }));
+  assert.equal(ignoredBreaker.failures, 0);
+
   // Test registry functions
   const registered = getCircuitBreaker('custom_registered_breaker', { failureThreshold: 5 });
   const same = getCircuitBreaker('custom_registered_breaker');

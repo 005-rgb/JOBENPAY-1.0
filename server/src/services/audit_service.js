@@ -62,6 +62,7 @@ export async function queryAuditLog(orgId, filters = {}, cursor = null, limit = 
     const resourceType = details.resource_type || details.resourceType || null;
     const resourceId = details.resource_id || details.resourceId || null;
     return {
+      id: r.id,
       event_id: r.id,
       org_id: r.org_id,
       user_id: r.actor_id,

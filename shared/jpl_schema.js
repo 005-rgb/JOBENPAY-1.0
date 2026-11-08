@@ -59,3 +59,22 @@ export const JplPolicySchema = z.object({
   default_outcome: JplDefaultOutcomeSchema,
   signature: JplSignatureSchema.optional(),
 });
+
+/**
+ * Validates a policy object against the JPL v1.0 schema (PRD 2.0 §5.3 F2-1).
+ * @param {any} policy
+ * @returns {{ valid: boolean, errors?: any[], policy?: any }}
+ */
+export function validateJplPolicy(policy) {
+  const result = JplPolicySchema.safeParse(policy);
+  if (!result.success) {
+    return {
+      valid: false,
+      errors: result.error.issues,
+    };
+  }
+  return {
+    valid: true,
+    policy: result.data,
+  };
+}

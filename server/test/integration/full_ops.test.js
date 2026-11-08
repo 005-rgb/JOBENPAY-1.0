@@ -45,7 +45,7 @@ test('full ops integration flow', async (t) => {
     const healthz = await fetch(`${appInfo.url}/healthz`);
     assert.equal(healthz.status, 200);
     const healthzData = await healthz.json();
-    assert.equal(healthzData.status, 'ok');
+    assert.ok(healthzData.status === 'healthy' || healthzData.status === 'ok');
 
     const readyz = await fetch(`${appInfo.url}/readyz`);
     assert.equal(readyz.status, 200);

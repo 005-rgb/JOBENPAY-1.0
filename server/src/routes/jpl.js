@@ -6,9 +6,10 @@ import { compile } from '../services/jpl_compiler.js';
 import { evaluate } from '../services/jpl_evaluator.js';
 import { verify } from '../services/jpl_verifier.js';
 
-export function createJplRouter({ requireSession } = {}) {
+export function createJplRouter({ requireSession, requireCsrf } = {}) {
   const router = Router();
   const sessionAuth = requireSession || ((req, res, next) => next());
+  const csrfMiddleware = requireCsrf || function requireCsrf(req, res, next) { next(); };
 
   // 1. GET /api/v1/jpl/vectors - List all 20 open conformance vectors
   router.get('/jpl/vectors', sessionAuth, async (req, res, next) => {
@@ -38,7 +39,7 @@ export function createJplRouter({ requireSession } = {}) {
   });
 
   // 2. POST /api/v1/jpl/compile - Compile policy and compute RFC 8785 hash
-  router.post('/jpl/compile', sessionAuth, async (req, res, next) => {
+  router.post('/jpl/compile', sessionAuth, csrfMiddleware, async (req, res, next) => {
     try {
       const { policy } = req.body || {};
       if (!policy) {
@@ -67,7 +68,7 @@ export function createJplRouter({ requireSession } = {}) {
   });
 
   // 3. POST /api/v1/jpl/evaluate - Evaluate policy against context with explicit deny precedence
-  router.post('/jpl/evaluate', sessionAuth, async (req, res, next) => {
+  router.post('/jpl/evaluate', sessionAuth, csrfMiddleware, async (req, res, next) => {
     try {
       const { policy, context } = req.body || {};
       if (!policy || !context) {
@@ -90,7 +91,7 @@ export function createJplRouter({ requireSession } = {}) {
   });
 
   // 4. POST /api/v1/jpl/verify - Cryptographically verify hash & signature
-  router.post('/jpl/verify', sessionAuth, async (req, res, next) => {
+  router.post('/jpl/verify', sessionAuth, csrfMiddleware, async (req, res, next) => {
     try {
       const { policy } = req.body || {};
       if (!policy) {

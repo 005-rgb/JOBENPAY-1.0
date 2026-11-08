@@ -221,7 +221,7 @@ export function compile(rawPolicy, options = {}) {
   // Schema validation
   const parseResult = JplPolicySchema.safeParse(policy);
   if (!parseResult.success) {
-    const firstIssue = parseResult.error.issues[0]?.message || 'Schema validation failed';
+    const firstIssue = parseResult.error.issues[0].message;
     throw new AppError('INVALID_POLICY_SCHEMA', 422, `INVALID_POLICY_SCHEMA: Policy schema invalid: ${firstIssue}`);
   }
 

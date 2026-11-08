@@ -11,21 +11,21 @@ test('unified fase 0 ops api integration', async (t) => {
 
   t.before(async () => {
     appInfo = await startTestApp();
-    const orgRes = await pool.query('SELECT id FROM organizations LIMIT 1');
-    if (orgRes.rows.length > 0) {
-      testOrgId = orgRes.rows[0].id;
-    } else {
-      testOrgId = randomUUID();
-      await pool.query(
-        `INSERT INTO organizations (id, name, slug) VALUES ($1, 'Fase0 Test Org', 'fase0-test-org')`,
-        [testOrgId],
-      );
-    }
+    testOrgId = randomUUID();
+    await pool.query(
+      `INSERT INTO organizations (id, name, slug) VALUES ($1, 'Fase0 Test Org', $2)`,
+      [testOrgId, `fase0-test-org-${testOrgId.slice(0, 8)}`],
+    );
   });
 
   t.after(async () => {
     if (appInfo?.server) {
       await closeTestApp(appInfo.server);
+    }
+    if (testOrgId) {
+      await pool.query('DELETE FROM escrow_accounts WHERE org_id = $1', [testOrgId]);
+      await pool.query('DELETE FROM entities WHERE org_id = $1', [testOrgId]);
+      await pool.query('DELETE FROM organizations WHERE id = $1', [testOrgId]);
     }
     await pool.end();
   });

@@ -34,4 +34,5 @@ if (isDirectRun) {
 
 export { app };
 export { trustRouter } from './routes/trust.js';
+export { environmentMiddleware } from './middleware/environment.js';
 export default app;

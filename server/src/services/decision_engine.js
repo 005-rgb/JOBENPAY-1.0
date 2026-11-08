@@ -6,6 +6,7 @@ import { computeDecisionIntegrityScore } from './dip_service.js';
 import { computeReproducibilityScore } from './cpl_service.js';
 import { transition, isValidTransition, AGGREGATE_STATES, AGGREGATE_TRANSITIONS, TAHAP_A_MAPPING } from '../../../shared/state-machine.js';
 import { getFailClosedOutcome } from '../../../shared/fail-closed.js';
+import { evaluate as jplEvaluate } from './jpl_evaluator.js';
 
 function runQuery(sql, params, client) {
   if (client && typeof client.query === 'function') {
@@ -35,7 +36,7 @@ export async function hasActiveVlei(orgId, dbClient = null) {
       [orgId],
       dbClient,
     );
-    if (res.rowCount > 0) return true;
+    if ((res.rowCount && res.rowCount > 0) || (res.rows && res.rows.length > 0)) return true;
   } catch {
     // Abaikan jika tabel belum ada atau error koneksi
   }
@@ -196,6 +197,112 @@ export function checkMarkers(context = {}) {
 }
 
 /**
+ * Evaluasi kebijakan JPL pada Tahap B (PRD 2.0 §5.3 F2-5).
+ * Mendukung objek policy tunggal, JSON string, atau array policy.
+ * Menegakkan fail-closed: kegagalan evaluasi -> DENY -> decision: REJECT.
+ * Menegakkan Explicit Deny Precedence: jika ada aturan DENY yang cocok, outcome DENY.
+ *
+ * @param {object|string|Array<object|string>} policyOrPolicies
+ * @param {object} [input={}]
+ * @returns {{ outcome: string, decision: string, rule_id: string|null, reason_code: string|null, outcome_params: object }}
+ */
+export function evaluatePolicy(policyOrPolicies, input = {}) {
+  try {
+    if (!policyOrPolicies) {
+      return {
+        outcome: 'PERMIT',
+        decision: 'PASS',
+        rule_id: null,
+        reason_code: null,
+        outcome_params: {},
+      };
+    }
+
+    const policies = Array.isArray(policyOrPolicies) ? policyOrPolicies : [policyOrPolicies];
+    if (policies.length === 0) {
+      return {
+        outcome: 'PERMIT',
+        decision: 'PASS',
+        rule_id: null,
+        reason_code: null,
+        outcome_params: {},
+      };
+    }
+
+    let finalOutcome = 'PERMIT';
+    let matchedRuleId = null;
+    let matchedReasonCode = null;
+    let matchedParams = {};
+
+    for (const pol of policies) {
+      const res = jplEvaluate(pol, input);
+
+      if (res.outcome === 'DENY') {
+        return {
+          outcome: 'DENY',
+          decision: 'REJECT',
+          rule_id: res.rule_id,
+          reason_code: res.reason_code || 'POLICY_DENY',
+          outcome_params: res.outcome_params,
+        };
+      }
+
+      if (res.outcome === 'REQUIRE_APPROVAL' || res.outcome === 'ESCALATE') {
+        finalOutcome = 'REQUIRE_APPROVAL';
+        matchedRuleId = res.rule_id;
+        matchedReasonCode = res.reason_code;
+        matchedParams = res.outcome_params;
+      }
+    }
+
+    return {
+      outcome: finalOutcome,
+      decision: finalOutcome === 'PERMIT' ? 'PASS' : 'REQUIRE_APPROVAL',
+      rule_id: matchedRuleId,
+      reason_code: matchedReasonCode,
+      outcome_params: matchedParams,
+    };
+  } catch (err) {
+    // Fail-closed fallback: PRD 2.0 §2.7 JPL_EVALUATION_ERROR -> outcome: 'DENY'
+    return {
+      outcome: 'DENY',
+      decision: 'REJECT',
+      rule_id: null,
+      reason_code: 'JPL_EVALUATION_ERROR',
+      outcome_params: { error: err.message },
+    };
+  }
+}
+
+/**
+ * Evaluasi menyeluruh Tahap B (Markers & JPL Policy) (PRD 2.0 §5.2 F1-6, §5.3 F2-5).
+ * @param {object} [transaction={}]
+ * @param {object} [context={}]
+ * @returns {{ requireApproval: boolean, decision: string, code?: string, reason_code?: string, markers: string[], policy?: object|null }}
+ */
+export function evaluateStageB(transaction = {}, context = {}) {
+  const markersResult = checkMarkers(context);
+  const jplPolicy = context.policy ?? context.policies ?? transaction.policy ?? transaction.policies;
+  let policyResult = null;
+
+  if (jplPolicy) {
+    policyResult = evaluatePolicy(jplPolicy, { ...transaction, ...context });
+  }
+
+  const isReject = policyResult?.decision === 'REJECT';
+  const isApproval = markersResult.requireApproval || policyResult?.decision === 'REQUIRE_APPROVAL';
+
+  return {
+    requireApproval: isApproval,
+    decision: isReject ? 'REJECT' : (isApproval ? 'REQUIRE_APPROVAL' : 'PASS'),
+    code: isReject ? policyResult.reason_code : undefined,
+    reason_code: policyResult?.reason_code,
+    markers: markersResult.markers,
+    policy: policyResult,
+  };
+}
+
+/**
  * Tahap C: AI Intent Check (PRD 2.0 §5.2 F1-7).
  * Aturan Emas: AI HANYA boleh memperketat (APPROVE -> REQUIRE_APPROVAL/REJECT).
  * AI TIDAK PERNAH boleh memperlonggar (REJECT -> APPROVE/REQUIRE_APPROVAL).
@@ -265,10 +372,22 @@ export function finalDecision(tahapA, tahapB, tahapC) {
     if (tahapA.reason_codes) reason_codes.push(...tahapA.reason_codes);
   }
 
-  // 3. Evaluasi Tahap B (Markers)
-  if (tahapB?.requireApproval) {
+  // 3. Evaluasi Tahap B (Markers & JPL Policy)
+  if (tahapB?.decision === 'REJECT') {
+    if (tahapB.code) reason_codes.push(tahapB.code);
+    if (tahapB.reason_code && tahapB.reason_code !== tahapB.code) reason_codes.push(tahapB.reason_code);
+    return {
+      decision: 'REJECT',
+      state: 'REJECTED',
+      reason_codes: [...new Set(reason_codes)],
+    };
+  }
+
+  if (tahapB?.requireApproval || tahapB?.decision === 'REQUIRE_APPROVAL') {
     currentDecision = 'REQUIRE_APPROVAL';
     if (tahapB.markers?.length) reason_codes.push(...tahapB.markers);
+    if (tahapB.code) reason_codes.push(tahapB.code);
+    if (tahapB.reason_code && tahapB.reason_code !== tahapB.code) reason_codes.push(tahapB.reason_code);
   }
 
   // 4. Evaluasi Tahap C (AI Intent)
@@ -330,7 +449,11 @@ export async function evaluateUnifiedDecision(orgId, transaction, context = {}, 
   }
   if (dip.decision === 'REQUIRE_APPROVAL') {
     const tahapA = { decision: 'REQUIRE_APPROVAL', code: dip.code, dis_score: dip.score };
-    const tahapB = checkMarkers(context);
+    const tahapB = evaluateStageB(transaction, context);
+    if (tahapB.decision === 'REJECT') {
+      const res = finalDecision(tahapA, tahapB, null);
+      return { ...res, tahapA, tahapB, tahapC: null };
+    }
     const tahapC = context.ai ? checkAIIntent(context.ai, 'REQUIRE_APPROVAL') : null;
     const res = finalDecision(tahapA, tahapB, tahapC);
     return { ...res, tahapA, tahapB, tahapC };
@@ -345,7 +468,11 @@ export async function evaluateUnifiedDecision(orgId, transaction, context = {}, 
   }
   if (cpl.decision === 'REQUIRE_APPROVAL') {
     const tahapA = { decision: 'REQUIRE_APPROVAL', code: cpl.code, rs_score: cpl.score };
-    const tahapB = checkMarkers(context);
+    const tahapB = evaluateStageB(transaction, context);
+    if (tahapB.decision === 'REJECT') {
+      const res = finalDecision(tahapA, tahapB, null);
+      return { ...res, tahapA, tahapB, tahapC: null };
+    }
     const tahapC = context.ai ? checkAIIntent(context.ai, 'REQUIRE_APPROVAL') : null;
     const res = finalDecision(tahapA, tahapB, tahapC);
     return { ...res, tahapA, tahapB, tahapC };
@@ -354,8 +481,12 @@ export async function evaluateUnifiedDecision(orgId, transaction, context = {}, 
   // --- Tahap A Lolos Penuh ---
   const tahapA = { decision: 'PASS' };
 
-  // --- Tahap B: Markers ---
-  const tahapB = checkMarkers(context);
+  // --- Tahap B: Markers & JPL Policy ---
+  const tahapB = evaluateStageB(transaction, context);
+  if (tahapB.decision === 'REJECT') {
+    const res = finalDecision(tahapA, tahapB, null);
+    return { ...res, tahapA, tahapB, tahapC: null };
+  }
 
   // --- Tahap C: AI Intent ---
   const prior = tahapB.requireApproval ? 'REQUIRE_APPROVAL' : 'AUTO_APPROVE';

@@ -1,8 +1,8 @@
 /**
  * server/src/services/escrow_service.js
- * PRD 1.4 Trust Infrastructure & PRD 2.0 Unified Architecture (§2.4, §4.3, §4.4)
+ * PRD 1.4 Trust Infrastructure & PRD 2.0 Unified Architecture (§2.4, §4.3, §4.4) & PRD 2.1 (§2)
  *
- * Provides unified escrow account creation, balance verification, and status reporting.
+ * Provides unified escrow account creation, balance verification, and status reporting with environment isolation.
  */
 
 import { query } from '../db/pool.js';
@@ -22,7 +22,7 @@ function runQuery(sql, params, client) {
 }
 
 /**
- * Creates a unified escrow account (PRD 2.0 §4.4).
+ * Creates a unified escrow account with environment isolation (PRD 2.0 §4.4, PRD 2.1 §2).
  * Enforces reference alignment per escrow_type:
  * - PACT: contractId required, splitId and dpId null
  * - SPLIT: splitId required, contractId and dpId null
@@ -35,10 +35,15 @@ function runQuery(sql, params, client) {
  * @param {string} [params.splitId]
  * @param {string} [params.dpId]
  * @param {string|number|bigint} params.heldMinor
+ * @param {string} [params.environment='SANDBOX']
  * @param {object} [dbClient]
- * @returns {Promise<{ escrow_id: string, status: string, created_at: string }>}
+ * @returns {Promise<{ escrow_id: string, status: string, environment: string, created_at: string }>}
  */
-export async function createEscrow(orgId, { escrowType, contractId = null, splitId = null, dpId = null, heldMinor }, dbClient = null) {
+export async function createEscrow(
+  orgId,
+  { escrowType, contractId = null, splitId = null, dpId = null, heldMinor, environment = 'SANDBOX' },
+  dbClient = null
+) {
   if (!orgId || !isValidUuid(orgId)) {
     throw new AppError('INVALID_ORG_ID', 400, 'Valid org_id is required');
   }
@@ -72,11 +77,11 @@ export async function createEscrow(orgId, { escrowType, contractId = null, split
   const result = await runQuery(
     `INSERT INTO escrow_accounts (
        org_id, escrow_type, contract_id, split_id, dp_id,
-       held_minor, released_minor, slashed_minor, status
+       held_minor, released_minor, slashed_minor, status, environment
      )
-     VALUES ($1, $2, $3, $4, $5, $6, 0, 0, 'FUNDED')
-     RETURNING escrow_id, status, created_at`,
-    [orgId, escrowType, contractId, splitId, dpId, minorVal.toString()],
+     VALUES ($1, $2, $3, $4, $5, $6, 0, 0, 'FUNDED', $7)
+     RETURNING escrow_id, status, environment, created_at`,
+    [orgId, escrowType, contractId, splitId, dpId, minorVal.toString(), environment],
     dbClient,
   );
 
@@ -84,19 +89,21 @@ export async function createEscrow(orgId, { escrowType, contractId = null, split
   return {
     escrow_id: row.escrow_id,
     status: row.status,
+    environment: row.environment,
     created_at: new Date(row.created_at).toISOString(),
   };
 }
 
 /**
- * Gets a unified escrow account by id and orgId (PRD 2.0 §4.3).
+ * Gets a unified escrow account by id and orgId with environment filtering (PRD 2.0 §4.3, PRD 2.1 §2).
  *
  * @param {string} orgId
  * @param {string} escrowId
+ * @param {string|object} [environmentOrClient='SANDBOX']
  * @param {object} [dbClient]
- * @returns {Promise<{ escrow_id: string, escrow_type: string, held_minor: string, released_minor: string, slashed_minor: string, status: string, balanced: boolean }>}
+ * @returns {Promise<{ escrow_id: string, escrow_type: string, held_minor: string, released_minor: string, slashed_minor: string, status: string, environment: string, balanced: boolean }>}
  */
-export async function getEscrow(orgId, escrowId, dbClient = null) {
+export async function getEscrow(orgId, escrowId, environmentOrClient = 'SANDBOX', dbClient = null) {
   if (!orgId || !isValidUuid(orgId)) {
     throw new AppError('INVALID_ORG_ID', 400, 'Valid org_id is required');
   }
@@ -104,14 +111,25 @@ export async function getEscrow(orgId, escrowId, dbClient = null) {
     throw new AppError('ESCROW_NOT_FOUND', 404, 'Invalid or missing escrow_id');
   }
 
+  let environment = 'SANDBOX';
+  let client = dbClient;
+
+  if (typeof environmentOrClient === 'string') {
+    environment = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient.query === 'function') {
+    client = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient === 'object' && environmentOrClient.environment) {
+    environment = environmentOrClient.environment;
+  }
+
   const result = await runQuery(
     `SELECT escrow_id, org_id, escrow_type, contract_id, split_id, dp_id,
-            held_minor, released_minor, slashed_minor, status
+            held_minor, released_minor, slashed_minor, status, environment
      FROM escrow_accounts
-     WHERE escrow_id = $1 AND org_id = $2
+     WHERE escrow_id = $1 AND org_id = $2 AND environment = $3
      LIMIT 1`,
-    [escrowId, orgId],
-    dbClient,
+    [escrowId, orgId, environment],
+    client,
   );
 
   if (result.rows.length === 0) {
@@ -131,6 +149,7 @@ export async function getEscrow(orgId, escrowId, dbClient = null) {
     released_minor: released.toString(),
     slashed_minor: slashed.toString(),
     status: row.status,
+    environment: row.environment,
     balanced,
   };
 }
@@ -140,22 +159,34 @@ export async function getEscrow(orgId, escrowId, dbClient = null) {
  * Invariant: held === released + slashed
  *
  * @param {string} contractId
+ * @param {string|object} [environmentOrClient='SANDBOX']
  * @param {object} [dbClient]
- * @returns {Promise<{ held: string, released: string, slashed: string, balanced: boolean, status: string, escrow_id: string }>}
+ * @returns {Promise<{ held: string, released: string, slashed: string, balanced: boolean, status: string, environment: string, escrow_id: string }>}
  */
-export async function checkEscrowBalance(contractId, dbClient = null) {
+export async function checkEscrowBalance(contractId, environmentOrClient = 'SANDBOX', dbClient = null) {
   if (!contractId || !isValidUuid(contractId)) {
     throw new AppError('ESCROW_NOT_FOUND', 404, 'Invalid or missing contractId');
   }
 
+  let environment = 'SANDBOX';
+  let client = dbClient;
+
+  if (typeof environmentOrClient === 'string') {
+    environment = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient.query === 'function') {
+    client = environmentOrClient;
+  } else if (environmentOrClient && typeof environmentOrClient === 'object' && environmentOrClient.environment) {
+    environment = environmentOrClient.environment;
+  }
+
   const result = await runQuery(
-    `SELECT escrow_id, contract_id, held_minor, released_minor, slashed_minor, status
+    `SELECT escrow_id, contract_id, held_minor, released_minor, slashed_minor, status, environment
      FROM escrow_accounts
-     WHERE contract_id = $1
+     WHERE contract_id = $1 AND environment = $2
      ORDER BY created_at DESC
      LIMIT 1`,
-    [contractId],
-    dbClient,
+    [contractId, environment],
+    client,
   );
 
   if (result.rows.length === 0) {
@@ -176,5 +207,6 @@ export async function checkEscrowBalance(contractId, dbClient = null) {
     slashed: slashed.toString(),
     balanced,
     status: row.status,
+    environment: row.environment,
   };
 }
