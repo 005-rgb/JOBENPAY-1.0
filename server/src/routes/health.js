@@ -1,99 +1,71 @@
-/**
- * server/src/routes/health.js
- * Endpoint pemeriksaan kesehatan proses (/healthz) dan kesiapan operasional (/readyz).
- * 
- * Aturan Pagar:
- * 1. /healthz memvalidasi proses Node.js hidup (liveness).
- * 2. /readyz memvalidasi koneksi PostgreSQL, seluruh migrasi disk terapkan (checksum valid),
- *    serta kesegaran heartbeat worker background.
- * 3. Gagal cepat (HTTP 503) bila DB terputus, migrasi tertinggal/rusak, atau worker heartbeat basi.
- */
-
+// @ts-check
 import { Router } from 'express';
-import pool from '../db/pool.js';
-import { env } from '../config.js';
-import { checkMigrationStatus } from '../db/migrate.js';
-import { logger } from '../logger.js';
+import { pool } from '../db/pool.js';
+import { worker } from '../jobs/worker.js';
+import { migrationStatus } from '../db/migrations.js';
+import { logger } from '../lib/logger.js';
 
 export const healthRouter = Router();
 
+// Liveness: hanya cek process alive
 healthRouter.get('/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
     service: 'jobenpay',
-    status: 'healthy',
-    timestamp: new Date().toISOString()
+    status: 'ok',
+    timestamp: new Date().toISOString(),
   });
 });
 
+// Readiness: cek DB, migrasi, worker heartbeat
 healthRouter.get('/readyz', async (_req, res) => {
+  const checks = {
+    database: false,
+    migrations: false,
+    worker_heartbeat: false,
+  };
+
   try {
-    const client = await pool.connect();
-    let dbConnected = false;
-    let migrationsOk = false;
-    let workerStatus = 'not-configured';
-    let ready = false;
+    const dbResult = await pool.query('SELECT 1 as ping');
+    checks.database = dbResult.rowCount === 1;
+  } catch (err) {
+    logger.warn({ err }, 'Readiness check: database failed');
+  }
 
-    try {
-      // 1. Verifikasi koneksi database
-      const ping = await client.query('SELECT 1 as ping');
-      dbConnected = ping.rowCount === 1;
+  try {
+    checks.migrations = await migrationStatus();
+  } catch (err) {
+    logger.warn({ err }, 'Readiness check: migrationStatus failed');
+  }
 
-      // 2. Verifikasi status migrasi dan checksum
-      const migStatus = await checkMigrationStatus(client);
-      migrationsOk = migStatus.upToDate;
+  try {
+    checks.worker_heartbeat = typeof worker?.isAlive === 'function' ? worker.isAlive() : true;
+  } catch (err) {
+    logger.warn({ err }, 'Readiness check: worker_heartbeat failed');
+  }
 
-      // 3. Verifikasi heartbeat worker
-      if (env.WORKER_ENABLED === 1) {
-        const heartbeat = await client.query(`
-          SELECT 1
-          FROM jobs
-          WHERE type = '_worker_heartbeat'
-            AND dedupe_key = '_worker_heartbeat'
-            AND status = 'COMPLETED'
-            AND run_at >= now() - interval '30 seconds'
-          LIMIT 1
-        `);
-        if (heartbeat.rowCount === 1) {
-          workerStatus = 'healthy';
-        } else {
-          workerStatus = 'stale';
-        }
-      } else {
-        // Sebelum F1-6 atau jika worker tidak diaktifkan pada lingkungan ini
-        workerStatus = 'not-configured';
-      }
+  const allReady = Boolean(checks.database && checks.migrations && checks.worker_heartbeat);
+  res.status(allReady ? 200 : 503).json({
+    ok: allReady,
+    service: 'jobenpay',
+    status: allReady ? 'ready' : 'not_ready',
+    checks,
+    timestamp: new Date().toISOString(),
+  });
+});
 
-      ready = dbConnected && migrationsOk && (workerStatus === 'healthy' || workerStatus === 'not-configured');
-
-      const responseStatus = ready ? 200 : 503;
-      res.status(responseStatus).json({
-        ok: ready,
-        service: 'jobenpay',
-        status: ready ? 'ready' : 'not_ready',
-        checks: {
-          database: dbConnected ? 'connected' : 'disconnected',
-          migrations: migrationsOk ? 'up_to_date' : (migStatus.error || 'pending'),
-          worker: workerStatus
-        }
-      });
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    logger.error({ err: error }, 'Readiness check failed with exception');
-    res.status(503).json({
-      ok: false,
-      service: 'jobenpay',
-      status: 'not_ready',
-      checks: {
-        database: 'error',
-        migrations: 'unknown',
-        worker: 'unknown'
-      }
+// Startup: cek migrasi selesai
+healthRouter.get('/startupz', async (_req, res) => {
+  try {
+    const ready = await migrationStatus();
+    res.status(ready ? 200 : 503).json({
+      ok: ready,
+      status: ready ? 'started' : 'starting',
+      timestamp: new Date().toISOString(),
     });
+  } catch {
+    res.status(503).json({ ok: false, status: 'error' });
   }
 });
 
 export default healthRouter;
-

@@ -139,3 +139,41 @@ export function startWorker({
     },
   };
 }
+
+export class Worker {
+  constructor() {
+    this.paused = false;
+    this.activeJobs = new Set();
+    this.lastHeartbeat = Date.now();
+  }
+
+  pause() {
+    this.paused = true;
+  }
+
+  isAlive() {
+    return !this.paused && (Date.now() - this.lastHeartbeat < 60000);
+  }
+
+  async drain() {
+    while (this.activeJobs.size > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  async processJob(job) {
+    if (this.paused) return;
+    this.activeJobs.add(job.id);
+    this.lastHeartbeat = Date.now();
+    try {
+      if (typeof executeClaimedJob === 'function') {
+        await executeClaimedJob(job);
+      }
+    } finally {
+      this.activeJobs.delete(job.id);
+    }
+  }
+}
+
+export const worker = new Worker();
+

@@ -2,6 +2,7 @@ import { assertRuntimeSecrets, env } from './config.js';
 import app from './app.js';
 import { startWorker } from './jobs/worker.js';
 import { logger } from './lib/logger.js';
+import { setupGracefulShutdown } from './shutdown.js';
 
 export function startServer(port = env.PORT, { requireSecrets = false } = {}) {
   if (requireSecrets) assertRuntimeSecrets();
@@ -9,6 +10,8 @@ export function startServer(port = env.PORT, { requireSecrets = false } = {}) {
     const address = server.address();
     console.log(`JOBENPAY listening on port ${typeof address === 'object' && address ? address.port : port} (configured URL: ${env.PUBLIC_BASE_URL})`);
   });
+
+  setupGracefulShutdown(server);
 
   if (env.WORKER_ENABLED === 1) {
     const worker = startWorker();

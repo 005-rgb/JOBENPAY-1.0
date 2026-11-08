@@ -14,5 +14,6 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
+export { pool };
 export const query = (text, params) => pool.query(text, params);
 export default pool;
