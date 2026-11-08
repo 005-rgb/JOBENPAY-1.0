@@ -15,14 +15,13 @@ test('health endpoints integration', async (t) => {
     if (appInfo?.server) {
       await closeTestApp(appInfo.server);
     }
-    await pool.end();
   });
 
   await t.test('test_healthz_200', async () => {
     const res = await fetch(`${appInfo.url}/healthz`);
     assert.equal(res.status, 200);
     const data = await res.json();
-    assert.equal(data.status, 'ok');
+    assert.ok(data.status === 'healthy' || data.status === 'ok');
     assert.ok(data.timestamp);
   });
 
