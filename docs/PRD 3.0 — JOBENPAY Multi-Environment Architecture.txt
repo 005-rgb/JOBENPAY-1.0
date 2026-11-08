@@ -1,0 +1,272 @@
+# PRD 3.0 (REVISI 2.0) — JOBENPAY Multi-Environment Architecture
+## Perfect Isolation: Global Entities vs. Environment-Specific Entities
+
+**Versi:** 2.0 (Major Revision — Fixed Global Settings Flaw)
+**Tanggal:** 8 November 2026
+**Basis:** PRD 1.2–2.0 + Audit Logika Multi-Environment
+**Prinsip Kunci:** **Satu Organisasi, Dua Environment.** Pengaturan umum (Profil Perusahaan, Anggota Tim, Billing) bersifat **GLOBAL**. Data operasional (Agen, Mandat, Transaksi, Uang) bersifat **ENVIRONMENT-SPECIFIC** (terpisah antara Sandbox dan Live).
+
+---
+
+## 0. ATURAN EMAS (NON-NEGOTIABLE)
+
+1. **Pemisahan Entitas (Global vs Env):** Tabel `organizations`, `users`, dan `memberships` **DILARANG** memiliki kolom `environment`. Tabel operasional (`agents`, `mandates`, `transaction_intents`, `ledger_entries`, dll.) **WAJIB** memiliki kolom `environment`.
+2. **Konsistensi Tim:** User yang diundang ke Organisasi "Acme Corp" dapat mengakses Sandbox dan Live menggunakan kredensial login yang sama.
+3. **Isolasi Total Data Operasional:** Data Agen, Mandat, dan Uang di Sandbox **TIDAK BOLEH** bocor atau terlihat di Live (dan sebaliknya).
+4. **Kredensial Terpisah:** PayPal Client ID/Secret untuk Sandbox dan Live disimpan di tabel terpisah yang memiliki kolom `environment`.
+5. **UI Wajib Menampilkan Environment Aktif:** Banner dan Toggle wajib ada di semua halaman operasional.
+6. **Fail-Closed:** Jika route operasional diakses tanpa header `X-Jobenpay-Environment`, sistem menolak dengan `400 ENVIRONMENT_HEADER_MISSING`.
+7. **Coverage 100%** untuk *service* yang menangani isolasi environment.
+8. **Zero Ambiguity:** Prompt untuk AI Builder harus eksplisit mengenai file mana yang harus dihapus kolom `environment`-nya.
+
+---
+
+## 1. ARSITEKTUR BARU: GLOBAL VS ENVIRONMENT
+
+| Kategori | Tabel | Kolom `environment`? | Alasan |
+|---|---|---|---|
+| **Global** | `organizations` | ❌ Tidak | Profil perusahaan (Nama, Logo, NPWP) berlaku untuk Sandbox & Live. |
+| **Global** | `users` | ❌ Tidak | Karyawan (Owner, Admin) adalah entitas nyata, bukan entitas environment. |
+| **Global** | `memberships` | ❌ Tidak | Hak akses staf berlaku di kedua mode. |
+| **Global** | `billing_subscriptions` | ❌ Tidak | Anda membayar 1 tagihan untuk 1 Organisasi, bukan 2. |
+| **Global** | `audit_events` (Auth) | ❌ Tidak | Log login (siapa yang masuk) adalah global. |
+| **Operasional** | `agents` | ✅ Ya | Agen AI untuk testing (Sandbox) beda dengan Agen AI produksi (Live). |
+| **Operasional** | `mandates` | ✅ Ya | Batas anggaran Sandbox ($100) beda dengan Live ($10.000). |
+| **Operasional** | `payees` | ✅ Ya | Vendor di Sandbox tidak otomatis terdaftar di Live. |
+| **Operasional** | `documents` | ✅ Ya | Invoice testing beda dengan invoice asli. |
+| **Operasional** | `ledger_entries` | ✅ Ya | Pembukuan uang mainan dan uang asli dipisah total. |
+| **Operasional** | `paypal_credentials` | ✅ Ya | Kredensial API Sandbox beda dengan Live. |
+| **Operasional** | `kyc_records` | ✅ Ya | KYC hanya ada di Live (di Sandbox tidak perlu). |
+
+---
+
+## 2. SKEMA DATA (REVISI MIGRASI)
+
+**File:** `server/migrations/040_environment_foundation_v2.sql`
+
+```sql
+BEGIN;
+
+-- 2.1 Bersihkan Skema Lama (Drop kolom environment dari tabel Global)
+ALTER TABLE organizations DROP COLUMN IF EXISTS environment;
+ALTER TABLE users DROP COLUMN IF EXISTS default_environment;
+ALTER TABLE memberships DROP COLUMN IF EXISTS environment;
+ALTER TABLE billing_subscriptions DROP COLUMN IF EXISTS environment;
+
+-- 2.2 Pastikan Tabel Operasional Memiliki Environment
+-- (Jika sebelumnya sudah ada, query ini idempoten)
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE mandates ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE payees ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE transaction_intents ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE transaction_legs ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE ledger_heads ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+
+-- 2.3 RLS (Row Level Security) HANYA untuk Tabel Operasional
+ALTER TABLE agents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mandates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transaction_intents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ledger_entries ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY agents_env_isolation ON agents
+  FOR ALL USING (environment = current_setting('app.current_environment', true)::environment_type);
+
+CREATE POLICY mandates_env_isolation ON mandates
+  FOR ALL USING (environment = current_setting('app.current_environment', true)::environment_type);
+
+-- (Lakukan hal yang sama untuk payees, transaction_intents, ledger_entries)
+
+-- 2.4 Trigger: Mencegah Agent Sandbox dipakai di Live
+CREATE OR REPLACE FUNCTION check_agent_environment() RETURNS TRIGGER AS $$
+DECLARE agent_env environment_type;
+BEGIN
+  SELECT environment INTO agent_env FROM agents WHERE agent_id = NEW.agent_id;
+  IF agent_env IS NULL THEN RAISE EXCEPTION 'Agent % not found', NEW.agent_id; END IF;
+  IF agent_env <> NEW.environment THEN
+    RAISE EXCEPTION 'Environment mismatch: agent=% transaction=%', agent_env, NEW.environment;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_agent_environment BEFORE INSERT OR UPDATE ON transaction_intents
+FOR EACH ROW EXECUTE FUNCTION check_agent_environment();
+
+COMMIT;
+```
+
+---
+
+## 3. UPDATE SERVICE LAYER
+
+### 3.1 Organization Service (GLOBAL - Tanpa Environment)
+
+```javascript
+// server/src/services/organization_service.js
+// @ts-check
+import { pool } from '../db/pool.js';
+
+/**
+ * Mengambil profil organisasi. TIDAK membutuhkan environment header.
+ * Data ini sama di Sandbox dan Live.
+ */
+export async function getOrgProfile(orgId) {
+  const result = await pool.query(
+    `SELECT org_id, display_name, legal_name, logo_url, website_url, address 
+     FROM organizations WHERE org_id = $1`,
+    [orgId]
+  );
+  return result.rows[0];
+}
+```
+
+### 3.2 Agent Service (OPERASIONAL - Wajib Environment)
+
+```javascript
+// server/src/services/agent_service.js
+// @ts-check
+import { pool } from '../db/pool.js';
+import { AppError } from '../lib/errors.js';
+
+/**
+ * Mengambil daftar agen. WAJIB menyertakan environment.
+ * Agen Sandbox tidak akan muncul di Live.
+ */
+export async function listAgents(orgId, environment) {
+  if (!environment || !['SANDBOX', 'LIVE'].includes(environment)) {
+    throw new AppError('INVALID_ENVIRONMENT', 400);
+  }
+  
+  const result = await pool.query(
+    `SELECT agent_id, name, status FROM agents 
+     WHERE org_id = $1 AND environment = $2
+     ORDER BY created_at DESC`,
+    [orgId, environment]
+  );
+  return result.rows;
+}
+```
+
+---
+
+## 4. API CONTRACTS (MIDDLEWARE ROUTING)
+
+**File:** `server/src/middleware/environment.js`
+
+```javascript
+// @ts-check
+import { AppError } from '../lib/errors.js';
+
+export function environmentMiddleware(req, res, next) {
+  // Pengecualian: Route Global tidak butuh environment header
+  const globalRoutes = [
+    '/api/v1/org/profile',
+    '/api/v1/org/members',
+    '/api/v1/billing',
+    '/api/v1/auth/me'
+  ];
+  
+  if (globalRoutes.some(route => req.path.startsWith(route))) {
+    return next();
+  }
+
+  // Untuk route operasional, header WAJIB ada
+  const env = req.headers['x-jobenpay-environment'];
+  if (!env || !['SANDBOX', 'LIVE'].includes(env)) {
+    return next(new AppError('ENVIRONMENT_HEADER_MISSING', 400));
+  }
+
+  req.environment = env;
+  next();
+}
+```
+
+---
+
+## 5. UI & FRONTEND BEHAVIOR
+
+### 5.1 Environment Toggle Context
+Di React, buat `EnvironmentContext` yang menyimpan state `currentEnvironment` ('SANDBOX' | 'LIVE').
+
+### 5.2 Route Guard
+- Saat mengakses `/organization` (Business Tools), Axios/fetch **TIDAK** mengirim header `X-Jobenpay-Environment`.
+- Saat mengakses `/agents`, Axios/fetch **WAJIB** mengirim header `X-Jobenpay-Environment: SANDBOX` atau `LIVE` sesuai state.
+
+### 5.3 Visual Indicator
+- Saat di Sandbox: Banner biru "SANDBOX MODE".
+- Saat di Live: Banner merah "LIVE MODE — Real money".
+
+---
+
+## 6. TEST SUITE (WAJIB LULUS, COVERAGE 100%)
+
+### 6.1 Unit & Integration Tests
+
+| Test ID | Assertion |
+|---|---|
+| `test_org_profile_global` | `GET /api/v1/org/profile` mengembalikan data yang **sama** meskipun header environment diubah dari SANDBOX ke LIVE. |
+| `test_agent_isolation` | Buat agen di SANDBOX. Panggil `GET /api/v1/agents` dengan header LIVE. Hasil harus **0 (kosong)**. |
+| `test_mandate_isolation` | Mandat yang dibuat di SANDBOX tidak bisa dieksekusi di LIVE (Trigger DB menolak). |
+| `test_membership_global` | Undang user di Sandbox. User tersebut bisa login dan melihat menu di Live. |
+| `test_env_header_missing` | Panggil `GET /api/v1/agents` tanpa header environment → 400. |
+| `test_env_header_missing_global` | Panggil `GET /api/v1/org/profile` tanpa header environment → 200 (Berhasil). |
+
+---
+
+## 7. PROMPT UNTUK AI BUILDER (ZERO-HALLUCINATION)
+
+### 7.1 Preamble (`replit.md`)
+
+```markdown
+# ATURAN PRD 3.0 REVISI (Global vs Environment)
+
+Kamu memperbaiki arsitektur Multi-Environment.
+- Tabel `organizations`, `users`, `memberships`, `billing` adalah GLOBAL. Hapus kolom `environment` dari tabel ini.
+- Tabel `agents`, `mandates`, `transactions`, `ledger` adalah OPERASIONAL. Wajib ada kolom `environment`.
+- Middleware wajib membedakan route Global (tanpa header) dan Operasional (wajib header).
+- Frontend wajib mengirim `X-Jobenpay-Environment` HANYA untuk route operasional.
+- Coverage 100% untuk `environment_middleware.test.js` dan `organization_service.test.js`.
+```
+
+### 7.2 Prompt Refactoring (Copy-Paste ke AI Anda)
+
+```markdown
+# PROMPT REFACTORING — Perbaikan Multi-Environment Flaw
+
+Terdapat kelemahan logika pada implementasi Multi-Environment saat ini. Tabel `organizations` dan `users` salah memiliki kolom `environment`. 
+
+Lakukan refactoring berikut secara berurutan:
+
+### Langkah 1: Migrasi Database
+Buat file migrasi baru `server/migrations/044_fix_global_entities.sql`:
+1. Hapus kolom `environment` dari tabel `organizations`.
+2. Hapus kolom `default_environment` dari tabel `users`.
+3. Pastikan kolom `environment` TETAP ADA di tabel `agents`, `mandates`, `payees`, `transaction_intents`, `ledger_entries`.
+
+### Langkah 2: Perbaiki Middleware
+Ubah file `server/src/middleware/environment.js`:
+1. Buat array `GLOBAL_ROUTES` yang berisi: `/api/v1/org`, `/api/v1/members`, `/api/v1/billing`, `/api/v1/auth`.
+2. Jika `req.path` diawali dengan salah satu `GLOBAL_ROUTES`, panggil `next()` tanpa mengecek header `X-Jobenpay-Environment`.
+3. Untuk route lainnya (seperti `/api/v1/agents`), wajib cek header. Jika tidak ada, return 400.
+
+### Langkah 3: Perbaiki Service & Controller
+1. Di `organization_service.js`, hapus argumen `environment` dari fungsi-fungsi query DB.
+2. Di `agent_service.js` (dan service operasional lainnya), pastikan query DB menyertakan `WHERE environment = $X`.
+
+### Langkah 4: Perbaiki Frontend (React)
+1. Di `web/src/lib/api.js` (atau konfigurasi Axios), buat *interceptor*.
+2. Jika URL request mengandung `/agents`, `/mandates`, `/transactions`, dsb, sisipkan header `X-Jobenpay-Environment`.
+3. Jika URL mengandung `/org` atau `/members`, JANGAN sisipkan header tersebut.
+
+### Langkah 5: Tulis Test
+Buat `server/test/integration/environment_isolation_v2.test.js`:
+- Test `test_global_profile_same_in_both_env`: Request GET /api/v1/org/profile dengan header SANDBOX dan LIVE harus mengembalikan `org_id` yang sama.
+- Test `test_agent_isolation_strict`: Buat agen di SANDBOX. Panggil list agen dengan header LIVE. Harus return array kosong.
+```
+
+---
+
+**Dokumen ini selesai.** Semua kelemahan logika pemisahan Environment vs Global telah ditutup. AI Builder dapat mengeksekusi prompt refactoring di atas untuk menyempurnakan sistem yang sudah berjalan.

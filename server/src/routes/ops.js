@@ -4,6 +4,13 @@ import { getSLOs, getSLOByIdHandler } from '../controllers/slo_controller.js';
 import { getCircuitBreakers } from '../controllers/circuit_breaker_controller.js';
 import { getTenantMetricsHandler } from '../controllers/metrics_controller.js';
 import { getAuditLog } from '../controllers/audit_controller.js';
+import {
+  getEntitiesHandler,
+  postEntityHandler,
+  getEscrowHandler,
+  postEscrowHandler,
+  getFailClosedMatrixHandler,
+} from '../controllers/ops_unified_controller.js';
 
 export function createOpsRouter({ requireSession } = {}) {
   const router = Router();
@@ -19,6 +26,13 @@ export function createOpsRouter({ requireSession } = {}) {
   // WP4: Per-tenant metrics + audit log
   router.get('/ops/tenants/:org_id/metrics', (req, res, next) => getTenantMetricsHandler(req, res, next));
   router.get('/audit', (req, res, next) => getAuditLog(req, res, next));
+
+  // PRD 2.0 Unified Ops Endpoints (§4)
+  router.get('/ops/entities', (req, res, next) => getEntitiesHandler(req, res, next));
+  router.post('/ops/entities', (req, res, next) => postEntityHandler(req, res, next));
+  router.get('/ops/escrow/:escrow_id', (req, res, next) => getEscrowHandler(req, res, next));
+  router.post('/ops/escrow', (req, res, next) => postEscrowHandler(req, res, next));
+  router.get('/ops/fail-closed-matrix', (req, res) => getFailClosedMatrixHandler(req, res));
 
   return router;
 }

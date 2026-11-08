@@ -1,8 +1,8 @@
 /**
  * server/src/services/escrow_service.js
- * PRD 1.4 Trust Infrastructure (Fase C: PACT Arbitration & Bonding, WP2)
+ * PRD 1.4 Trust Infrastructure & PRD 2.0 Unified Architecture (§2.4, §4.3, §4.4)
  *
- * Provides escrow balance verification and status reporting.
+ * Provides unified escrow account creation, balance verification, and status reporting.
  */
 
 import { query } from '../db/pool.js';
@@ -19,6 +19,120 @@ function runQuery(sql, params, client) {
     return client.query(sql, params);
   }
   return query(sql, params);
+}
+
+/**
+ * Creates a unified escrow account (PRD 2.0 §4.4).
+ * Enforces reference alignment per escrow_type:
+ * - PACT: contractId required, splitId and dpId null
+ * - SPLIT: splitId required, contractId and dpId null
+ * - DOWN_PAYMENT: dpId required, contractId and splitId null
+ *
+ * @param {string} orgId
+ * @param {object} params
+ * @param {string} params.escrowType
+ * @param {string} [params.contractId]
+ * @param {string} [params.splitId]
+ * @param {string} [params.dpId]
+ * @param {string|number|bigint} params.heldMinor
+ * @param {object} [dbClient]
+ * @returns {Promise<{ escrow_id: string, status: string, created_at: string }>}
+ */
+export async function createEscrow(orgId, { escrowType, contractId = null, splitId = null, dpId = null, heldMinor }, dbClient = null) {
+  if (!orgId || !isValidUuid(orgId)) {
+    throw new AppError('INVALID_ORG_ID', 400, 'Valid org_id is required');
+  }
+
+  const validTypes = ['SPLIT', 'PACT', 'DOWN_PAYMENT'];
+  if (!validTypes.includes(escrowType)) {
+    throw new AppError('INVALID_ESCROW_TYPE', 400, `escrow_type must be one of: ${validTypes.join(', ')}`);
+  }
+
+  if (escrowType === 'PACT' && (!contractId || !isValidUuid(contractId) || splitId || dpId)) {
+    throw new AppError('INVALID_ESCROW_REF', 400, 'PACT escrow requires contract_id and no split_id or dp_id');
+  }
+  if (escrowType === 'SPLIT' && (!splitId || !isValidUuid(splitId) || contractId || dpId)) {
+    throw new AppError('INVALID_ESCROW_REF', 400, 'SPLIT escrow requires split_id and no contract_id or dp_id');
+  }
+  if (escrowType === 'DOWN_PAYMENT' && (!dpId || !isValidUuid(dpId) || contractId || splitId)) {
+    throw new AppError('INVALID_ESCROW_REF', 400, 'DOWN_PAYMENT escrow requires dp_id and no contract_id or split_id');
+  }
+
+  let minorVal;
+  try {
+    minorVal = BigInt(heldMinor);
+  } catch {
+    throw new AppError('INVALID_AMOUNT', 400, 'heldMinor must be a valid integer minor amount');
+  }
+
+  if (minorVal < 0n) {
+    throw new AppError('INVALID_AMOUNT', 400, 'heldMinor must be non-negative');
+  }
+
+  const result = await runQuery(
+    `INSERT INTO escrow_accounts (
+       org_id, escrow_type, contract_id, split_id, dp_id,
+       held_minor, released_minor, slashed_minor, status
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, 0, 0, 'FUNDED')
+     RETURNING escrow_id, status, created_at`,
+    [orgId, escrowType, contractId, splitId, dpId, minorVal.toString()],
+    dbClient,
+  );
+
+  const row = result.rows[0];
+  return {
+    escrow_id: row.escrow_id,
+    status: row.status,
+    created_at: new Date(row.created_at).toISOString(),
+  };
+}
+
+/**
+ * Gets a unified escrow account by id and orgId (PRD 2.0 §4.3).
+ *
+ * @param {string} orgId
+ * @param {string} escrowId
+ * @param {object} [dbClient]
+ * @returns {Promise<{ escrow_id: string, escrow_type: string, held_minor: string, released_minor: string, slashed_minor: string, status: string, balanced: boolean }>}
+ */
+export async function getEscrow(orgId, escrowId, dbClient = null) {
+  if (!orgId || !isValidUuid(orgId)) {
+    throw new AppError('INVALID_ORG_ID', 400, 'Valid org_id is required');
+  }
+  if (!escrowId || !isValidUuid(escrowId)) {
+    throw new AppError('ESCROW_NOT_FOUND', 404, 'Invalid or missing escrow_id');
+  }
+
+  const result = await runQuery(
+    `SELECT escrow_id, org_id, escrow_type, contract_id, split_id, dp_id,
+            held_minor, released_minor, slashed_minor, status
+     FROM escrow_accounts
+     WHERE escrow_id = $1 AND org_id = $2
+     LIMIT 1`,
+    [escrowId, orgId],
+    dbClient,
+  );
+
+  if (result.rows.length === 0) {
+    throw new AppError('ESCROW_NOT_FOUND', 404, `Escrow ${escrowId} not found`);
+  }
+
+  const row = result.rows[0];
+  const held = BigInt(row.held_minor);
+  const released = BigInt(row.released_minor);
+  const slashed = BigInt(row.slashed_minor);
+  const balanced = held === (released + slashed);
+
+  return {
+    escrow_id: row.escrow_id,
+    escrow_type: row.escrow_type,
+    held_minor: held.toString(),
+    released_minor: released.toString(),
+    slashed_minor: slashed.toString(),
+    status: row.status,
+    balanced,
+  };
 }
 
 /**

@@ -1,17 +1,12 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: Implementasi Penuh PRD 1.9 Production Operations Layer (WP1 s/d WP12).
-- **Langkah saat ini**: Seluruh Fase PRD 1.4, 1.5, 1.6, 1.7, 1.8, & 1.9 LULUS 100% (SLI/SLO Framework, Graceful Shutdown, Health Checks, Circuit Breaker, Per-Tenant Metrics, Audit Logs, 10 Runbooks, Alerts, Rollback & Canary, Exceptions, Secret Rotation, Load Benchmarks, Capacity Model, 100% Code Coverage pada seluruh modul baru).
+- **Langkah terakhir dikerjakan**: PRD 2.0 Unified Architecture — Fase 0: Foundation (F0-1 s/d F0-6).
+- **Langkah saat ini**: Fase 0 LULUS 100% (Unified Entities, Unified Escrow, Unified Outcome Contracts, Request Hash v2, Fail-Closed Matrix, 100% Coverage pada seluruh modul baru). Siap melanjutkan ke Fase 1 (Core Decision Engine).
 - **Validasi lokal terkini**:
-  - `npm test` (`scripts/test-suite.js`): **976 / 976 tes lulus 100% tanpa gagal/skip** (termasuk 30 golden characterization tests, 4 negative CI guard tests, 1.000 property tests seimbang, 6/6 tamper classes, dan 8 organisasi verified).
-  - Pagar CI (9 pagar): 100% LULUS (`guard`, `check-spec-lock`, `check-tenant-isolation`, `check-insert-tests`, `guard-characterization`, `lint-no-float-money`, `check-traceability`, `check-tests-from-data`, `secret-scan`).
-  - Traceability (`docs/traceability.csv`): 135/135 ID berstatus `done` (0 pending-by-design, 100% terlacak).
-  - CCC Check (15 Kategori / 28 Pasangan): 14/14 butir terpenuhi per kategori (100% LENGKAP).
-  - UI Geometry Parity (`scripts/geometry-test.js`): 46/46 asersi lulus 0 horizontal overflow.
-  - Dokumentasi API (`docs/API_REFERENCE.md`): Dibangkitkan secara deterministik dari skema Zod.
-  - Spec Gaps (`docs/spec-gaps.md`): 6/6 butir berstatus DITUTUP.
-  - Vulnerability Audit: 0 vulnerabilities (`npm audit`).
+  - `npm run test:coverage:fase0`: **23 / 23 tes lulus 100%** dengan **100% Stmts, 100% Branch, 100% Funcs, 100% Lines** (`request-hash.js`, `fail-closed.js`, `entity_service.js`, `escrow_service.js`).
+  - `npm run migrate`: Idempoten (2x eksekusi berturut-turut exit code 0).
+  - Pagar CI: 100% LULUS (`guard`, `lint`, `lint-no-float-money`, `check-insert-tests`).
 - **Blueprint PRD**: `docs/spec/PRD_1_3R.md` & `docs/spec/addendum-1_3R.md` (APPROVED).
 - **Status Git**: Branch `dev`.
 
@@ -103,6 +98,7 @@
 | PRD-1.7 | DONE | feat(prd-1.7) | 2026-11-08 | Cognitive Provenance Layer (CPL): Cognitive Snapshot Schema v1.0, Deterministic Replay Engine, Reproducibility Score (RS: 0-100), Hard rules (CPL_SNAPSHOT_INVALID, CPL_REPLAY_FAILED, CPL_SCORE_BELOW_THRESHOLD), SAR v1.1 extension, REST API /api/v1/requests/:id/snapshot & /api/v1/requests/:id/replay, UI Cognitive Snapshot Card & Replay Runner with SVG gauge, 80+ tests passing (unit, adversarial 50 scenarios, concurrency, e2e), 100% test coverage |
 | PRD-1.8 | DONE | feat(prd-1.8) | 2026-11-08 | JobenPay Policy Language (JPL): Declarative open standard for AI agent control policies, RFC 8785 canonical hashing, Ed25519 signatures, Explicit Deny Precedence, 18 deterministic operators, JplCompiler, JplEvaluator, JplVerifier, Conformance Suite (20/20 vectors passed), CLI tool (validate, evaluate, verify), shared package export, 56/56 tests passing, 100% test coverage |
 | PRD-1.9 | DONE | feat(prd-1.9-wp12) | 2026-11-08 | Production Operations Layer: SLI/SLO Framework (6 SLI / 6 SLO), Error Budget Policy, Graceful Shutdown (SIGTERM/drain/pool.end), Health Endpoints (/healthz, /readyz, /startupz), Circuit Breakers (PayPal & AI, fail-fast, timeout, half-open probe), Per-Tenant Metrics & Audit Log queryable (< 30s), 10 Operational Runbooks, Alert Definitions, Rollback Plan & Canary release, Exception Tracking, Secret Rotation (API Key grace 1h & Ed25519 Ledger Key), Load Testing benchmarks, Capacity Model, 100% test coverage across all new modules, Laporan Audit Adversarial lengkap (`docs/audit/PRD-1.9.md`), dan UI Operations Dashboard (`/ops`, `/ops/slo`, `/ops/circuit-breakers`, `/ops/runbooks`, `/ops/secrets`). |
+| PRD-2.0-F0 | DONE | feat(prd-2.0-fase-0) | 2026-11-08 | Unified Architecture — Fase 0 Foundation: Unified Entities (050), Unified Escrow (051), Unified Outcome Contracts (052), Request Hash v2 (053), Fail-Closed Matrix (11 kegagalan eksplisit), Entity Service, Escrow Service, Ops Endpoints (/api/v1/ops/entities, /api/v1/ops/escrow, /api/v1/ops/fail-closed-matrix), 23/23 tests passing, 100% test coverage (lines, branches, functions, stmts) pada seluruh modul baru. |
 
 ## Resume
 Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Rute beranda publik (`/` untuk domain `nh.jobenapp.cloud`) kini aktif melayani Landing Page dengan navigasi tombol Login di pojok kanan atas menuju `/login`, rute proteksi `/dashboard` untuk sesi aktif, tata letak token murni, dan kepatuhan penuh terhadap guard sistem.

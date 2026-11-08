@@ -1,0 +1,166 @@
+Karena PRD 2.0 sudah ter-build, kita tidak bisa sembarangan mengubah kode tanpa merusak data yang sudah ada (backward compatibility). Kita harus melakukan **Refactoring (Patch)**. 
+
+Berikut adalah **PRD 2.1 (Revisi PRD 2.0)** dan **Prompt Zero-Hallucination** untuk memperbaiki cacat arsitektur Environment, membebaskan AI dari *hang* (Coverage 100%), dan memperbaiki Routing JPL.
+
+---
+
+# PRD 2.1 — JOBENPAY Unified Architecture Patch
+## Environment Isolation Fix, Test Optimization & Routing Repair
+
+**Versi:** 2.1 (Patch untuk PRD 2.0)  
+**Status:** Implementation-ready, Zero-Hallucination  
+**Target:** Memperbaiki kode PRD 2.0 yang sudah ter-build agar selaras dengan PRD 3.0 (Multi-Environment) dan mencegah AI Builder *timeout/hang*.
+
+---
+
+## 0. ATURAN EMAS (NON-NEGOTIABLE)
+
+1. **Jangan Hapus Data.** Migrasi wajib menggunakan `ADD COLUMN IF NOT EXISTS` dengan default `'SANDBOX'`.
+2. **Isolasi Tabel Unifikasi.** Tabel `entities`, `escrow_accounts`, `outcome_contracts`, dan `cognitive_snapshots` **wajib** memiliki kolom `environment`.
+3. **Longgarkan Coverage (PENTING).** Hapus aturan `--lines 100` secara global untuk mencegah AI *hang*. Gunakan target 90% (kecuali modul uang).
+4. **Routing Priority.** Rute API (`/api/v1/*`) wajib didaftarkan sebelum *catch-all fallback* React (`*`) di `server.js`.
+
+---
+
+## 1. SKEMA DATA (MIGRASI PATCH)
+
+**File:** `server/migrations/045_unified_environment_patch.sql`
+
+```sql
+BEGIN;
+
+-- 1.1 Patch Tabel Entities
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+ALTER TABLE entities DROP CONSTRAINT IF EXISTS entities_org_id_entity_type_key;
+ALTER TABLE entities ADD CONSTRAINT entities_org_id_env_type_key UNIQUE(org_id, environment, entity_type);
+
+-- 1.2 Patch Tabel Escrow Accounts
+ALTER TABLE escrow_accounts ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+
+-- 1.3 Patch Tabel Outcome Contracts
+ALTER TABLE outcome_contracts ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+
+-- 1.4 Patch Tabel Cognitive Snapshots (Dari PRD 1.7)
+ALTER TABLE cognitive_snapshots ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';
+
+-- 1.5 Aktifkan RLS (Row Level Security) pada tabel yang baru di-patch
+ALTER TABLE entities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE escrow_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE outcome_contracts ENABLE ROW LEVEL SECURITY;
+
+-- 1.6 Buat Policy RLS
+CREATE POLICY entities_env_isolation ON entities FOR ALL USING (environment = current_setting('app.current_environment', true)::environment_type);
+CREATE POLICY escrow_env_isolation ON escrow_accounts FOR ALL USING (environment = current_setting('app.current_environment', true)::environment_type);
+CREATE POLICY contracts_env_isolation ON outcome_contracts FOR ALL USING (environment = current_setting('app.current_environment', true)::environment_type);
+
+COMMIT;
+```
+
+---
+
+## 2. SERVICE LAYER PATCH
+
+Setiap service yang menangani tabel di atas **wajib** menerima parameter `environment` dan memfilternya di query.
+
+**File:** `server/src/services/entity_service.js` (Contoh)
+```javascript
+// WAJIB: Tambahkan parameter environment
+export async function listEntities(orgId, environment) {
+  // WAJIB: Tambahkan filter environment di WHERE
+  const result = await pool.query(
+    `SELECT * FROM entities WHERE org_id = $1 AND environment = $2`,
+    [orgId, environment]
+  );
+  return result.rows;
+}
+```
+
+---
+
+## 3. PERBAIKAN COVERAGE (MENGATASI AI HANG)
+
+**File:** `package.json` (Modifikasi)
+
+**Hapus script lama:** 
+`c8 --check-coverage --lines 100 ...`
+
+**Ganti dengan script baru yang terbagi dua:**
+```json
+"scripts": {
+  "test:unit": "node --test server/test/unit/",
+  "test:coverage": "c8 --check-coverage --lines 90 --functions 90 --branches 90 --statements 90 --include 'shared/request-hash.js' --include 'shared/fail-closed.js' --include 'shared/state-machine.js' --include 'server/src/services/entity_service.js' node --test server/test/unit/",
+  "test:coverage:money": "c8 --check-coverage --lines 100 --functions 100 --branches 100 --statements 100 --include 'server/src/services/escrow_service.js' --include 'server/src/services/ledger.js' node --test server/test/money/"
+}
+```
+*Aturan untuk AI: Jangan pernah jalankan `test:coverage:money` jika `test:coverage` (standar) belum hijau.*
+
+---
+
+## 4. PERBAIKAN ROUTING (JPL & REACT FALLBACK)
+
+**File:** `server/src/server.js` (Modifikasi)
+
+Urutan pendaftaran rute **wajib** seperti ini:
+1. Middleware Global (CORS, Helmet, JSON Parser)
+2. `environmentMiddleware`
+3. **Semua API Routes** (`/api/v1/auth`, `/api/v1/agents`, `/api/v1/jpl`, `/api/v1/ops`, dll.)
+4. **Error Handler JSON** (`app.use((err, req, res, next) => ...)`)
+5. **SPA Fallback** (`app.get('*', ...)`)
+
+Jika urutannya salah (misal SPA fallback di atas API), maka request ke `/api/v1/jpl` akan mengembalikan HTML `<!DOCTYPE html>`, yang menyebabkan error `Unexpected token '<' is not valid JSON` di frontend.
+
+---
+
+## 5. PROMPT REVISI UNTUK AI BUILDER (ZERO-HALLUCINATION)
+
+Copy-paste prompt ini ke AI Agent (Antigravity/Gemini) Anda untuk melakukan patch:
+
+```markdown
+# PROMPT REFACTORING — PRD 2.1 (Unified Architecture Patch)
+
+Kamu bertugas melakukan *patching* pada codebase PRD 2.0 yang sudah berjalan. JANGAN merusak fitur yang sudah ada. Lakukan langkah berikut secara berurutan:
+
+### TUGAS 1: Patch Skema Database
+Buat file migrasi baru: `server/migrations/045_unified_environment_patch.sql`.
+Isi dengan perintah SQL berikut:
+1. `ALTER TABLE entities ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';`
+2. Ubah constraint unique di tabel `entities` menjadi `(org_id, environment, entity_type)`.
+3. `ALTER TABLE escrow_accounts ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';`
+4. `ALTER TABLE outcome_contracts ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';`
+5. Aktifkan RLS (Row Level Security) dan buat Policy `USING (environment = current_setting('app.current_environment', true)::environment_type)` untuk ketiga tabel tersebut.
+6. Jalankan `npm run migrate`.
+
+### TUGAS 2: Refactor Service Layer
+Cari file `entity_service.js`, `escrow_service.js`, dan `outcome_contract_service.js` (atau sejenisnya).
+1. Tambahkan parameter `environment` pada setiap fungsi yang melakukan query ke tabel tersebut.
+2. Wajib tambahkan klausa `WHERE environment = $X` pada query SELECT, UPDATE, DELETE.
+
+### TUGAS 3: Perbaiki Routing Express (Fix JPL Error)
+Buka `server/src/server.js` (atau file utama Express).
+1. Pastikan route `/api/v1/*` didaftarkan SEBELUM `app.get('*', ...)`.
+2. Pastikan terdapat Error Handler JSON di bagian paling bawah (setelah API routes, sebelum SPA fallback):
+   `app.use((err, req, res, next) => { res.status(500).json({ error: err.message }); });`
+Ini akan mencegah error "Unexpected token '<' is not valid JSON" saat mengakses halaman JPL.
+
+### TUGAS 4: Longgarkan Test Coverage (PENTING AGAR TIDAK HANG)
+Buka `package.json`.
+1. Hapus script `test:coverage` yang menggunakan `--lines 100` secara global.
+2. Ganti dengan script `test:coverage` yang menggunakan `--lines 90`.
+3. Buat script terpisah `test:coverage:money` dengan `--lines 100` hanya untuk file `escrow_service.js` dan `ledger.js`.
+4. Jalankan `npm run test:coverage` (bukan yang money) untuk memastikan tidak ada error. JANGAN paksakan 100% untuk semua file.
+
+## STOP-LOSS
+Jika AI macet saat menjalankan test (karena mencari 100% coverage), hentikan paksa dengan `Ctrl+C`. Jalankan `node --test server/test/unit/` secara manual di terminal. 
+
+Selesai bila ketiga tugas di atas berhasil dan test unit berjalan tanpa hang.
+```
+
+---
+
+### Ringkasan Eksekusi
+1. Simpan prompt di atas ke dalam file `docs/PROMPTS_PRD_2.1.md`.
+2. Buka VS Code Anda, hentikan AI Agent yang sedang hang.
+3. Berikan prompt tersebut ke AI Agent Anda.
+4. Pantau terminal. Jika AI mencoba menjalankan tes dengan `c8` dan macet lagi, paksa `Ctrl+C` dan ketik manual `node --test server/test/unit/` untuk melihat hasilnya.
+
+Dengan patch ini, PRD 2.0 (yang sudah terbuild) akan selamat dari kebocoran data Sandbox/Live dan AI Anda akan terbebas dari *infinite loop* pencarian 100% coverage!
