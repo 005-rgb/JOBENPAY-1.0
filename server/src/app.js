@@ -47,6 +47,8 @@ import { createDipRouter } from './routes/dip.js';
 import { createCplRouter } from './routes/cpl.js';
 import { createJplRouter } from './routes/jpl.js';
 import { createOpsRouter } from './routes/ops.js';
+import agentsRouter from './routes/agents.js';
+import orgRouter from './routes/org.js';
 import { handleAgentTransaction } from './controllers/dip_controller.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
@@ -640,6 +642,8 @@ export function createApp() {
   api.use(createCplRouter({ requireSession }));
   api.use(createJplRouter({ requireSession }));
   api.use(createOpsRouter({ requireSession }));
+  api.use(agentsRouter);
+  api.use(orgRouter);
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,

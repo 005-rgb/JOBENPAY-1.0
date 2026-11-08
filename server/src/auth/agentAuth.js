@@ -72,6 +72,9 @@ export function createAgentAuth({
       if (stored.revoked_at) {
         throw authError('UNAUTHENTICATED', 401);
       }
+      if (stored.grace_until && new Date(stored.grace_until).getTime() < Date.now()) {
+        throw authError('UNAUTHENTICATED', 401);
+      }
       if (stored.agent_status !== 'ACTIVE') {
         throw authError('FORBIDDEN', 403);
       }

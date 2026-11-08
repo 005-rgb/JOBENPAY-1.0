@@ -79,7 +79,7 @@ export async function getAgentKeysByPrefix(prefix, db = pool) {
     throw new Error('prefix is required for API key authentication.');
   }
   const result = await db.query(
-    `SELECT keys.id, keys.org_id, keys.agent_id, keys.key_hash, keys.revoked_at,
+    `SELECT keys.id, keys.org_id, keys.agent_id, keys.key_hash, keys.revoked_at, keys.grace_until,
             agents.status AS agent_status
      FROM agent_api_keys AS keys
      JOIN agents ON agents.org_id = keys.org_id AND agents.id = keys.agent_id
