@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { compile } from '../services/jpl_compiler.js';
 import { evaluate } from '../services/jpl_evaluator.js';
-import { verify, verifySignature } from '../services/jpl_verifier.js';
+import { verify } from '../services/jpl_verifier.js';
 
 export function createJplRouter({ requireSession } = {}) {
   const router = Router();
