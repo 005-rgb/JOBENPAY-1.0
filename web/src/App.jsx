@@ -65,6 +65,7 @@ const IntentAnchorsPage = lazy(() => import('./pages/DipPages.jsx').then((p) => 
 const DipPage = lazy(() => import('./pages/DipPages.jsx').then((p) => ({ default: p.DipPage })));
 const CplPage = lazy(() => import('./pages/CplPages.jsx').then((p) => ({ default: p.CplPage })));
 const JplPage = lazy(() => import('./pages/JplPages.jsx').then((p) => ({ default: p.JplPage })));
+const OpsPage = lazy(() => import('./pages/OpsPages.jsx'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -152,6 +153,11 @@ function AuthenticatedApp() {
           <Route element={<DipPage />} path="/dip" />
           <Route element={<CplPage />} path="/cpl" />
           <Route element={<JplPage />} path="/jpl" />
+          <Route element={<OpsPage tab="overview" />} path="/ops" />
+          <Route element={<OpsPage tab="slo" />} path="/ops/slo" />
+          <Route element={<OpsPage tab="circuit-breakers" />} path="/ops/circuit-breakers" />
+          <Route element={<OpsPage tab="runbooks" />} path="/ops/runbooks" />
+          <Route element={<OpsPage tab="secrets" />} path="/ops/secrets" />
           <Route element={<ComingSoonPage />} path="*" />
         </Routes>
       </Suspense>
