@@ -1310,8 +1310,16 @@
 }
 
 /* PRD 3.0: Environment Isolation & Visual Paranoia */
+.sandboxMode {
+  border-left: 4px solid var(--jp-primary, #0070ba);
+}
+
 .sandboxMode .header {
   border-bottom: 2px solid rgba(245, 158, 11, 0.4);
+}
+
+.liveMode {
+  border-left: 4px solid var(--jp-error, #dc2626);
 }
 
 .liveMode .header {

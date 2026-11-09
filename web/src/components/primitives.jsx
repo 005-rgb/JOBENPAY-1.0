@@ -188,11 +188,12 @@ export function ToastProvider({ children }) {
   const dismiss = useCallback((id) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
-  const notify = useCallback(({ message, kind = 'success', action }) => {
+  const notify = useCallback(({ title, message, kind = 'success', action, duration }) => {
     const id = `${Date.now()}-${Math.random()}`;
-    setToasts((current) => [...current, { id, message, kind, action }]);
+    setToasts((current) => [...current, { id, title, message, kind, action }]);
     if (!action) {
-      window.setTimeout(() => dismiss(id), kind === 'error' ? 8000 : 5000);
+      const timeout = duration || (kind === 'error' ? 6000 : 5000);
+      window.setTimeout(() => dismiss(id), timeout);
     }
     return id;
   }, [dismiss]);
@@ -201,13 +202,25 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={value}>
       {children}
       <div className={styles.toastViewport} aria-live="polite" aria-relevant="additions text">
-        {toasts.map((toast) => (
-          <div className={`${styles.toast} ${toast.kind === 'error' ? styles.toastError : ''}`} key={toast.id} role={toast.kind === 'error' ? 'alert' : 'status'}>
-            <span>{toast.message}</span>
-            {toast.action ? <button type="button" onClick={toast.action.onClick}>{toast.action.label}</button> : null}
-            <button type="button" aria-label={t('app.dismiss')} onClick={() => dismiss(toast.id)}><X aria-hidden="true" /></button>
-          </div>
-        ))}
+        {toasts.map((toast) => {
+          const kindClass = toast.kind === 'error'
+            ? styles.toastError
+            : toast.kind === 'info'
+            ? styles.toastInfo
+            : toast.kind === 'warning'
+            ? styles.toastWarning
+            : '';
+          return (
+            <div className={`${styles.toast} ${kindClass}`.trim()} key={toast.id} role={toast.kind === 'error' ? 'alert' : 'status'}>
+              <div className={styles.toastContent}>
+                {toast.title ? <strong className={styles.toastTitle}>{toast.title}</strong> : null}
+                {toast.message ? <span>{toast.message}</span> : null}
+              </div>
+              {toast.action ? <button type="button" onClick={toast.action.onClick}>{toast.action.label}</button> : null}
+              <button type="button" aria-label={t('app.dismiss')} onClick={() => dismiss(toast.id)}><X aria-hidden="true" /></button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

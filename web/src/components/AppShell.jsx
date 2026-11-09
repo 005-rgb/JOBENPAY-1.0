@@ -524,6 +524,32 @@ export default function AppShell({
         : t(`app.${routeTitle}`)));
 
   const { notify } = useToast();
+
+  useEffect(() => {
+    if (isLive || environment === 'LIVE') {
+      notify({
+        title: '⚠️ LIVE MODE',
+        message: 'You are operating in the LIVE production environment. All transactions and funds are real.',
+        kind: 'error',
+        duration: 6000,
+      });
+    } else if (aiMode === 'replay') {
+      notify({
+        title: 'REPLAY MODE',
+        message: 'AI responses are currently replayed from recorded data. No real LLM is being called.',
+        kind: 'warning',
+        duration: 5000,
+      });
+    } else {
+      notify({
+        title: 'SANDBOX MODE',
+        message: 'You are operating in the SANDBOX testing environment. All transactions and funds are simulated.',
+        kind: 'info',
+        duration: 5000,
+      });
+    }
+  }, [environment, isLive, aiMode, notify]);
+
   const handleLogout = async (token) => {
     try {
       if (onLogoutProp) {
@@ -587,19 +613,11 @@ export default function AppShell({
           </div>
         </header>
         <main className={styles.mainContent}>
-          <div className={styles.globalBanners}>
-            {isLive ? (
-              <Banner kind="error" title="LIVE MODE — Real money">
-                You are operating in the LIVE production environment. All transactions and funds are real.
-              </Banner>
-            ) : (
-              <Banner kind="info" title="SANDBOX MODE">
-                You are operating in the SANDBOX testing environment. All transactions and funds are simulated.
-              </Banner>
-            )}
-            {frozen ? <Banner kind="error" title={t('app.killSwitch')}>{t('app.frozenNotice')}</Banner> : null}
-            {aiMode === 'replay' && !isLive ? <Banner className={styles.replayBanner} kind="warning" title={t('app.replayMode')} /> : null}
-          </div>
+          {frozen ? (
+            <div className={styles.globalBanners}>
+              <Banner kind="error" title={t('app.killSwitch')}>{t('app.frozenNotice')}</Banner>
+            </div>
+          ) : null}
           {children || (
             <div className={styles.emptyRoute}>
               <ShieldCheck aria-hidden="true" />

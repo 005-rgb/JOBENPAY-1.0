@@ -443,6 +443,28 @@
 
 .toastError {
   background: var(--jp-error);
+  color: var(--jp-white);
+}
+
+.toastInfo {
+  background: var(--jp-primary, #0070ba);
+  color: var(--jp-white);
+}
+
+.toastWarning {
+  background: #f59e0b;
+  color: #1c1917;
+}
+
+.toastContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toastTitle {
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .toast button {
