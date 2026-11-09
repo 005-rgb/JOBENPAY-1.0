@@ -1,0 +1,99 @@
+# SUPER PROMPT — PRD 3.0 Ultimate Implementation (Isolation, Safety & DX)
+
+Kamu bertindak sebagai Principal Full-Stack Engineer. Tugasmu adalah mengeksekusi pembaruan masif pada JOBENPAY untuk menciptakan standar Multi-Environment (Sandbox/Live) tingkat Enterprise. 
+
+Lakukan semua instruksi di bawah ini secara berurutan. JANGAN melewatkan satu langkah pun. JANGAN mengubah logika bisnis inti (Decision Engine), fokuslah pada Isolasi Environment, Keamanan, UI, dan Developer Experience.
+
+---
+
+## FASE 1: BACKEND — SECURITY & STRICT ISOLATION
+
+### Langkah 1.1: Strict Credential Prefixing (Anti-Cross-Contamination)
+1. Buka `server/src/middleware/auth.js`.
+2. Terapkan aturan validasi API Key:
+   - API Key untuk Sandbox WAJIB berawalan `jp_sbx_`.
+   - API Key untuk Live WAJIB berawalan `jp_live_`.
+3. Jika request masuk dengan header `X-Jobenpay-Environment: SANDBOX` tetapi menggunakan API Key `jp_live_`, maka tolak dengan `HTTP 400 Cross-Environment Contamination Detected`. (Dan sebaliknya).
+
+### Langkah 1.2: Environment-Specific Webhooks
+1. Buka `server/src/routes/webhooks.js`.
+2. Pisahkan endpoint webhook:
+   - Sandbox: `POST /api/v1/webhooks/sbx/paypal`
+   - Live: `POST /api/v1/webhooks/live/paypal`
+3. Pastikan Webhook Sandbox tidak bisa memicu perubahan status pada transaksi yang ada di tabel `LIVE`.
+4. Pastikan Signature HMAC untuk Live menggunakan secret yang berbeda dengan Sandbox.
+
+### Langkah 1.3: Shadow Mode (Dry-Run untuk Enterprise)
+1. Buka `server/src/services/decision_engine.js`.
+2. Tambahkan parameter `shadow_mode` (boolean) pada payload request transaksi.
+3. Jika `shadow_mode: true`:
+   - Jalankan semua evaluasi kebijakan (Mandat, DIP, CPL) menggunakan data asli dari environment yang dipilih.
+   - **PENTING:** Jika evaluasi berhasil dan masuk status `APPROVED`, JANGAN panggil `PaymentOrchestrator` (jangan kirim uang ke PayPal). 
+   - Ubah status akhir menjadi `SHADOW_COMPLETED` dan catat ke `ledger_entries` dengan flag `is_shadow: true`.
+
+---
+
+## FASE 2: BACKEND — DEVELOPER EXPERIENCE (DX)
+
+### Langkah 2.1: One-Click Sandbox Seeding (Cloning with PII Scrubber)
+1. Buat endpoint baru: `POST /api/v1/sandbox/seed`.
+2. Logika endpoint:
+   - Ambil 10 transaksi terakhir dari environment `LIVE`.
+   - Lakukan **PII Scrubbing**: Ubah nama payee menjadi "Vendor Test X", hapus/ubah nomor rekening asli menjadi dummy, ubah nominal uang menjadi angka acak kecil (misal: $10).
+   - Simpan data tiruan ini ke dalam database `SANDBOX` agar developer punya data untuk ngetes UI.
+
+### Langkah 2.2: Time-Travel Debugger (Debug Live Failures in Sandbox)
+1. Buat endpoint: `POST /api/v1/debug/time-travel/:live_tx_id`.
+2. Logika:
+   - Ambil semua state dari transaksi LIVE yang gagal (State Agen, Mandat, Error Code PayPal).
+   - Buat snapshot dari state tersebut dan inject ke dalam environment SANDBOX.
+   - Kembalikan URL/id Sandbox agar Developer bisa me-replay transaksi tersebut di Sandbox tanpa menyentuh Live.
+
+---
+
+## FASE 3: FRONTEND — UI ISOLATION & DIALOG KONFIRMASI
+
+### Langkah 3.1: Buat Komponen `EnvSwitchDialog.jsx`
+Buat file: `web/src/components/EnvSwitchDialog.jsx` menggunakan Radix UI Dialog.
+- **Target LIVE:** Warna merah. Judul "⚠️ Switch to LIVE Mode?". Ada input teks. User WAJIB mengetik `LIVE` untuk mengaktifkan tombol "Switch to LIVE". Deskripsi: "Real money. All transactions are final."
+- **Target SANDBOX:** Warna biru. Judul "Switch to SANDBOX Mode?". Tombol "Switch to SANDBOX" langsung aktif.
+
+### Langkah 3.2: Integrasi Toggle & Hard Reset
+1. Buka `web/src/components/EnvironmentToggle.jsx`.
+2. Saat user klik toggle, JANGAN langsung ubah state. Tampilkan `EnvSwitchDialog`.
+3. Jika user mengonfirmasi di dialog:
+   - `localStorage.setItem('currentEnvironment', targetEnv)`
+   - Hancurkan cache React Query: `queryClient.clear()`
+   - Lakukan hard reload: `window.location.href = '/dashboard'`
+   *(Ini memastikan tidak ada data Sandbox yang tersisa di memori saat masuk ke Live).*
+
+### Langkah 3.3: Musnahkan Kebocoran UI (Sandbox vs Live)
+Lakukan pencarian global (Grep) dan perbaiki:
+1. **Banner "REPLAY MODE":** Cari komponennya. Tambahkan `if (environment === 'LIVE') return null;`. Banner ini HANYA untuk Sandbox.
+2. **Chip Hardcode "SANDBOX":** Di `NewTransactionForm.jsx`, hapus teks hardcode. Ganti dengan `<Chip>{environment}</Chip>` agar dinamis.
+3. **Dropdown Kategori:** Di file list kategori, hapus string `+ ' (SANDBOX)'`. Filter array secara dinamis: Jika environment `LIVE`, sembunyikan kategori `FINANCING` dan `DEBIT` yang bersifat simulasi.
+
+### Langkah 3.4: Visual Paranoia (Pencegahan Fat-Finger Error)
+1. **Watermark Latar Belakang:** Di `AppLayout.jsx`, jika `environment === 'SANDBOX'`, tambahkan div overlay absolute dengan teks diagonal "SANDBOX" berwarna biru transparan (opacity 0.05, font-size besar).
+2. **Kursor Berubah:** Tambahkan CSS body: `.env-sandbox { cursor: url('blue-cursor.cur'), auto; } .env-live { cursor: url('red-cursor.cur'), auto; }`.
+3. **Delay Tombol Execute (Live Only):** 
+   - Buka tombol "Execute" atau "Submit" di form transaksi.
+   - Jika `environment === 'LIVE'`, saat tombol diklik, JANGAN langsung kirim API. Ubah teks tombol menjadi "Processing Real Money..." dan disable tombol selama **2 detik**. Setelah 2 detik, baru kirim request API.
+
+---
+
+## FASE 4: FRONTEND — DX (Seeding & Time-Travel)
+1. Di halaman Dashboard (hanya saat mode Sandbox), tambahkan tombol "Seed Sandbox Data" yang memanggil endpoint dari Langkah 2.1.
+2. Di halaman Detail Transaksi (hanya saat mode Live), jika status transaksi `FAILED`, tampilkan tombol "Debug in Sandbox". Jika diklik, panggil endpoint dari Langkah 2.2.
+
+---
+
+## DEFINITION OF DONE (UJI MANUAL WAJIB)
+Setelah AI selesai menulis kode, lakukan uji berikut:
+- [ ] Klik Live → Muncul dialog merah. Ketik "LIVE" → Reload. 
+- [ ] Di Live: Tidak ada banner Replay, chip berubah merah "LIVE", tidak ada opsi Dropdown "(SANDBOX)".
+- [ ] Di Live: Klik tombol Execute → ada jeda 2 detik dengan teks "Processing Real Money...".
+- [ ] Di Live: Kursor mouse berwarna merah.
+- [ ] Di Sandbox: Kursor biru, ada watermark "SANDBOX" di latar belakang.
+- [ ] Di Sandbox: Tombol "Seed Sandbox Data" berfungsi.
+- [ ] Gunakan API Key `jp_live_` di Postman dengan Header Sandbox → Harus ditolak 400.

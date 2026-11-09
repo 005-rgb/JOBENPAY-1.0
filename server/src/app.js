@@ -52,6 +52,8 @@ import { postWebhookHandler } from './controllers/payment_controller.js';
 import { environmentMiddleware } from './middleware/environment.js';
 import { createAgentsRouter } from './routes/agents.js';
 import { createOrgRouter } from './routes/org.js';
+import { webhooksRouter } from './routes/webhooks.js';
+import { createDxRouter, dxRouter } from './routes/dx.js';
 import { handleAgentTransaction } from './controllers/dip_controller.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
@@ -552,6 +554,8 @@ export function createApp() {
 
   app.post('/mcp', mcpOriginGuard, agentAuth, mcpHandler);
 
+  app.use('/webhooks', webhooksRouter);
+
   app.post('/webhooks/payments/:gateway', (req, res, next) => {
     postWebhookHandler(req, res, next);
   });
@@ -654,6 +658,8 @@ export function createApp() {
   api.use(createPaymentsRouter({ requireSession, requireCsrf }));
   api.use(createAgentsRouter({ requireSession }));
   api.use(createOrgRouter({ requireSession }));
+  api.use('/webhooks', webhooksRouter);
+  api.use(createDxRouter({ requireSession }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,

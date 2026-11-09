@@ -10,7 +10,7 @@ import {
   touchAgentKey,
 } from '../repositories/agents.js';
 
-const API_KEY_PATTERN = /^jp_sbx_([A-Za-z0-9_-]{8})_([A-Za-z0-9_-]{32})$/;
+const API_KEY_PATTERN = /^jp_(sbx|live)_([A-Za-z0-9_-]{8})_([A-Za-z0-9_-]{32})$/;
 
 function authError(code, statusCode) {
   const error = new AppError(
@@ -27,7 +27,8 @@ export function parseAgentApiKey(value) {
     return null;
   }
   return {
-    prefix: `jp_sbx_${match[1]}`,
+    environment: match[1] === 'live' ? 'LIVE' : 'SANDBOX',
+    prefix: `jp_${match[1]}_${match[2]}`,
     key: String(value),
   };
 }
@@ -52,6 +53,17 @@ export function createAgentAuth({
       const parsed = parseAgentApiKey(bearer?.[1]);
       if (!parsed) {
         throw authError('UNAUTHENTICATED', 401);
+      }
+
+      // Check cross-environment contamination
+      const reqEnv = req.headers?.['x-jobenpay-environment'] || req.headers?.['x-environment'] || req.get?.('x-jobenpay-environment') || req.get?.('x-environment') || req.environment;
+      if (reqEnv) {
+        const envUpper = String(reqEnv).trim().toUpperCase();
+        if ((envUpper === 'SANDBOX' && parsed.environment === 'LIVE') || (envUpper === 'LIVE' && parsed.environment === 'SANDBOX')) {
+          const err = new AppError('CROSS_ENVIRONMENT_CONTAMINATION', 'Cross-Environment Contamination Detected');
+          err.statusCode = 400;
+          throw err;
+        }
       }
 
       const actual = Buffer.from(hmacSha256(pepper, parsed.key), 'hex');

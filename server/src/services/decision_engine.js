@@ -494,6 +494,31 @@ export async function evaluateUnifiedDecision(orgId, transaction, context = {}, 
 
   // --- Tahap D: Final Decision ---
   const res = finalDecision(tahapA, tahapB, tahapC);
+  const isShadow = Boolean(transaction?.shadow_mode ?? context?.shadow_mode);
+  if (isShadow) {
+    if (res.decision === 'APPROVE') {
+      return {
+        ...res,
+        decision: 'APPROVE',
+        state: 'SHADOW_COMPLETED',
+        shadow_mode: true,
+        is_shadow: true,
+        reason_codes: [...res.reason_codes, 'SHADOW_MODE_EVALUATED'],
+        tahapA,
+        tahapB,
+        tahapC,
+      };
+    }
+    return {
+      ...res,
+      shadow_mode: true,
+      is_shadow: true,
+      tahapA,
+      tahapB,
+      tahapC,
+    };
+  }
+
   return {
     ...res,
     tahapA,

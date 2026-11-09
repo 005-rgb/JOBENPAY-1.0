@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
+  Database,
   Ellipsis,
   FileCheck,
   Minus,
@@ -22,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import BrandLoadingScreen from '../components/BrandLoadingScreen.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
 import {
@@ -34,6 +36,7 @@ import {
   FloatingSelect,
   Modal,
   StatusPill,
+  useToast,
 } from '../components/primitives.jsx';
 import logoUrl from '../assets/jobenpay-logo.svg';
 import brandMarkUrl from '../assets/jobenpay-mark.svg';
@@ -354,8 +357,26 @@ export function DashboardPage() {
   const { t } = useTranslation();
   const auth = useAuth();
   const navigate = useNavigate();
+  const { isLive } = useEnvironment();
+  const { notify } = useToast();
+  const [seeding, setSeeding] = useState(false);
+
   const summaryQuery = usePageQuery(['dashboard', 'summary'], () => apiClient.get('/dashboard/summary'));
   const { data, error, isPending, refetch } = summaryQuery;
+
+  const handleSeedSandbox = async () => {
+    setSeeding(true);
+    try {
+      const res = await apiClient.post('/sandbox/seed', {});
+      notify({ message: `Sandbox seeded with ${res.seededCount || 0} scrubbed test transactions` });
+      refetch();
+    } catch (err) {
+      notify({ message: err.message || 'Failed to seed Sandbox data', kind: 'error' });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   if (isPending) return <LoadingState />;
   if (error || !data) return <PageError error={error} onRetry={refetch} />;
 
@@ -409,9 +430,24 @@ export function DashboardPage() {
           <p>{t('app.dashboardBudget')}</p>
           <strong>{formatMinor(data.remainingBudgetMinor, data.currency)}</strong>
         </div>
-        <Button className={styles.budgetAction} onClick={() => navigate('/mandates')} variant="secondary">
-          {t('app.manageMandates')} <ChevronDown aria-hidden="true" />
-        </Button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {!isLive && (
+            <Button
+              onClick={handleSeedSandbox}
+              loading={seeding}
+              variant="secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              title="Seed Sandbox with scrubbed test transactions"
+              data-testid="seed-sandbox-btn"
+            >
+              <Database size={16} />
+              Seed Sandbox Data
+            </Button>
+          )}
+          <Button className={styles.budgetAction} onClick={() => navigate('/mandates')} variant="secondary">
+            {t('app.manageMandates')} <ChevronDown aria-hidden="true" />
+          </Button>
+        </div>
       </section>
       <BrandCard auth={auth} data={data} setupCards={setupCards} t={t} />
       {['OWNER', 'ADMIN', 'JUDGE'].includes(auth.role) && data.aiDailyUsage?.warning ? (

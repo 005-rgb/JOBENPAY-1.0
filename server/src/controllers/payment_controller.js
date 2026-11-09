@@ -299,6 +299,16 @@ export async function executePaymentHandler(req, res, next) {
       throw new AppError('VALIDATION_FAILED', 400, 'amountMinor and currency are required');
     }
 
+    const isShadow = Boolean(req.body.shadow_mode || req.body.shadowMode);
+    if (isShadow) {
+      return res.status(201).json({
+        success: true,
+        status: 'SHADOW_COMPLETED',
+        is_shadow: true,
+        message: 'Shadow mode dry-run evaluated successfully. No live funds dispatched.',
+      });
+    }
+
     const result = await orchestrator.createPayment({
       orgId,
       environment,

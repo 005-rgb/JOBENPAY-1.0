@@ -31,6 +31,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import {
   TRANSACTION_CATEGORIES,
   CATEGORY_SUBTYPES,
@@ -54,12 +55,26 @@ export function NewTransactionPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isLive } = useEnvironment();
+  const [isDelayingLive, setIsDelayingLive] = useState(false);
+  const delayTimerRef = React.useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
+    };
+  }, []);
 
   // Category and Sub-Type Initialization
   const initialCategory = searchParams.get('category')?.toUpperCase();
   const validCategory = TRANSACTION_CATEGORIES.includes(initialCategory) ? initialCategory : 'PAYOUT';
 
-  const [category, setCategory] = useState(validCategory);
+  const [category, setCategory] = useState(() => {
+    if (isLive && (validCategory === 'FINANCING' || validCategory === 'DEBIT')) {
+      return 'PAYOUT';
+    }
+    return validCategory;
+  });
   const [subType, setSubType] = useState(() => (CATEGORY_SUBTYPES[validCategory] || ['standard'])[0]);
 
   // Common Fields
@@ -299,8 +314,23 @@ export function NewTransactionPage() {
       agentReason: agentReason || undefined,
     };
 
-    createMutation.mutate(payload);
+    if (isLive) {
+      setIsDelayingLive(true);
+      delayTimerRef.current = setTimeout(() => {
+        setIsDelayingLive(false);
+        createMutation.mutate(payload);
+      }, 2000);
+    } else {
+      createMutation.mutate(payload);
+    }
   };
+
+  const visibleCategories = TRANSACTION_CATEGORIES.filter((cat) => {
+    if (isLive && (cat === 'FINANCING' || cat === 'DEBIT')) {
+      return false;
+    }
+    return true;
+  });
 
   const currentSubTypes = CATEGORY_SUBTYPES[category] || ['standard'];
   const provider = CATEGORY_PROVIDERS[category] || 'SANDBOX';
@@ -325,7 +355,12 @@ export function NewTransactionPage() {
               Propose an intent across 15 categories with policy gates & balanced double-entry ledger verification.
             </p>
           </div>
-          <ProviderBadge provider={provider} />
+          <span
+            className={`${styles.providerBadge} ${isLive ? styles.badgeFailed : styles.badgeSandbox}`}
+            style={{ fontWeight: 700, padding: '4px 12px', fontSize: '12px' }}
+          >
+            {isLive ? 'LIVE' : 'SANDBOX'}
+          </span>
         </div>
 
         {/* Form Body */}
@@ -349,9 +384,9 @@ export function NewTransactionPage() {
                 className={styles.fieldSelect}
                 data-testid="category-select"
               >
-                {TRANSACTION_CATEGORIES.map((cat) => (
+                {visibleCategories.map((cat) => (
                   <option key={cat} value={cat}>
-                    {cat} ({CATEGORY_PROVIDERS[cat] || 'SANDBOX'})
+                    {cat}
                   </option>
                 ))}
               </select>
@@ -1042,16 +1077,31 @@ export function NewTransactionPage() {
 
           {/* Action Buttons */}
           <div className={styles.formActions}>
-            <Link to="/transactions" className={styles.secondaryLink}>
+            <Link
+              to="/transactions"
+              className={styles.secondaryLink}
+              onClick={() => {
+                if (delayTimerRef.current) {
+                  clearTimeout(delayTimerRef.current);
+                  setIsDelayingLive(false);
+                }
+              }}
+            >
               Cancel
             </Link>
             <button
               type="submit"
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || isDelayingLive}
               className={styles.primaryLink}
               data-testid="submit-transaction-btn"
+              style={isLive ? { backgroundColor: '#dc2626', borderColor: '#b91c1c' } : {}}
             >
-              {createMutation.isPending ? (
+              {isDelayingLive ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} />
+                  Processing Real Money... (Hold to cancel)
+                </>
+              ) : createMutation.isPending ? (
                 <>
                   <Loader2 className="animate-spin" size={16} />
                   Submitting Proposal...

@@ -99,3 +99,49 @@ test('agent API rate limit permits 60 requests per key per minute and rejects th
   for (let attempt = 0; attempt < 60; attempt += 1) assert.equal(await invoke(), null);
   assert.equal((await invoke()).statusCode, 429);
 });
+
+test('Langkah 1.1: rejects cross-environment contamination between Sandbox and Live', async () => {
+  const liveKey = createAgentApiKey('LIVE');
+  assert.ok(liveKey.apiKey.startsWith('jp_live_'));
+
+  const sbxKey = createAgentApiKey('SANDBOX');
+  assert.ok(sbxKey.apiKey.startsWith('jp_sbx_'));
+
+  const middleware = createAgentAuth({
+    pepper,
+    findKeys: async () => [],
+    touchKey: async () => true,
+    findOrganization: async () => ({ rows: [{ archived_at: null }] }),
+    applyRateLimit: async () => false,
+  });
+
+  // 1. Live key with Sandbox header -> rejected with 400
+  const err1 = await new Promise((resolve) => {
+    middleware({
+      get(name) {
+        if (name === 'authorization') return `Bearer ${liveKey.apiKey}`;
+        if (name === 'x-jobenpay-environment') return 'SANDBOX';
+        return '';
+      },
+      headers: { 'x-jobenpay-environment': 'SANDBOX' },
+    }, {}, resolve);
+  });
+  assert.equal(err1?.statusCode, 400);
+  assert.equal(err1?.code, 'CROSS_ENVIRONMENT_CONTAMINATION');
+  assert.equal(err1?.message, 'Cross-Environment Contamination Detected');
+
+  // 2. Sandbox key with Live header -> rejected with 400
+  const err2 = await new Promise((resolve) => {
+    middleware({
+      get(name) {
+        if (name === 'authorization') return `Bearer ${sbxKey.apiKey}`;
+        if (name === 'x-jobenpay-environment') return 'LIVE';
+        return '';
+      },
+      headers: { 'x-jobenpay-environment': 'LIVE' },
+    }, {}, resolve);
+  });
+  assert.equal(err2?.statusCode, 400);
+  assert.equal(err2?.code, 'CROSS_ENVIRONMENT_CONTAMINATION');
+  assert.equal(err2?.message, 'Cross-Environment Contamination Detected');
+});

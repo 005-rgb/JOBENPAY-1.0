@@ -32,6 +32,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '../api/client.js';
 import { useEnvironment } from '../context/EnvironmentContext.jsx';
+import EnvironmentToggle from './EnvironmentToggle.jsx';
 import wordmarkUrl from '../assets/jobenpay-logo.svg';
 import {
   Banner,
@@ -471,33 +472,7 @@ function Sidebar({ pathname, t, onNavigate, isLive, setEnvironment }) {
           <X aria-hidden="true" size={20} />
         </button>
       </div>
-      <div className={styles.sidebarEnvCard} data-testid="sidebar-env-card">
-        <div className={styles.sidebarEnvHeader}>
-          <span className={styles.sidebarEnvLabel}>{isLive ? 'MODE: LIVE' : 'MODE: SANDBOX'}</span>
-        </div>
-        <div className={styles.sidebarEnvGroup} role="group" aria-label="Environment Selection">
-          <button
-            type="button"
-            className={`${styles.sidebarEnvBtn} ${!isLive ? styles.sidebarEnvActiveSandbox : ''}`}
-            onClick={() => setEnvironment('SANDBOX')}
-            data-testid="sidebar-env-sandbox-btn"
-            aria-pressed={!isLive}
-          >
-            <span className={styles.envDotSandbox} aria-hidden="true" />
-            Sandbox
-          </button>
-          <button
-            type="button"
-            className={`${styles.sidebarEnvBtn} ${isLive ? styles.sidebarEnvActiveLive : ''}`}
-            onClick={() => setEnvironment('LIVE')}
-            data-testid="sidebar-env-live-btn"
-            aria-pressed={isLive}
-          >
-            <span className={styles.envDotLive} aria-hidden="true" />
-            Live
-          </button>
-        </div>
-      </div>
+      <EnvironmentToggle variant="sidebar" />
       <CreateMenu t={t} />
       <SideNavigation
         onNavigate={onNavigate}
@@ -566,7 +541,12 @@ export default function AppShell({
   const closeDrawer = () => setDrawerOpen(false);
 
   return (
-    <div className={`${styles.appShell} ${fixture ? styles.parityShell : ''}`}>
+    <div className={`${styles.appShell} ${fixture ? styles.parityShell : ''} ${isLive ? styles.liveMode : styles.sandboxMode}`}>
+      {!isLive ? (
+        <div className={styles.sandboxWatermark} aria-hidden="true">
+          <span>SANDBOX — NO REAL MONEY</span>
+        </div>
+      ) : null}
       {drawerOpen ? <button aria-label="Close navigation" className={styles.drawerBackdrop} onClick={closeDrawer} type="button" /> : null}
       <div className={`${styles.sidebarFrame} ${drawerOpen ? styles.sidebarOpen : ''}`}>
         <Sidebar
@@ -592,35 +572,7 @@ export default function AppShell({
             </div>
           </div>
           <div className={styles.headerActions}>
-            <div
-              className={styles.environmentSwitcher}
-              data-testid="sandbox-chip"
-              role="group"
-              aria-label="Environment Mode"
-            >
-              <button
-                type="button"
-                className={`${styles.envSwitchOption} ${!isLive ? styles.envSwitchActiveSandbox : styles.envSwitchInactive}`}
-                onClick={() => setEnvironment('SANDBOX')}
-                data-testid="env-sandbox-btn"
-                aria-pressed={!isLive}
-                title="Switch to Sandbox testing mode"
-              >
-                <span className={styles.envDotSandbox} aria-hidden="true" />
-                <span>Sandbox</span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.envSwitchOption} ${isLive ? styles.envSwitchActiveLive : styles.envSwitchInactive}`}
-                onClick={() => setEnvironment('LIVE')}
-                data-testid="env-live-btn"
-                aria-pressed={isLive}
-                title="Switch to Live production mode"
-              >
-                <span className={styles.envDotLive} aria-hidden="true" />
-                <span>Live</span>
-              </button>
-            </div>
+            <EnvironmentToggle variant="header" />
             <RouterLink aria-label={t('app.developer')} className={styles.headerIconButton} to="/developer">
               <Code2 aria-hidden="true" size={24} strokeWidth={1.5} />
             </RouterLink>
@@ -641,7 +593,7 @@ export default function AppShell({
               </Banner>
             )}
             {frozen ? <Banner kind="error" title={t('app.killSwitch')}>{t('app.frozenNotice')}</Banner> : null}
-            {aiMode === 'replay' ? <Banner className={styles.replayBanner} kind="warning" title={t('app.replayMode')} /> : null}
+            {aiMode === 'replay' && !isLive ? <Banner className={styles.replayBanner} kind="warning" title={t('app.replayMode')} /> : null}
           </div>
           {children || (
             <div className={styles.emptyRoute}>

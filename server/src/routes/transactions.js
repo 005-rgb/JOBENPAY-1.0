@@ -398,16 +398,22 @@ transactionsRouter.post('/', async (req, res, next) => {
         category === 'DEBIT' ||
         amountMinorBigInt > 100000n; // > $1000 threshold
 
-      const initialStatus = requiresApproval ? 'NEEDS_APPROVAL' : 'APPROVED';
+      const isShadow = Boolean(req.body.shadow_mode || req.body.shadowMode || metadata?.shadow_mode);
+      let initialStatus = requiresApproval ? 'NEEDS_APPROVAL' : 'APPROVED';
+      if (isShadow && initialStatus === 'APPROVED') {
+        initialStatus = 'SHADOW_COMPLETED';
+      }
 
       const enrichedMeta = {
         ...metadata,
+        shadow_mode: isShadow,
+        is_shadow: isShadow,
         agentReason: agentReason || 'Submitted via UI transaction builder',
         reasonCodes: requiresApproval
           ? (category === 'FINANCING' || category === 'DEBIT'
               ? ['TIER_C_REQUIRES_APPROVAL', 'AMOUNT_REQUIRES_APPROVAL']
               : ['AMOUNT_REQUIRES_APPROVAL'])
-          : [],
+          : (isShadow ? ['SHADOW_MODE_EVALUATED'] : []),
       };
 
       const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
@@ -473,6 +479,7 @@ transactionsRouter.post('/', async (req, res, next) => {
         type: LEDGER_TYPES.REQUEST_RECEIVED || 'INTENT_SUBMITTED',
         subjectType: 'TRANSACTION_INTENT',
         subjectId: intentRow.intent_id,
+        is_shadow: isShadow,
         payload: {
           intentId: intentRow.intent_id,
           category,
@@ -480,6 +487,7 @@ transactionsRouter.post('/', async (req, res, next) => {
           status: initialStatus,
           amountMinor: amountMinorBigInt.toString(),
           currency,
+          is_shadow: isShadow,
           actor: { kind: 'USER', id: req.user?.id || 'builder' },
         },
       });

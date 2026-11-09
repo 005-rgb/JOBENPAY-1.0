@@ -2,10 +2,12 @@ import crypto from 'node:crypto';
 
 import { hmacSha256 } from './crypto.js';
 
-export function createAgentApiKey() {
+export function createAgentApiKey(env = 'SANDBOX') {
+  const isLive = String(env).toUpperCase() === 'LIVE';
+  const prefixType = isLive ? 'jp_live' : 'jp_sbx';
   const prefixPart = crypto.randomBytes(6).toString('base64url');
   const secret = crypto.randomBytes(24).toString('base64url');
-  const prefix = `jp_sbx_${prefixPart}`;
+  const prefix = `${prefixType}_${prefixPart}`;
   const apiKey = `${prefix}_${secret}`;
   return { prefix, apiKey };
 }

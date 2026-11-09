@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
+import { useToast } from '../components/primitives.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
 import { DipDisplayCard } from './DipPages.jsx';
 import { CplDisplayCard } from './CplPages.jsx';
@@ -68,6 +70,28 @@ export function TransactionDetailPage() {
   const { t } = useTranslation();
   const auth = useAuth();
   const queryClient = useQueryClient();
+  const { isLive, setEnvironment } = useEnvironment();
+  const { notify } = useToast();
+  const [debugging, setDebugging] = useState(false);
+
+  const handleTimeTravelDebug = async () => {
+    setDebugging(true);
+    try {
+      const res = await apiClient.post(`/debug/time-travel/${id}`, {});
+      notify({ message: 'Transaction cloned to Sandbox. Redirecting to Sandbox replay...' });
+      try {
+        localStorage.setItem('currentEnvironment', 'SANDBOX');
+        localStorage.setItem('jobenpay_environment', 'SANDBOX');
+      } catch {}
+      setEnvironment('SANDBOX');
+      setTimeout(() => {
+        window.location.href = res.replay_url || `/transactions/${res.sandbox_intent_id}`;
+      }, 500);
+    } catch (err) {
+      notify({ message: err.message || 'Time-Travel debug failed', kind: 'error' });
+      setDebugging(false);
+    }
+  };
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'legs' | 'sar' | 'reconciliation'
   const [proofUrl, setProofUrl] = useState(null);
@@ -196,9 +220,36 @@ export function TransactionDetailPage() {
             <ProviderBadge provider={intent.provider} />
             <StatusPill status={intent.status} />
           </div>
-          <span className={styles.mono} style={{ fontSize: '12px', color: 'var(--jp-text-muted)' }}>
-            Intent: {intent.intent_id}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {isLive && intent.status === 'FAILED' && (
+              <button
+                type="button"
+                onClick={handleTimeTravelDebug}
+                disabled={debugging}
+                className={styles.secondaryButton}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#eff6ff',
+                  borderColor: '#93c5fd',
+                  color: '#1d4ed8',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  padding: '6px 12px',
+                  cursor: 'pointer',
+                  borderRadius: '4px',
+                }}
+                data-testid="debug-sandbox-btn"
+              >
+                <RefreshCw size={14} className={debugging ? 'animate-spin' : ''} />
+                {debugging ? 'Cloning to Sandbox...' : 'Debug in Sandbox (Time-Travel)'}
+              </button>
+            )}
+            <span className={styles.mono} style={{ fontSize: '12px', color: 'var(--jp-text-muted)' }}>
+              Intent: {intent.intent_id}
+            </span>
+          </div>
         </div>
 
         {/* Amount & Key Metrics */}
