@@ -2,14 +2,8 @@
 -- PRD 3.0 (REVISI 2.0) — JOBENPAY Multi-Environment Architecture
 -- Perfect Isolation: Global Entities vs. Environment-Specific Entities
 
-BEGIN;
-
--- 1.0 Ensure environment_type enum includes LIVE
-DO $$ BEGIN
-  ALTER TYPE environment_type ADD VALUE IF NOT EXISTS 'LIVE';
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
-END $$;
+-- 1.0 Ensure environment_type enum includes LIVE (executed outside transaction block in PostgreSQL)
+ALTER TYPE environment_type ADD VALUE IF NOT EXISTS 'LIVE';
 
 -- 2.1 Bersihkan Skema Lama: Drop kolom environment dari tabel Global
 ALTER TABLE organizations DROP COLUMN IF EXISTS environment;
@@ -85,5 +79,3 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_check_agent_environment ON transaction_intents;
 CREATE TRIGGER trg_check_agent_environment BEFORE INSERT OR UPDATE ON transaction_intents
 FOR EACH ROW EXECUTE PROCEDURE check_agent_environment();
-
-COMMIT;

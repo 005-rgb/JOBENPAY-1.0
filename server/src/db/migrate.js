@@ -81,10 +81,31 @@ export async function runMigrations(connectionString = env.DATABASE_URL) {
         continue;
       }
 
+      // PostgreSQL melarang ALTER TYPE ... ADD VALUE di dalam transaction block pada versi < 17.
+      // Eksekusi statement enum tersebut di luar BEGIN ... COMMIT.
+      const alterTypeRegex = /ALTER\s+TYPE\s+[^;]+ADD\s+VALUE[^;]+;?/gi;
+      const alterTypeStatements = sql.match(alterTypeRegex);
+      if (alterTypeStatements) {
+        for (const stmt of alterTypeStatements) {
+          try {
+            await client.query(stmt);
+          } catch (err) {
+            if (!/already exists|duplicate_object|42710/i.test(err.message)) {
+              throw err;
+            }
+          }
+        }
+      }
+
+      let cleanSql = alterTypeStatements ? sql.replace(alterTypeRegex, '') : sql;
+      cleanSql = cleanSql.replace(/^\s*BEGIN\s*;\s*$/gim, '').replace(/^\s*COMMIT\s*;\s*$/gim, '');
+
       // Migrasi baru: terapkan dalam transaksi
       await client.query('BEGIN');
       try {
-        await client.query(sql);
+        if (cleanSql.trim()) {
+          await client.query(cleanSql);
+        }
         await client.query(
           'INSERT INTO schema_migrations (filename, checksum, applied_at) VALUES ($1, $2, now())',
           [file, checksum]
