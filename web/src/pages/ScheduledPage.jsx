@@ -24,10 +24,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import styles from './TransactionPages.module.css';
 
 export function ScheduledPage({ scheduleId = null }) {
   const { t } = useTranslation();
+  const { environment, isLive } = useEnvironment();
   const [cancellingId, setCancellingId] = useState(null);
   const [actionSuccess, setActionSuccess] = useState('');
   const [actionError, setActionError] = useState('');
@@ -39,7 +41,7 @@ export function ScheduledPage({ scheduleId = null }) {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['scheduled'],
+    queryKey: ['scheduled', environment],
     queryFn: async () => {
       try {
         const res = await apiClient.get('/scheduled');

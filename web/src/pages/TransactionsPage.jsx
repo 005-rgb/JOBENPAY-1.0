@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import { TRANSACTION_CATEGORIES, TRANSACTION_STATUSES, CATEGORY_PROVIDERS } from '../../../shared/transaction.js';
 import styles from './TransactionPages.module.css';
 
@@ -88,6 +89,7 @@ export function ProviderBadge({ provider }) {
 
 export function TransactionsPage() {
   const { t } = useTranslation();
+  const { environment, isLive } = useEnvironment();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const selectedCategories = useMemo(() => {
@@ -110,7 +112,7 @@ export function TransactionsPage() {
   queryParams.set('limit', '100');
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['transactions', queryParams.toString()],
+    queryKey: ['transactions', queryParams.toString(), environment],
     queryFn: async () => {
       try {
         const res = await apiClient.get(`/transactions?${queryParams.toString()}`);

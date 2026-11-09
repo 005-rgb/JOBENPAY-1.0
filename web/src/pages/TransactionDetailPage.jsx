@@ -70,7 +70,7 @@ export function TransactionDetailPage() {
   const { t } = useTranslation();
   const auth = useAuth();
   const queryClient = useQueryClient();
-  const { isLive, setEnvironment } = useEnvironment();
+  const { environment, isLive, setEnvironment } = useEnvironment();
   const { notify } = useToast();
   const [debugging, setDebugging] = useState(false);
 
@@ -119,7 +119,7 @@ export function TransactionDetailPage() {
   const [actionError, setActionError] = useState('');
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['transaction', id],
+    queryKey: ['transaction', id, environment],
     queryFn: async () => {
       return apiClient.get(`/transactions/${id}`);
     },
@@ -137,7 +137,8 @@ export function TransactionDetailPage() {
     onSuccess: async () => {
       setActionError('');
       setDecisionComment('');
-      await queryClient.invalidateQueries({ queryKey: ['transaction', id] });
+      await queryClient.invalidateQueries({ queryKey: ['transaction', id, environment] });
+      await queryClient.invalidateQueries({ queryKey: ['transactions', environment] });
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
     onError: (err) => {

@@ -6,6 +6,7 @@ import { safePolicy } from '@shared/policy.schema.js';
 
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
 import {
   Banner,
@@ -71,14 +72,16 @@ const WEEKDAYS = [
 ];
 
 function usePageQuery(queryKey, queryFn, { active = false, enabled = true } = {}) {
+  const { environment } = useEnvironment();
   const [visible, setVisible] = useState(document.visibilityState === 'visible');
   useEffect(() => {
     const updateVisibility = () => setVisible(document.visibilityState === 'visible');
     document.addEventListener('visibilitychange', updateVisibility);
     return () => document.removeEventListener('visibilitychange', updateVisibility);
   }, []);
+  const enrichedKey = Array.isArray(queryKey) ? [...queryKey, environment] : [queryKey, environment];
   return useQuery({
-    queryKey,
+    queryKey: enrichedKey,
     queryFn,
     enabled,
     refetchInterval: visible ? (active ? 3000 : 15000) : false,

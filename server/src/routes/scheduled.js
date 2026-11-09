@@ -49,12 +49,13 @@ scheduledRouter.post('/', async (req, res, next) => {
     }
 
     const amountMinorBigInt = BigInt(amountMinor);
+    const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const result = await withTx(async (tx) => {
       // Check existing idempotency key
       const existing = await tx.query(
-        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2',
-        [orgId, idempotencyKey]
+        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2 AND environment = $3',
+        [orgId, idempotencyKey, targetEnv]
       );
       if (existing.rowCount > 0) {
         const row = existing.rows[0];
@@ -88,17 +89,18 @@ scheduledRouter.post('/', async (req, res, next) => {
         INSERT INTO transaction_intents (
           org_id, agent_id, category, sub_type, status,
           amount_minor, currency, counterparty_id, mandate_version_id,
-          request_hash, idempotency_key, metadata
+          request_hash, idempotency_key, metadata, environment
         ) VALUES (
           $1, $2, 'SCHEDULED', $3, 'SCHEDULED',
           $4, $5, $6, $7,
-          $8, $9, $10
+          $8, $9, $10, $11
         ) RETURNING *
       `, [
         orgId, agentId, subType,
         amountMinorBigInt.toString(), currency, counterpartyId || null, mandateVersionId,
         requestHash, idempotencyKey,
         JSON.stringify({ scheduledAt, recipientEmail, description }),
+        targetEnv,
       ]);
 
       const intent = insertIntent.rows[0];
@@ -133,16 +135,17 @@ scheduledRouter.get('/', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const { rows } = await query(`
       SELECT i.intent_id, i.org_id, i.category, i.sub_type, i.status, i.amount_minor, i.currency,
              i.counterparty_id, i.metadata, r.scheduled_at, r.status AS run_status, r.fired_at
       FROM transaction_intents i
       LEFT JOIN scheduled_runs r ON i.intent_id = r.intent_id
-      WHERE i.org_id = $1 AND i.category = 'SCHEDULED'
+      WHERE i.org_id = $1 AND i.category = 'SCHEDULED' AND i.environment = $2
       ORDER BY i.created_at DESC
       LIMIT 100
-    `, [orgId]);
+    `, [orgId, env]);
 
     res.json({ scheduled: rows });
   } catch (err) {
@@ -154,13 +157,14 @@ scheduledRouter.post('/:id/cancel', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const { id } = req.params;
 
     const result = await withTx(async (tx) => {
       const intentRes = await tx.query(
-        'SELECT * FROM transaction_intents WHERE org_id = $1 AND intent_id = $2 FOR UPDATE',
-        [orgId, id]
+        'SELECT * FROM transaction_intents WHERE org_id = $1 AND intent_id = $2 AND environment = $3 FOR UPDATE',
+        [orgId, id, env]
       );
       if (intentRes.rowCount === 0) {
         throw new AppError('NOT_FOUND', 'Scheduled intent not found', 404);

@@ -43,14 +43,16 @@ import brandMarkUrl from '../assets/jobenpay-mark.svg';
 import styles from './FeaturePages.module.css';
 
 function usePageQuery(queryKey, queryFn, { active = false } = {}) {
+  const { environment } = useEnvironment();
   const [visible, setVisible] = useState(document.visibilityState === 'visible');
   useEffect(() => {
     const updateVisibility = () => setVisible(document.visibilityState === 'visible');
     document.addEventListener('visibilitychange', updateVisibility);
     return () => document.removeEventListener('visibilitychange', updateVisibility);
   }, []);
+  const enrichedKey = Array.isArray(queryKey) ? [...queryKey, environment] : [queryKey, environment];
   return useQuery({
-    queryKey,
+    queryKey: enrichedKey,
     queryFn,
     refetchInterval: visible ? (active ? 3000 : 15000) : false,
     refetchIntervalInBackground: false,

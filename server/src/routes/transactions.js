@@ -139,6 +139,7 @@ transactionsRouter.get('/:id', async (req, res, next) => {
   try {
     const orgId = resolveOrgId(req);
     const { id } = req.params;
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || req.query?.environment || 'SANDBOX').toUpperCase();
 
     // Load intent
     const intentResult = await query(
@@ -150,8 +151,8 @@ transactionsRouter.get('/:id', async (req, res, next) => {
          p.trust AS counterparty_status
        FROM transaction_intents ti
        LEFT JOIN payees p ON p.id = ti.counterparty_id AND p.org_id = ti.org_id
-       WHERE ti.org_id = $1 AND ti.intent_id = $2`,
-      [orgId, id]
+       WHERE ti.org_id = $1 AND ti.intent_id = $2 AND ti.environment = $3`,
+      [orgId, id, env]
     );
 
     if (intentResult.rowCount === 0) {
@@ -368,11 +369,13 @@ transactionsRouter.post('/', async (req, res, next) => {
     const agentId = req.agent?.id || '00000000-0000-4000-8000-000000000001';
     const mandateVersionId = req.mandate?.versionId || '00000000-0000-4000-8000-000000000001';
 
+    const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
+
     const result = await withTx(async (tx) => {
       // 1. Idempotency check
       const existing = await tx.query(
-        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2',
-        [orgId, idempotencyKey]
+        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2 AND environment = $3',
+        [orgId, idempotencyKey, targetEnv]
       );
       if (existing.rowCount > 0) {
         const row = existing.rows[0];
@@ -385,6 +388,17 @@ transactionsRouter.post('/', async (req, res, next) => {
           throw new AppError('IDEMPOTENCY_KEY_REUSED', 'Idempotency key reused with different payload', 422);
         }
         return { intent: row, replayed: true };
+      }
+
+      // 1b. Parent intent environment validation
+      if (parentIntentId) {
+        const parentCheck = await tx.query(
+          'SELECT environment FROM transaction_intents WHERE org_id = $1 AND intent_id = $2',
+          [orgId, parentIntentId]
+        );
+        if (parentCheck.rowCount > 0 && parentCheck.rows[0].environment !== targetEnv) {
+          throw new AppError('CROSS_ENVIRONMENT_REFERENCE_BLOCKED', 'Parent transaction belongs to a different environment.', 400);
+        }
       }
 
       // 2. Compute request_hash
@@ -415,8 +429,6 @@ transactionsRouter.post('/', async (req, res, next) => {
               : ['AMOUNT_REQUIRES_APPROVAL'])
           : (isShadow ? ['SHADOW_MODE_EVALUATED'] : []),
       };
-
-      const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
       // 4. Insert transaction intent
       const inserted = await tx.query(

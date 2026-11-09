@@ -24,6 +24,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import { StatusPill, ProviderBadge } from './TransactionsPage.jsx';
 import styles from './TransactionPages.module.css';
 
@@ -57,6 +58,7 @@ export function PayoutPage({ payoutId = null }) {
   const { t } = useTranslation();
   const params = useParams();
   const effectiveId = payoutId || params.id;
+  const { environment, isLive } = useEnvironment();
 
   // Single payout query
   const {
@@ -65,7 +67,7 @@ export function PayoutPage({ payoutId = null }) {
     isError: isSingleError,
     error: singleError,
   } = useQuery({
-    queryKey: ['payout', effectiveId],
+    queryKey: ['payout', effectiveId, environment],
     queryFn: async () => {
       if (!effectiveId) return null;
       return apiClient.get(`/payouts/${effectiveId}`);
@@ -82,7 +84,7 @@ export function PayoutPage({ payoutId = null }) {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['payouts-list'],
+    queryKey: ['payouts-list', environment],
     queryFn: async () => {
       try {
         const res = await apiClient.get('/transactions?category=PAYOUT&limit=50');
@@ -140,8 +142,8 @@ export function PayoutPage({ payoutId = null }) {
       <div className={styles.pageStack} data-testid="payout-detail">
         <div className={styles.calculationCard} style={{ margin: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-            <strong style={{ color: 'var(--jp-blue-dark)' }}>SANDBOX ONLY</strong>
-            <span style={{ color: 'var(--jp-text-muted)' }}>Testing Environment — No real money movement</span>
+            <strong style={{ color: 'var(--jp-blue-dark)' }}>{isLive ? 'LIVE ENVIRONMENT' : 'SANDBOX ONLY'}</strong>
+            <span style={{ color: 'var(--jp-text-muted)' }}>{isLive ? 'Real money movement' : 'Testing Environment — No real money movement'}</span>
           </div>
         </div>
 

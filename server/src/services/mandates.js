@@ -85,14 +85,20 @@ export async function addMandateVersion(tx, { orgId, mandateId, policy, purposeT
   return publicPolicyRow(version.rows[0]);
 }
 
-export async function getMandate(orgId, mandateId, db = query) {
+export async function getMandate(orgId, mandateId, db = query, environment = null) {
+  const conditions = ['m.org_id = $1', 'm.id = $2'];
+  const params = [orgId, mandateId];
+  if (environment) {
+    conditions.push('m.environment = $3');
+    params.push(String(environment).toUpperCase());
+  }
   const result = await db(
     `SELECT m.*, v.id AS version_id, v.version, v.purpose_text, v.policy, v.policy_canonical,
             v.policy_hash, v.signature, v.signing_kid, v.activated_by, v.activated_at,
             v.valid_from, v.valid_to, v.prompt_version, v.created_at AS version_created_at
      FROM mandates m LEFT JOIN mandate_versions v ON v.id = m.current_version_id
-     WHERE m.org_id = $1 AND m.id = $2 LIMIT 1`,
-    [orgId, mandateId],
+     WHERE ${conditions.join(' AND ')} LIMIT 1`,
+    params,
   );
   if (!result.rows[0]) return null;
   const row = result.rows[0];

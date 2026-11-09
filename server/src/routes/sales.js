@@ -38,12 +38,13 @@ salesRouter.post('/', async (req, res, next) => {
 
     const { amountMinor, currency, counterpartyId, buyerEmail, description } = parsed.data;
     const amountMinorBigInt = BigInt(amountMinor);
+    const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const result = await withTx(async (tx) => {
       // Check existing idempotency key
       const existing = await tx.query(
-        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2',
-        [orgId, idempotencyKey]
+        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2 AND environment = $3',
+        [orgId, idempotencyKey, targetEnv]
       );
       if (existing.rowCount > 0) {
         const row = existing.rows[0];
@@ -60,16 +61,17 @@ salesRouter.post('/', async (req, res, next) => {
         INSERT INTO transaction_intents (
           org_id, agent_id, category, sub_type, status,
           amount_minor, currency, counterparty_id, mandate_version_id,
-          request_hash, idempotency_key, metadata
+          request_hash, idempotency_key, metadata, environment
         ) VALUES (
           $1, $2, 'SALE', 'standard', 'SUBMITTED',
           $3, $4, $5, $6,
-          $7, $8, $9
+          $7, $8, $9, $10
         ) RETURNING *
       `, [
         orgId, agentId, amountMinorBigInt.toString(), currency, counterpartyId || null, mandateVersionId,
         `hash_sale_${idempotencyKey}`, idempotencyKey,
-        JSON.stringify({ buyerEmail: buyerEmail || null, description: description || null })
+        JSON.stringify({ buyerEmail: buyerEmail || null, description: description || null }),
+        targetEnv
       ]);
 
       return { row: inserted.rows[0], replayed: false };
@@ -95,14 +97,15 @@ salesRouter.get('/', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const result = await query(
       `SELECT ti.*, COALESCE(p.display_name, p.identifier_masked, 'Customer Checkout') AS counterparty_name
        FROM transaction_intents ti
        LEFT JOIN payees p ON p.id = ti.counterparty_id AND p.org_id = ti.org_id
-       WHERE ti.org_id = $1 AND ti.category = 'SALE'
+       WHERE ti.org_id = $1 AND ti.category = 'SALE' AND ti.environment = $2
        ORDER BY ti.created_at DESC LIMIT 100`,
-      [orgId]
+      [orgId, env]
     );
 
     const rows = result.rows.map(r => ({ ...r, amount_minor: r.amount_minor?.toString() }));
@@ -120,11 +123,12 @@ salesRouter.get('/:id', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const { id } = req.params;
     const result = await query(
-      'SELECT * FROM transaction_intents WHERE org_id = $1 AND intent_id = $2 AND category = $3',
-      [orgId, id, 'SALE']
+      'SELECT * FROM transaction_intents WHERE org_id = $1 AND intent_id = $2 AND category = $3 AND environment = $4',
+      [orgId, id, 'SALE', env]
     );
 
     if (result.rowCount === 0) {

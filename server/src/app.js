@@ -660,7 +660,7 @@ export function createApp() {
   api.use(createAgentsRouter({ requireSession }));
   api.use(createOrgRouter({ requireSession }));
   api.use('/webhooks', webhooksRouter);
-  api.use(createDxRouter({ requireSession }));
+  api.use(createDxRouter({ requireSession, requireCsrf }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,
@@ -1178,7 +1178,7 @@ export function createApp() {
   api.post('/mandates/draft-from-text', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const agent = await getAgent(orgId, req.body?.agentId);
+      const agent = await getAgent(orgId, req.body?.agentId, undefined, req.environment || null);
       if (!agent || typeof req.body?.purposeText !== 'string' || !req.body.purposeText.trim()) {
         throw buildError('VALIDATION_FAILED', 'agentId and purposeText are required.', 400);
       }
@@ -1233,7 +1233,7 @@ export function createApp() {
 
   api.get('/mandates/:id', requireSession, async (req, res, next) => {
     try {
-      const mandate = await getMandate(req.session.current_org_id || GLOBAL_ORG_ID, req.params.id);
+      const mandate = await getMandate(req.session.current_org_id || GLOBAL_ORG_ID, req.params.id, undefined, req.environment || null);
       if (!mandate) throw buildError('NOT_FOUND', 'Mandate not found.', 404);
       return res.status(200).json({ mandate });
     } catch (error) {
@@ -1602,7 +1602,7 @@ export function createApp() {
       }
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       const rotated = await withTx(async (tx) => {
-        const agent = await getAgent(orgId, req.params.id, tx);
+        const agent = await getAgent(orgId, req.params.id, tx, req.environment || null);
         if (!agent) {
           throw buildError('NOT_FOUND', 'Agent not found.', 404);
         }

@@ -24,6 +24,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import { StatusPill, ProviderBadge } from './TransactionsPage.jsx';
 import styles from './TransactionPages.module.css';
 
@@ -57,6 +58,7 @@ export function PartialPage({ partialId = null }) {
   const { t } = useTranslation();
   const params = useParams();
   const effectiveId = partialId || params.id;
+  const { environment, isLive } = useEnvironment();
 
   // Single partial capture query
   const {
@@ -65,7 +67,7 @@ export function PartialPage({ partialId = null }) {
     isError: isSingleError,
     error: singleError,
   } = useQuery({
-    queryKey: ['partial', effectiveId],
+    queryKey: ['partial', effectiveId, environment],
     queryFn: async () => {
       if (!effectiveId) return null;
       return apiClient.get(`/partials/${effectiveId}`);
@@ -82,7 +84,7 @@ export function PartialPage({ partialId = null }) {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['partials-list'],
+    queryKey: ['partials-list', environment],
     queryFn: async () => {
       try {
         const res = await apiClient.get('/transactions?category=PARTIAL&limit=50');
@@ -140,8 +142,8 @@ export function PartialPage({ partialId = null }) {
       <div className={styles.pageStack} data-testid="partial-detail">
         <div className={styles.calculationCard} style={{ margin: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-            <strong style={{ color: 'var(--jp-blue-dark)' }}>SANDBOX MULTI-CAPTURE</strong>
-            <span style={{ color: 'var(--jp-text-muted)' }}>Testing Environment — Cumulative Remaining Balance Tracking</span>
+            <strong style={{ color: 'var(--jp-blue-dark)' }}>{isLive ? 'LIVE' : 'SANDBOX'} MULTI-CAPTURE</strong>
+            <span style={{ color: 'var(--jp-text-muted)' }}>{isLive ? 'Live Environment' : 'Testing Environment'} — Cumulative Remaining Balance Tracking</span>
           </div>
         </div>
 

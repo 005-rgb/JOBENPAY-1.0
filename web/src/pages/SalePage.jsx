@@ -24,6 +24,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import { StatusPill, ProviderBadge } from './TransactionsPage.jsx';
 import styles from './TransactionPages.module.css';
 
@@ -57,6 +58,7 @@ export function SalePage({ saleId = null }) {
   const { t } = useTranslation();
   const params = useParams();
   const effectiveId = saleId || params.id;
+  const { environment, isLive } = useEnvironment();
 
   // Single sale query
   const {
@@ -65,7 +67,7 @@ export function SalePage({ saleId = null }) {
     isError: isSingleError,
     error: singleError,
   } = useQuery({
-    queryKey: ['sale', effectiveId],
+    queryKey: ['sale', effectiveId, environment],
     queryFn: async () => {
       if (!effectiveId) return null;
       return apiClient.get(`/sales/${effectiveId}`);
@@ -82,7 +84,7 @@ export function SalePage({ saleId = null }) {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['sales-list'],
+    queryKey: ['sales-list', environment],
     queryFn: async () => {
       try {
         const res = await apiClient.get('/transactions?category=SALE&limit=50');
@@ -140,8 +142,8 @@ export function SalePage({ saleId = null }) {
       <div className={styles.pageStack} data-testid="sale-detail">
         <div className={styles.calculationCard} style={{ margin: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-            <strong style={{ color: 'var(--jp-blue-dark)' }}>SANDBOX CHECKOUT</strong>
-            <span style={{ color: 'var(--jp-text-muted)' }}>Testing Environment — PayPal Orders Capture API</span>
+            <strong style={{ color: 'var(--jp-blue-dark)' }}>{isLive ? 'LIVE CHECKOUT' : 'SANDBOX CHECKOUT'}</strong>
+            <span style={{ color: 'var(--jp-text-muted)' }}>{isLive ? 'Live Production Environment — PayPal Orders Capture API' : 'Testing Environment — PayPal Orders Capture API'}</span>
           </div>
         </div>
 

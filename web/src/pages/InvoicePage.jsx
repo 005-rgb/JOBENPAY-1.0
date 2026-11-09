@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import styles from './TransactionPages.module.css';
 
 function formatMoney(amountMinor, currency = 'USD') {
@@ -68,13 +69,14 @@ export function InvoicePage({ invoiceId = null }) {
   const effectiveId = invoiceId || id;
   const { t } = useTranslation();
   const auth = useAuth();
+  const { environment, isLive } = useEnvironment();
   const queryClient = useQueryClient();
   const [actionSuccess, setActionSuccess] = useState('');
   const [actionError, setActionError] = useState('');
 
   // 1. Fetch list of invoices when on /invoices without an id
   const listQuery = useQuery({
-    queryKey: ['invoices-list'],
+    queryKey: ['invoices-list', environment],
     queryFn: async () => {
       try {
         const res = await apiClient.get('/invoices');
@@ -93,7 +95,7 @@ export function InvoicePage({ invoiceId = null }) {
 
   // 2. Fetch specific invoice when effectiveId is present
   const detailQuery = useQuery({
-    queryKey: ['invoice-detail', effectiveId],
+    queryKey: ['invoice-detail', effectiveId, environment],
     queryFn: async () => apiClient.get(`/invoices/${effectiveId}`),
     enabled: Boolean(effectiveId),
   });
@@ -104,8 +106,8 @@ export function InvoicePage({ invoiceId = null }) {
     onSuccess: async () => {
       setActionSuccess('Invoice successfully sent to recipient!');
       setActionError('');
-      await queryClient.invalidateQueries({ queryKey: ['invoices-list'] });
-      await queryClient.invalidateQueries({ queryKey: ['invoice-detail', effectiveId] });
+      await queryClient.invalidateQueries({ queryKey: ['invoices-list', environment] });
+      await queryClient.invalidateQueries({ queryKey: ['invoice-detail', effectiveId, environment] });
     },
     onError: (err) => {
       setActionError(err.message || 'Failed to dispatch invoice.');
@@ -118,8 +120,8 @@ export function InvoicePage({ invoiceId = null }) {
     onSuccess: async () => {
       setActionSuccess('Invoice marked as PAID!');
       setActionError('');
-      await queryClient.invalidateQueries({ queryKey: ['invoices-list'] });
-      await queryClient.invalidateQueries({ queryKey: ['invoice-detail', effectiveId] });
+      await queryClient.invalidateQueries({ queryKey: ['invoices-list', environment] });
+      await queryClient.invalidateQueries({ queryKey: ['invoice-detail', effectiveId, environment] });
     },
     onError: (err) => {
       setActionError(err.message || 'Failed to settle invoice payment.');

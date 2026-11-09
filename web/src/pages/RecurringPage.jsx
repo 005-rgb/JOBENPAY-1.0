@@ -27,10 +27,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import styles from './TransactionPages.module.css';
 
 export function RecurringPage({ recurringId = null }) {
   const { t } = useTranslation();
+  const { environment, isLive } = useEnvironment();
   const [amount, setAmount] = useState('49.99');
   const [currency, setCurrency] = useState('USD');
   const [frequency, setFrequency] = useState('MONTHLY');
@@ -47,7 +49,7 @@ export function RecurringPage({ recurringId = null }) {
     isError,
     error,
   } = useQuery({
-    queryKey: ['recurring', recurringId],
+    queryKey: ['recurring', recurringId, environment],
     queryFn: async () => {
       if (!recurringId) return null;
       return apiClient.get(`/recurring/${recurringId}`);

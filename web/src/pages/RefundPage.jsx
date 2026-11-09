@@ -23,6 +23,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import { StatusPill, ProviderBadge } from './TransactionsPage.jsx';
 import styles from './TransactionPages.module.css';
 
@@ -56,6 +57,7 @@ export function RefundPage({ refundId = null }) {
   const { t } = useTranslation();
   const params = useParams();
   const effectiveId = refundId || params.id;
+  const { environment, isLive } = useEnvironment();
 
   // Single refund query
   const {
@@ -64,7 +66,7 @@ export function RefundPage({ refundId = null }) {
     isError: isSingleError,
     error: singleError,
   } = useQuery({
-    queryKey: ['refund', effectiveId],
+    queryKey: ['refund', effectiveId, environment],
     queryFn: async () => {
       if (!effectiveId) return null;
       return apiClient.get(`/refunds/${effectiveId}`);
@@ -81,7 +83,7 @@ export function RefundPage({ refundId = null }) {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['refunds-list'],
+    queryKey: ['refunds-list', environment],
     queryFn: async () => {
       try {
         const res = await apiClient.get('/transactions?category=REFUND&limit=50');
@@ -139,8 +141,8 @@ export function RefundPage({ refundId = null }) {
       <div className={styles.pageStack} data-testid="refund-detail">
         <div className={styles.calculationCard} style={{ margin: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-            <strong style={{ color: 'var(--jp-blue-dark)' }}>SANDBOX REFUND</strong>
-            <span style={{ color: 'var(--jp-text-muted)' }}>Testing Environment — Cumulative Refund Ceiling Safeguard</span>
+            <strong style={{ color: 'var(--jp-blue-dark)' }}>{isLive ? 'LIVE REFUND' : 'SANDBOX REFUND'}</strong>
+            <span style={{ color: 'var(--jp-text-muted)' }}>{isLive ? 'Live Production Environment' : 'Testing Environment — Cumulative Refund Ceiling Safeguard'}</span>
           </div>
         </div>
 

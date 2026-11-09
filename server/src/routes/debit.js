@@ -32,12 +32,13 @@ debitRouter.post('/', async (req, res, next) => {
 
     const { authId, amountMinor, currency, counterpartyId, description } = parsed.data;
     const amtBig = BigInt(amountMinor);
+    const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const result = await withTx(async (tx) => {
       // 1. Check idempotency
       const existing = await tx.query(
-        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2 FOR UPDATE',
-        [orgId, idempotencyKey]
+        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2 AND environment = $3 FOR UPDATE',
+        [orgId, idempotencyKey, targetEnv]
       );
 
       if (existing.rows.length > 0) {
@@ -72,8 +73,8 @@ debitRouter.post('/', async (req, res, next) => {
       const intentRes = await tx.query(
         `INSERT INTO transaction_intents (
           org_id, agent_id, category, sub_type, status, amount_minor, currency,
-          counterparty_id, mandate_version_id, request_hash, idempotency_key, metadata
-        ) VALUES ($1, $2, 'DEBIT', 'direct', 'NEEDS_APPROVAL', $3, $4, $5, $6, $7, $8, $9)
+          counterparty_id, mandate_version_id, request_hash, idempotency_key, metadata, environment
+        ) VALUES ($1, $2, 'DEBIT', 'direct', 'NEEDS_APPROVAL', $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *`,
         [
           orgId,
@@ -85,6 +86,7 @@ debitRouter.post('/', async (req, res, next) => {
           reqHash,
           idempotencyKey,
           JSON.stringify({ authId, description, provider: 'simulated' }),
+          targetEnv,
         ]
       );
       const intent = intentRes.rows[0];
@@ -180,13 +182,14 @@ debitRouter.post('/authorizations/:authId/revoke', async (req, res, next) => {
 debitRouter.get('/', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
     const result = await query(
       `SELECT i.*, e.auth_id, e.status as execution_status, e.provider
        FROM transaction_intents i
        LEFT JOIN debit_execution_records e ON e.intent_id = i.intent_id AND e.org_id = i.org_id
-       WHERE i.org_id = $1 AND i.category = 'DEBIT'
+       WHERE i.org_id = $1 AND i.category = 'DEBIT' AND i.environment = $2
        ORDER BY i.created_at DESC LIMIT 100`,
-      [orgId]
+      [orgId, env]
     );
 
     const rows = result.rows.map(r => ({
@@ -208,14 +211,15 @@ debitRouter.get('/', async (req, res, next) => {
 debitRouter.get('/:intentId', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
     const { intentId } = req.params;
 
     const resDeb = await query(
       `SELECT i.*, e.auth_id, e.status as execution_status, e.provider
        FROM transaction_intents i
        LEFT JOIN debit_execution_records e ON e.intent_id = i.intent_id AND e.org_id = i.org_id
-       WHERE i.org_id = $1 AND i.intent_id = $2`,
-      [orgId, intentId]
+       WHERE i.org_id = $1 AND i.intent_id = $2 AND i.environment = $3`,
+      [orgId, intentId, env]
     );
 
     if (resDeb.rows.length === 0) {

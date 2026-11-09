@@ -28,10 +28,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import styles from './TransactionPages.module.css';
 
 export function DebitPage({ debitId = null }) {
   const { t } = useTranslation();
+  const { environment, isLive } = useEnvironment();
   const [authId, setAuthId] = useState('');
   const [amount, setAmount] = useState('250.00');
   const [currency, setCurrency] = useState('USD');
@@ -48,7 +50,7 @@ export function DebitPage({ debitId = null }) {
     isError,
     error,
   } = useQuery({
-    queryKey: ['debit', debitId],
+    queryKey: ['debit', debitId, environment],
     queryFn: async () => {
       if (!debitId) return null;
       return apiClient.get(`/debit/${debitId}`);

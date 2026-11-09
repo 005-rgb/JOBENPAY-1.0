@@ -225,7 +225,7 @@ test('P5: Rate limits on registration (IP 5/hour, email 3/hour, global limit)', 
   env.REGISTRATION_ENABLED = 1;
   const { server, url } = await startTestApp();
 
-  const dedicatedIp = `198.51.100.${100 + crypto.randomInt(100)}`;
+  const dedicatedIp = `198.51.200.${100 + crypto.randomInt(100)}`;
 
   try {
     // 1. IP rate limit: 5/hour per IP

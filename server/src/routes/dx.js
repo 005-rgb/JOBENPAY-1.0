@@ -22,16 +22,18 @@ function resolveOrgId(req) {
  * Creates the DX router for Developer Experience endpoints.
  * @param {object} [opts]
  * @param {import('express').RequestHandler} [opts.requireSession]
+ * @param {import('express').RequestHandler} [opts.requireCsrf]
  */
-export function createDxRouter({ requireSession } = {}) {
+export function createDxRouter({ requireSession, requireCsrf } = {}) {
   const router = express.Router();
   const sessionGuard = requireSession || ((_req, _res, next) => next());
+  const csrfGuard = requireCsrf || ((_req, _res, next) => next());
 
   /**
    * Langkah 2.1: One-Click Sandbox Seeding (Cloning with PII Scrubber)
    * POST /api/v1/sandbox/seed
    */
-  router.post('/sandbox/seed', sessionGuard, async (req, res, next) => {
+  router.post('/sandbox/seed', sessionGuard, csrfGuard, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
 
@@ -168,7 +170,7 @@ export function createDxRouter({ requireSession } = {}) {
    * Langkah 2.2: Time-Travel Debugger (Debug Live Failures in Sandbox)
    * POST /api/v1/debug/time-travel/:live_tx_id
    */
-  router.post('/debug/time-travel/:live_tx_id', sessionGuard, async (req, res, next) => {
+  router.post('/debug/time-travel/:live_tx_id', sessionGuard, csrfGuard, async (req, res, next) => {
     try {
       const orgId = resolveOrgId(req);
       const { live_tx_id } = req.params;

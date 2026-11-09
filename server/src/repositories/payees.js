@@ -32,15 +32,21 @@ export async function listPayees(orgId, db = pool, environment = null) {
   return result.rows;
 }
 
-export async function getPayee(orgId, payeeId, db = pool) {
+export async function getPayee(orgId, payeeId, db = pool, environment = null) {
   assertOrgId(orgId);
+  const conditions = ['org_id = $1', 'id = $2'];
+  const params = [orgId, payeeId];
+  if (environment) {
+    conditions.push('environment = $3');
+    params.push(String(environment).toUpperCase());
+  }
   const result = await db.query(
     `SELECT id, org_id, display_name, kind, identifier_enc, identifier_hmac,
-            identifier_masked, trust, changed_at, created_at
+            identifier_masked, trust, environment, changed_at, created_at
      FROM payees
-     WHERE org_id = $1 AND id = $2
+     WHERE ${conditions.join(' AND ')}
      LIMIT 1`,
-    [orgId, payeeId],
+    params,
   );
   return result.rows[0] ?? null;
 }

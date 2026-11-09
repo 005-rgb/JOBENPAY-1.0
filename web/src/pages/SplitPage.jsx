@@ -26,10 +26,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import styles from './TransactionPages.module.css';
 
 export function SplitPage({ splitId = null }) {
   const { t } = useTranslation();
+  const { environment, isLive } = useEnvironment();
   const [totalAmount, setTotalAmount] = useState('1000.00');
   const [currency, setCurrency] = useState('USD');
   const [platformFeeBps, setPlatformFeeBps] = useState(250); // Default 2.5%
@@ -44,7 +46,7 @@ export function SplitPage({ splitId = null }) {
     isError,
     error,
   } = useQuery({
-    queryKey: ['split', splitId],
+    queryKey: ['split', splitId, environment],
     queryFn: async () => {
       if (!splitId) return null;
       return apiClient.get(`/split/${splitId}`);

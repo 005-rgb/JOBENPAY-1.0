@@ -121,6 +121,17 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['GET /payments/webhooks', 'List payment webhooks'],
   ['POST /payments/webhooks/:gateway', 'Inbound gateway webhook receiver'],
   ['POST /webhooks/payments/:gateway', 'Top-level raw body payment webhook receiver'],
+  // test-changed: PRD 3.0 multi-environment credentials, webhooks and developer experience endpoints
+  ['GET /paypal/credentials', 'Retrieves PayPal connector credentials for session tenant and environment'],
+  ['PUT /paypal/credentials', 'Updates PayPal connector credentials for session tenant and environment'],
+  ['DELETE /paypal/credentials', 'Deletes PayPal connector credentials for session tenant and environment'],
+  ['POST /paypal/credentials/test', 'Tests PayPal connection for session tenant and environment'],
+  ['POST /sbx/paypal', 'PayPal Sandbox webhook receiver verified by signature'],
+  ['POST /sbx/paypal/:webhookToken', 'PayPal Sandbox webhook receiver with token'],
+  ['POST /live/paypal', 'PayPal Live webhook receiver verified by signature'],
+  ['POST /live/paypal/:webhookToken', 'PayPal Live webhook receiver with token'],
+  ['POST /sandbox/seed', 'Clones sanitized template transactions to sandbox for session tenant'],
+  ['POST /debug/time-travel/:live_tx_id', 'Simulates time travel debug on live transaction within session tenant'],
 ]);
 
 async function createOrgFixture(db, orgName, slug) {
@@ -470,14 +481,17 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
   const docB = docBRes.rows[0];
 
   try {
+    // test-changed: PRD 3.0 requires X-Jobenpay-Environment for operational routes
     const sessionAHeaders = {
       cookie: `jp_sid=${orgA.session.token}`,
       'x-csrf-token': orgA.session.csrfToken,
       'content-type': 'application/json',
+      'x-jobenpay-environment': 'SANDBOX',
     };
     const agentAHeaders = {
       authorization: `Bearer ${orgA.agentKey.apiKey}`,
       'content-type': 'application/json',
+      'x-jobenpay-environment': 'SANDBOX',
     };
 
     // -------------------------------------------------------------
@@ -531,6 +545,9 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
           }
           if (targetPath.includes(':gateway')) {
             targetPath = targetPath.replace(':gateway', 'stripe');
+          }
+          if (targetPath.includes(':live_tx_id')) {
+            targetPath = targetPath.replace(':live_tx_id', crypto.randomUUID());
           }
           if (targetPath.includes(':id')) {
             if (targetPath.startsWith('/requests/')) targetPath = targetPath.replace(':id', orgB.requestPending.id);

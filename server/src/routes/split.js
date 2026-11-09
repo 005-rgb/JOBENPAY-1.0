@@ -64,12 +64,13 @@ splitRouter.post('/', async (req, res, next) => {
       platformFeeBps,
       recipients: recipients || (counterpartyId ? [{ counterpartyId }] : []),
     });
+    const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const result = await withTx(async (tx) => {
       // Check existing idempotency key
       const existing = await tx.query(
-        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2',
-        [orgId, idempotencyKey]
+        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2 AND environment = $3',
+        [orgId, idempotencyKey, targetEnv]
       );
       if (existing.rowCount > 0) {
         const row = existing.rows[0];
@@ -81,6 +82,17 @@ splitRouter.post('/', async (req, res, next) => {
           throw new AppError('IDEMPOTENCY_KEY_REUSED', 'Idempotency key reused with different payload', 422);
         }
         return { row, replayed: true };
+      }
+
+      // Validate parent intent environment if provided
+      if (parentIntentId) {
+        const parentCheck = await tx.query(
+          'SELECT environment FROM transaction_intents WHERE org_id = $1 AND intent_id = $2',
+          [orgId, parentIntentId]
+        );
+        if (parentCheck.rowCount > 0 && parentCheck.rows[0].environment !== targetEnv) {
+          throw new AppError('CROSS_ENVIRONMENT_REFERENCE_BLOCKED', 'Parent transaction belongs to a different environment.', 400);
+        }
       }
 
       // Check active mandate
@@ -99,16 +111,16 @@ splitRouter.post('/', async (req, res, next) => {
         INSERT INTO transaction_intents (
           org_id, agent_id, category, sub_type, status,
           amount_minor, currency, counterparty_id, mandate_version_id,
-          idempotency_key, request_hash
+          idempotency_key, request_hash, environment
         ) VALUES (
           $1, $2, 'SPLIT', $3, 'SUBMITTED',
           $4, $5, $6, $7,
-          $8, $9
+          $8, $9, $10
         ) RETURNING *
       `, [
         orgId, agentId, subType,
         amountMinorBigInt.toString(), currency, counterpartyId || null, mandateVersionId,
-        idempotencyKey, requestHash
+        idempotencyKey, requestHash, targetEnv
       ]);
 
       const intent = insertIntent.rows[0];
@@ -152,6 +164,7 @@ splitRouter.get('/:id', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const intentId = req.params.id;
     const result = await query(`
@@ -164,8 +177,8 @@ splitRouter.get('/:id', async (req, res, next) => {
         sr.paypal_reference_id
       FROM transaction_intents ti
       LEFT JOIN split_records sr ON sr.intent_id = ti.intent_id
-      WHERE ti.org_id = $1 AND ti.intent_id = $2 AND ti.category = 'SPLIT'
-    `, [orgId, intentId]);
+      WHERE ti.org_id = $1 AND ti.intent_id = $2 AND ti.category = 'SPLIT' AND ti.environment = $3
+    `, [orgId, intentId, env]);
 
     if (result.rowCount === 0) {
       throw new AppError('NOT_FOUND', 'Split intent not found', 404);
@@ -181,6 +194,7 @@ splitRouter.get('/', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const result = await query(`
       SELECT 
@@ -191,10 +205,10 @@ splitRouter.get('/', async (req, res, next) => {
         sr.status AS split_status
       FROM transaction_intents ti
       LEFT JOIN split_records sr ON sr.intent_id = ti.intent_id
-      WHERE ti.org_id = $1 AND ti.category = 'SPLIT'
+      WHERE ti.org_id = $1 AND ti.category = 'SPLIT' AND ti.environment = $2
       ORDER BY ti.created_at DESC
       LIMIT 100
-    `, [orgId]);
+    `, [orgId, env]);
 
     res.json({ splits: result.rows });
   } catch (err) {

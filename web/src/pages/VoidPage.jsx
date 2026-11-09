@@ -23,6 +23,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import { StatusPill, ProviderBadge } from './TransactionsPage.jsx';
 import styles from './TransactionPages.module.css';
 
@@ -56,6 +57,7 @@ export function VoidPage({ voidId = null }) {
   const { t } = useTranslation();
   const params = useParams();
   const effectiveId = voidId || params.id;
+  const { environment, isLive } = useEnvironment();
 
   // Single void query
   const {
@@ -64,7 +66,7 @@ export function VoidPage({ voidId = null }) {
     isError: isSingleError,
     error: singleError,
   } = useQuery({
-    queryKey: ['void', effectiveId],
+    queryKey: ['void', effectiveId, environment],
     queryFn: async () => {
       if (!effectiveId) return null;
       return apiClient.get(`/voids/${effectiveId}`);
@@ -81,7 +83,7 @@ export function VoidPage({ voidId = null }) {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['voids-list'],
+    queryKey: ['voids-list', environment],
     queryFn: async () => {
       try {
         const res = await apiClient.get('/transactions?category=VOID&limit=50');
@@ -139,8 +141,8 @@ export function VoidPage({ voidId = null }) {
       <div className={styles.pageStack} data-testid="void-detail">
         <div className={styles.calculationCard} style={{ margin: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-            <strong style={{ color: 'var(--jp-blue-dark)' }}>SANDBOX VOID</strong>
-            <span style={{ color: 'var(--jp-text-muted)' }}>Testing Environment — Release Held Authorization</span>
+            <strong style={{ color: 'var(--jp-blue-dark)' }}>{isLive ? 'LIVE VOID' : 'SANDBOX VOID'}</strong>
+            <span style={{ color: 'var(--jp-text-muted)' }}>{isLive ? 'Live Production Environment — Release Held Authorization' : 'Testing Environment — Release Held Authorization'}</span>
           </div>
         </div>
 

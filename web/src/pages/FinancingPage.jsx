@@ -27,10 +27,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import styles from './TransactionPages.module.css';
 
 export function FinancingPage({ financingId = null }) {
   const { t } = useTranslation();
+  const { environment, isLive } = useEnvironment();
   const [facilityType, setFacilityType] = useState('PO');
   const [principalAmount, setPrincipalAmount] = useState('50000');
   const [collateralValue, setCollateralValue] = useState('100000');
@@ -48,7 +50,7 @@ export function FinancingPage({ financingId = null }) {
     isError,
     error,
   } = useQuery({
-    queryKey: ['financing', financingId],
+    queryKey: ['financing', financingId, environment],
     queryFn: async () => {
       if (!financingId) return null;
       return apiClient.get(`/financing/${financingId}`);

@@ -51,7 +51,7 @@ export async function getDashboardSummary(orgId, db = pool, environment = 'SANDB
       EXISTS (SELECT 1 FROM active_budget) AS has_active_budget,
       EXISTS (
         SELECT 1 FROM paypal_connections
-        WHERE org_id = $1 AND status = 'CONNECTED'
+        WHERE org_id = $1 AND environment = $2 AND status = 'CONNECTED'
       ) AS paypal_connected,
       EXISTS (
         SELECT 1 FROM agents

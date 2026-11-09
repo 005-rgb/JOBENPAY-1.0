@@ -27,10 +27,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import styles from './TransactionPages.module.css';
 
 export function TransferPage({ transferId = null }) {
   const { t } = useTranslation();
+  const { environment, isLive } = useEnvironment();
   const [senderId, setSenderId] = useState('org-main-treasury');
   const [receiverId, setReceiverId] = useState('payee-vendor-002');
   const [amount, setAmount] = useState('250.00');
@@ -45,7 +47,7 @@ export function TransferPage({ transferId = null }) {
     isError,
     error,
   } = useQuery({
-    queryKey: ['transfer', transferId],
+    queryKey: ['transfer', transferId, environment],
     queryFn: async () => {
       if (!transferId) return null;
       return apiClient.get(`/transfer/${transferId}`);

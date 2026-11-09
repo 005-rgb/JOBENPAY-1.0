@@ -76,13 +76,14 @@ financingRouter.post('/', async (req, res, next) => {
 
     const schedule = underwriting.schedule;
     const adminFeeMinor = BigInt(underwriting.adminFeeMinor);
+    const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     // 2. Persist intent and financing_records atomically
     const result = await withTx(async (tx) => {
       // Check existing idempotency
       const existing = await tx.query(
-        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2 FOR UPDATE',
-        [orgId, idempotencyKey]
+        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2 AND environment = $3 FOR UPDATE',
+        [orgId, idempotencyKey, targetEnv]
       );
 
       if (existing.rows.length > 0) {
@@ -102,8 +103,8 @@ financingRouter.post('/', async (req, res, next) => {
       const intentRes = await tx.query(
         `INSERT INTO transaction_intents (
           org_id, agent_id, category, sub_type, status, amount_minor, currency,
-          counterparty_id, mandate_version_id, request_hash, idempotency_key, metadata
-        ) VALUES ($1, $2, 'FINANCING', $3, 'NEEDS_APPROVAL', $4, $5, $6, $7, $8, $9, $10)
+          counterparty_id, mandate_version_id, request_hash, idempotency_key, metadata, environment
+        ) VALUES ($1, $2, 'FINANCING', $3, 'NEEDS_APPROVAL', $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *`,
         [
           orgId,
@@ -122,6 +123,7 @@ financingRouter.post('/', async (req, res, next) => {
             interestBps,
             provider: 'simulated',
           }),
+          targetEnv,
         ]
       );
       const intent = intentRes.rows[0];
@@ -172,14 +174,15 @@ financingRouter.post('/', async (req, res, next) => {
 financingRouter.get('/', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
     const result = await query(
       `SELECT i.*, f.facility_type, f.principal_amount_minor, f.interest_bps,
               f.admin_fee_minor, f.tenor_months, f.repaid_amount_minor, f.status as facility_status
        FROM transaction_intents i
        LEFT JOIN financing_records f ON f.intent_id = i.intent_id AND f.org_id = i.org_id
-       WHERE i.org_id = $1 AND i.category = 'FINANCING'
+       WHERE i.org_id = $1 AND i.category = 'FINANCING' AND i.environment = $2
        ORDER BY i.created_at DESC LIMIT 100`,
-      [orgId]
+      [orgId, env]
     );
 
     const rows = result.rows.map(r => ({
@@ -202,6 +205,7 @@ financingRouter.get('/', async (req, res, next) => {
 financingRouter.get('/:intentId', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
     const { intentId } = req.params;
 
     const resFin = await query(
@@ -210,8 +214,8 @@ financingRouter.get('/:intentId', async (req, res, next) => {
               f.status as facility_status
        FROM transaction_intents i
        JOIN financing_records f ON f.intent_id = i.intent_id AND f.org_id = i.org_id
-       WHERE i.org_id = $1 AND i.intent_id = $2`,
-      [orgId, intentId]
+       WHERE i.org_id = $1 AND i.intent_id = $2 AND i.environment = $3`,
+      [orgId, intentId, env]
     );
 
     if (resFin.rows.length === 0) {

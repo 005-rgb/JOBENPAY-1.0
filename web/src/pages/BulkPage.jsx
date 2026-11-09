@@ -26,10 +26,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import styles from './TransactionPages.module.css';
 
 export function BulkPage({ batchId = null }) {
   const { t } = useTranslation();
+  const { environment, isLive } = useEnvironment();
 
   const {
     data: batchData,
@@ -37,7 +39,7 @@ export function BulkPage({ batchId = null }) {
     isError,
     error,
   } = useQuery({
-    queryKey: ['bulk', batchId],
+    queryKey: ['bulk', batchId, environment],
     queryFn: async () => {
       if (!batchId) return null;
       return apiClient.get(`/bulk/${batchId}`);

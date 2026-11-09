@@ -55,7 +55,7 @@ export function NewTransactionPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isLive } = useEnvironment();
+  const { environment, isLive } = useEnvironment();
   const [isDelayingLive, setIsDelayingLive] = useState(false);
   const delayTimerRef = React.useRef(null);
 
@@ -159,7 +159,7 @@ export function NewTransactionPage() {
 
   // Fetch registered payees
   const { data: payeesData } = useQuery({
-    queryKey: ['payees'],
+    queryKey: ['payees', environment],
     queryFn: async () => apiClient.get('/payees'),
   });
 

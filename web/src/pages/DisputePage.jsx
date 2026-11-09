@@ -25,10 +25,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import styles from './TransactionPages.module.css';
 
 export function DisputePage({ disputeId = null }) {
   const { t } = useTranslation();
+  const { environment, isLive } = useEnvironment();
   const [actionSuccess, setActionSuccess] = useState('');
   const [actionError, setActionError] = useState('');
 
@@ -38,7 +40,7 @@ export function DisputePage({ disputeId = null }) {
     isError,
     error,
   } = useQuery({
-    queryKey: ['dispute', disputeId],
+    queryKey: ['dispute', disputeId, environment],
     queryFn: async () => {
       if (!disputeId) return null;
       return apiClient.get(`/disputes/${disputeId}`);
@@ -80,7 +82,7 @@ export function DisputePage({ disputeId = null }) {
     counterparty_id: '00000000-0000-4000-8000-000000000011',
     created_at: new Date().toISOString(),
     metadata: {
-      paypalDisputeId: 'DISP-SANDBOX-001',
+      paypalDisputeId: isLive ? 'DISP-LIVE-001' : 'DISP-SANDBOX-001',
       reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED',
       evidenceDraft: 'Proof of fulfillment uploaded by system: Carrier UPS tracking 1Z9999999999999999 delivered to buyer address.',
       description: 'Customer claims merchandise package was not received',
@@ -90,7 +92,7 @@ export function DisputePage({ disputeId = null }) {
   const isNeedsApproval = intent.status === 'NEEDS_APPROVAL';
 
   const handleContest = () => {
-    setActionSuccess('Evidence submitted! Dispute contested with PayPal Sandbox.');
+    setActionSuccess(`Evidence submitted! Dispute contested with PayPal ${isLive ? 'Live' : 'Sandbox'}.`);
     setActionError('');
   };
 

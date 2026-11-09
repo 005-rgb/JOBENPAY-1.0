@@ -58,12 +58,13 @@ bulkRouter.post('/', async (req, res, next) => {
     for (const item of items) {
       totalAmountMinor += BigInt(item.amountMinor);
     }
+    const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const result = await withTx(async (tx) => {
       // Check existing idempotency key
       const existing = await tx.query(
-        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2',
-        [orgId, idempotencyKey]
+        'SELECT * FROM transaction_intents WHERE org_id = $1 AND idempotency_key = $2 AND environment = $3',
+        [orgId, idempotencyKey, targetEnv]
       );
       if (existing.rowCount > 0) {
         const row = existing.rows[0];
@@ -95,17 +96,18 @@ bulkRouter.post('/', async (req, res, next) => {
         INSERT INTO transaction_intents (
           org_id, agent_id, category, sub_type, status,
           amount_minor, currency, mandate_version_id,
-          request_hash, idempotency_key, metadata
+          request_hash, idempotency_key, metadata, environment
         ) VALUES (
           $1, $2, 'BULK', $3, 'SUBMITTED',
           $4, $5, $6,
-          $7, $8, $9
+          $7, $8, $9, $10
         ) RETURNING *
       `, [
         orgId, agentId, subType,
         totalAmountMinor.toString(), currency, mandateVersionId,
         requestHash, idempotencyKey,
         JSON.stringify({ itemCount: items.length, metadata }),
+        targetEnv,
       ]);
 
       const parentIntent = parentInsert.rows[0];
@@ -131,17 +133,18 @@ bulkRouter.post('/', async (req, res, next) => {
           INSERT INTO transaction_intents (
             org_id, agent_id, category, sub_type, status,
             amount_minor, currency, counterparty_id, parent_intent_id,
-            mandate_version_id, request_hash, idempotency_key, metadata
+            mandate_version_id, request_hash, idempotency_key, metadata, environment
           ) VALUES (
             $1, $2, 'BULK', 'payout', 'SUBMITTED',
             $3, $4, $5, $6,
-            $7, $8, $9, $10
+            $7, $8, $9, $10, $11
           )
         `, [
           orgId, agentId,
           itemAmount.toString(), currency, item.counterpartyId || null, parentIntent.intent_id,
           mandateVersionId, `${requestHash}_item_${i + 1}`, childIdemp,
           JSON.stringify({ recipientEmail: item.recipientEmail, note: item.note, itemIndex: i + 1 }),
+          targetEnv,
         ]);
       }
 
@@ -170,6 +173,7 @@ bulkRouter.get('/:id', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.session?.org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
     if (!orgId) throw new AppError('UNAUTHORIZED', 'Organization context required', 401);
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
 
     const { id } = req.params;
 
@@ -187,9 +191,9 @@ bulkRouter.get('/:id', async (req, res, next) => {
     const childrenRes = await query(
       `SELECT intent_id, status, amount_minor, currency, counterparty_id, metadata, created_at
        FROM transaction_intents
-       WHERE org_id = $1 AND parent_intent_id = $2
+       WHERE org_id = $1 AND parent_intent_id = $2 AND environment = $3
        ORDER BY created_at ASC`,
-      [orgId, batch.parent_intent_id]
+      [orgId, batch.parent_intent_id, env]
     );
 
     res.json({
@@ -204,13 +208,14 @@ bulkRouter.get('/:id', async (req, res, next) => {
 bulkRouter.get('/', async (req, res, next) => {
   try {
     const orgId = req.org?.id || req.session?.current_org_id || req.user?.org_id || '00000000-0000-4000-8000-000000000001';
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
     const result = await query(`
       SELECT bb.*, ti.created_at
       FROM bulk_batches bb
       LEFT JOIN transaction_intents ti ON ti.intent_id = bb.parent_intent_id
-      WHERE bb.org_id = $1
+      WHERE bb.org_id = $1 AND ti.environment = $2
       ORDER BY ti.created_at DESC
-    `, [orgId]);
+    `, [orgId, env]);
 
     res.json({
       success: true,
