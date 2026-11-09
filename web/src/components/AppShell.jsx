@@ -21,6 +21,7 @@ import {
   Plus,
   ScrollText,
   Server,
+  ShieldAlert,
   ShieldCheck,
   Users,
   Wallet,
@@ -118,6 +119,7 @@ const navigation = [
     icon: Server,
     children: [
       { title: 'opsDashboard', path: '/ops' },
+      { title: 'securityHardening', path: '/security' },
       { title: 'sloMonitoring', path: '/ops/slo' },
       { title: 'circuitBreakers', path: '/ops/circuit-breakers' },
       { title: 'runbooksAndAlerts', path: '/ops/runbooks' },

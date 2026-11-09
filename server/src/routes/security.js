@@ -16,6 +16,7 @@ import {
   verifyArtifact,
   recordAttestation,
   getAttestation,
+  listAttestations,
 } from '../services/supply_chain.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -164,6 +165,21 @@ export function createSecurityRouter({
 
         const result = await recordAttestation(parseResult.data);
         return res.status(201).json({ ok: true, ...result });
+      } catch (err) {
+        return next(err);
+      }
+    }
+  );
+
+  // 6.5 GET /supply-chain/attestations - List all supply chain attestations
+  router.get(
+    '/security/supply-chain/attestations',
+    requireSession,
+    requireRole('OWNER', 'ADMIN', 'JUDGE', 'VIEWER', 'OPERATOR'),
+    async (req, res, next) => {
+      try {
+        const attestations = await listAttestations(req.query);
+        return res.status(200).json({ ok: true, attestations });
       } catch (err) {
         return next(err);
       }

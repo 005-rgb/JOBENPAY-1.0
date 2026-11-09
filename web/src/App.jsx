@@ -68,6 +68,7 @@ const CplPage = lazy(() => import('./pages/CplPages.jsx').then((p) => ({ default
 const JplPage = lazy(() => import('./pages/JplPages.jsx').then((p) => ({ default: p.JplPage })));
 const OpsPage = lazy(() => import('./pages/OpsPages.jsx'));
 const PaymentsPage = lazy(() => import('./pages/PaymentsPage.jsx'));
+const SecurityHardeningPage = lazy(() => import('./pages/SecurityPage.jsx'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -155,6 +156,8 @@ function AuthenticatedApp() {
           <Route element={<DipPage />} path="/dip" />
           <Route element={<CplPage />} path="/cpl" />
           <Route element={<JplPage />} path="/jpl" />
+          <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER', 'JUDGE']}><SecurityHardeningPage tab="pqc" /></RequireRole>} path="/security" />
+          <Route element={<RequireRole roles={['OWNER', 'ADMIN', 'APPROVER', 'OPERATOR', 'VIEWER', 'JUDGE']}><SecurityHardeningPage /></RequireRole>} path="/security/:tab" />
           <Route element={<OpsPage tab="overview" />} path="/ops" />
           <Route element={<OpsPage tab="slo" />} path="/ops/slo" />
           <Route element={<OpsPage tab="circuit-breakers" />} path="/ops/circuit-breakers" />

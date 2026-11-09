@@ -56,6 +56,7 @@ const english = {
     circuitBreakers: 'Circuit Breakers',
     runbooksAndAlerts: 'Runbooks & Alerts',
     secretRotation: 'Secret Rotation',
+    securityHardening: 'Security Hardening',
     simulator: 'Simulator',
     proofs: 'Proof Verification',
     handshakes: 'Trust Handshakes',
@@ -396,6 +397,7 @@ const indonesian = {
   app: {
     ...english.app,
     paymentOrchestration: 'Orkestrasi Pembayaran (POL)',
+    securityHardening: 'Penguatan Keamanan (PRD 5.0)',
   },
   transactions: {
     ...english.transactions,
