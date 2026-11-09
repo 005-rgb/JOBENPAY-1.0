@@ -13,27 +13,34 @@ export async function createDocument(orgId, {
   sha256,
   storageKey,
   status = 'RECEIVED',
+  environment = 'SANDBOX',
 }, db = pool) {
   assertOrgId(orgId);
   const result = await db.query(`
     INSERT INTO documents (
-      org_id, uploader_kind, uploader_id, filename, mime, size, sha256, storage_key, status
+      org_id, uploader_kind, uploader_id, filename, mime, size, sha256, storage_key, status, environment
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING *
-  `, [orgId, uploaderKind, uploaderId, filename, mime, size, sha256, storageKey, status]);
+  `, [orgId, uploaderKind, uploaderId, filename, mime, size, sha256, storageKey, status, (environment || 'SANDBOX').toUpperCase()]);
   return result.rows[0];
 }
 
-export async function listDocuments(orgId, db = pool) {
+export async function listDocuments(orgId, db = pool, environment = null) {
   assertOrgId(orgId);
+  const conditions = ['org_id = $1'];
+  const params = [orgId];
+  if (environment) {
+    conditions.push('environment = $2');
+    params.push(String(environment).toUpperCase());
+  }
   const result = await db.query(`
     SELECT id, created_at, uploader_kind, filename, mime, size, sha256, status, injection_flags
     FROM documents
-    WHERE org_id = $1
+    WHERE ${conditions.join(' AND ')}
     ORDER BY created_at DESC, id
     LIMIT 100
-  `, [orgId]);
+  `, params);
   return result.rows;
 }
 

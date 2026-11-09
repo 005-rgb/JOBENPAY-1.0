@@ -45,11 +45,11 @@ export function validatePolicy(policy) {
   }
 }
 
-export async function createMandate(tx, { orgId, agentId, name, policy, purposeText, promptVersion }) {
+export async function createMandate(tx, { orgId, agentId, name, policy, purposeText, promptVersion, environment }) {
   const parsed = validatePolicy(policy);
   const mandate = await tx.query(
-    `INSERT INTO mandates (org_id, agent_id, name, status) VALUES ($1, $2, $3, 'DRAFT') RETURNING *`,
-    [orgId, agentId, name],
+    `INSERT INTO mandates (org_id, agent_id, name, status, environment) VALUES ($1, $2, $3, 'DRAFT', $4) RETURNING *`,
+    [orgId, agentId, name, environment || 'SANDBOX'],
   );
   const version = await tx.query(
     `INSERT INTO mandate_versions (org_id, mandate_id, version, purpose_text, policy, prompt_version, valid_from, valid_to)
@@ -109,12 +109,18 @@ export async function getMandate(orgId, mandateId, db = query) {
   };
 }
 
-export async function listMandates(orgId, db = { query }) {
+export async function listMandates(orgId, db = { query }, environment = null) {
+  const conditions = ['m.org_id = $1'];
+  const params = [orgId];
+  if (environment) {
+    conditions.push('m.environment = $2');
+    params.push(String(environment).toUpperCase());
+  }
   const result = await db.query(
     `SELECT m.*, v.version, v.policy, v.activated_at
      FROM mandates m LEFT JOIN mandate_versions v ON v.id = m.current_version_id
-     WHERE m.org_id = $1 ORDER BY m.created_at DESC, m.id`,
-    [orgId],
+     WHERE ${conditions.join(' AND ')} ORDER BY m.created_at DESC, m.id`,
+    params,
   );
   return result.rows;
 }

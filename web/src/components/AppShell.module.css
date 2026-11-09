@@ -299,6 +299,145 @@
   opacity: 0.85;
 }
 
+/* Environment Switcher in Header (PRD 3.0 Segmented Control) */
+.environmentSwitcher {
+  display: inline-flex;
+  align-items: center;
+  background: var(--jp-surface-muted, #f1f5f9);
+  border: 1px solid var(--jp-border, #e2e8f0);
+  border-radius: var(--jp-radius-pill, 9999px);
+  padding: 2px;
+  gap: 2px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.envSwitchOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: var(--jp-radius-pill, 9999px);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  background: transparent;
+  color: var(--jp-text-muted, #64748b);
+  transition: all 0.2s ease-in-out;
+}
+
+.envSwitchOption:hover:not(:disabled) {
+  color: var(--jp-text, #0f172a);
+}
+
+.envSwitchActiveSandbox {
+  background: #2563eb;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.35);
+}
+
+.envSwitchActiveLive {
+  background: #dc2626;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.35);
+}
+
+.envSwitchInactive {
+  opacity: 0.75;
+}
+
+.envSwitchInactive:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.envDotSandbox {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #60a5fa;
+  box-shadow: 0 0 4px #93c5fd;
+  display: inline-block;
+}
+
+.envDotLive {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #f87171;
+  box-shadow: 0 0 6px #ef4444;
+  display: inline-block;
+}
+
+/* Sidebar Environment Card */
+.sidebarEnvCard {
+  margin: 10px 14px 10px;
+  padding: 10px 12px;
+  background: var(--jp-surface-subtle, #f8fafc);
+  border: 1px solid var(--jp-border, #e2e8f0);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebarEnvHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebarEnvLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--jp-text-muted, #64748b);
+}
+
+.sidebarEnvGroup {
+  display: flex;
+  background: var(--jp-surface, #ffffff);
+  border: 1px solid var(--jp-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.sidebarEnvBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--jp-text-muted, #64748b);
+  transition: all 0.15s ease-in-out;
+}
+
+.sidebarEnvBtn:hover {
+  color: var(--jp-text, #0f172a);
+}
+
+.sidebarEnvActiveSandbox {
+  background: #2563eb;
+  color: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.sidebarEnvActiveLive {
+  background: #dc2626;
+  color: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
 .headerIconButton {
   align-items: center;
   background: var(--jp-transparent);
@@ -1074,7 +1213,8 @@
     display: contents;
   }
 
-  .headerActions > .sandboxChip {
+  .headerActions > .sandboxChip,
+  .headerActions > .environmentSwitcher {
     display: inline-flex;
     grid-column: 1;
     grid-row: 2;

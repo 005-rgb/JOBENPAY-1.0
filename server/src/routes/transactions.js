@@ -37,9 +37,10 @@ transactionsRouter.get('/', async (req, res, next) => {
     const orgId = resolveOrgId(req);
     const { category, status, search, limit = '50', cursor } = req.query;
 
-    const conditions = ['ti.org_id = $1'];
-    const params = [orgId];
-    let paramIndex = 2;
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
+    const conditions = ['ti.org_id = $1', `ti.environment = $2`];
+    const params = [orgId, env];
+    let paramIndex = 3;
 
     // Multi-select category (comma-separated or single)
     if (category && typeof category === 'string' && category.trim()) {
@@ -117,8 +118,8 @@ transactionsRouter.get('/', async (req, res, next) => {
 
     // Get total count for summary
     const countResult = await query(
-      `SELECT count(*)::int AS total FROM transaction_intents WHERE org_id = $1`,
-      [orgId]
+      `SELECT count(*)::int AS total FROM transaction_intents WHERE org_id = $1 AND environment = $2`,
+      [orgId, env]
     );
 
     return res.status(200).json({
@@ -409,13 +410,15 @@ transactionsRouter.post('/', async (req, res, next) => {
           : [],
       };
 
+      const targetEnv = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || 'SANDBOX').toUpperCase();
+
       // 4. Insert transaction intent
       const inserted = await tx.query(
         `INSERT INTO transaction_intents (
            org_id, agent_id, category, sub_type, status,
            amount_minor, currency, counterparty_id, parent_intent_id,
-           mandate_version_id, request_hash, idempotency_key, metadata
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           mandate_version_id, request_hash, idempotency_key, metadata, environment
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING *`,
         [
           orgId,
@@ -431,6 +434,7 @@ transactionsRouter.post('/', async (req, res, next) => {
           requestHash,
           idempotencyKey,
           JSON.stringify(enrichedMeta),
+          targetEnv,
         ]
       );
 
@@ -448,14 +452,15 @@ transactionsRouter.post('/', async (req, res, next) => {
           for (const leg of legs) {
             await tx.query(
               `INSERT INTO transaction_legs (
-                 intent_id, leg_type, amount_minor, currency, account_ref, status
-               ) VALUES ($1, $2, $3, $4, $5, 'POSTED')`,
+                 intent_id, leg_type, amount_minor, currency, account_ref, status, environment
+               ) VALUES ($1, $2, $3, $4, $5, 'POSTED', $6)`,
               [
                 intentRow.intent_id,
                 leg.legType,
                 leg.amountMinor.toString(),
                 leg.currency,
                 leg.accountRef,
+                targetEnv,
               ]
             );
           }

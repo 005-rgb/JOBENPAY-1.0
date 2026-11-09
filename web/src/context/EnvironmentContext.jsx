@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { getEnvironment, setEnvironment as setClientEnvironment } from '../api/client.js';
 
 const EnvironmentContext = createContext({
@@ -9,6 +10,11 @@ const EnvironmentContext = createContext({
 });
 
 export function EnvironmentProvider({ children }) {
+  let queryClient = null;
+  try {
+    queryClient = useQueryClient();
+  } catch {}
+
   const [environment, setEnvState] = useState(() => {
     try {
       const saved = localStorage.getItem('jobenpay_environment');
@@ -28,12 +34,15 @@ export function EnvironmentProvider({ children }) {
 
   const setEnvironment = (newEnv) => {
     const upper = String(newEnv || '').toUpperCase();
-    if (upper === 'SANDBOX' || upper === 'LIVE') {
+    if ((upper === 'SANDBOX' || upper === 'LIVE') && upper !== environment) {
       setEnvState(upper);
       setClientEnvironment(upper);
       try {
         localStorage.setItem('jobenpay_environment', upper);
       } catch {}
+      if (queryClient) {
+        queryClient.invalidateQueries();
+      }
     }
   };
 

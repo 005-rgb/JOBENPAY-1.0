@@ -13,15 +13,21 @@ function assertOrgId(orgId) {
   }
 }
 
-export async function listPayees(orgId, db = pool) {
+export async function listPayees(orgId, db = pool, environment = null) {
   assertOrgId(orgId);
+  const conditions = ['org_id = $1'];
+  const params = [orgId];
+  if (environment) {
+    conditions.push('environment = $2');
+    params.push(String(environment).toUpperCase());
+  }
   const result = await db.query(
     `SELECT id, org_id, display_name, kind, identifier_enc, identifier_hmac,
             identifier_masked, trust, changed_at, created_at
      FROM payees
-     WHERE org_id = $1
+     WHERE ${conditions.join(' AND ')}
      ORDER BY created_at DESC, id`,
-    [orgId],
+    params,
   );
   return result.rows;
 }
@@ -46,16 +52,17 @@ export async function createPayee(orgId, {
   identifierHmac,
   identifierMasked,
   trust = PAYEE_STATUSES.NEW,
+  environment = 'SANDBOX',
 }, db = pool) {
   assertOrgId(orgId);
   const result = await db.query(
     `INSERT INTO payees (
-       org_id, display_name, kind, identifier_enc, identifier_hmac, identifier_masked, trust
+       org_id, display_name, kind, identifier_enc, identifier_hmac, identifier_masked, trust, environment
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id, org_id, display_name, kind, identifier_enc, identifier_hmac,
                identifier_masked, trust, changed_at, created_at`,
-    [orgId, displayName, kind, identifierEnc, identifierHmac, identifierMasked, trust],
+    [orgId, displayName, kind, identifierEnc, identifierHmac, identifierMasked, trust, (environment || 'SANDBOX').toUpperCase()],
   );
   return result.rows[0];
 }

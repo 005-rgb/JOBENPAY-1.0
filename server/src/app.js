@@ -950,7 +950,7 @@ export function createApp() {
   api.get('/dashboard/summary', requireSession, async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const summary = await getDashboardSummary(orgId);
+      const summary = await getDashboardSummary(orgId, undefined, req.environment || 'SANDBOX');
       const sessionUser = await loadSessionUser(req);
       const role = effectiveRole(sessionUser?.membership, sessionUser?.org?.slug);
       if (['OWNER', 'ADMIN', 'JUDGE'].includes(role)) {
@@ -1142,7 +1142,7 @@ export function createApp() {
 
   api.get('/mandates', requireSession, async (req, res, next) => {
     try {
-      const mandates = await listMandates(req.session.current_org_id || GLOBAL_ORG_ID);
+      const mandates = await listMandates(req.session.current_org_id || GLOBAL_ORG_ID, undefined, req.environment || null);
       return res.status(200).json({ mandates });
     } catch (error) {
       return next(error);
@@ -1152,7 +1152,7 @@ export function createApp() {
   api.post('/mandates', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const agent = await getAgent(orgId, req.body?.agentId);
+      const agent = await getAgent(orgId, req.body?.agentId, undefined, req.environment || null);
       if (!agent) throw buildError('NOT_FOUND', 'Agent not found.', 404);
       const result = await withTx((tx) => createMandate(tx, {
         orgId,
@@ -1160,6 +1160,7 @@ export function createApp() {
         name: String(req.body?.name || '').trim() || 'Untitled mandate',
         policy: req.body?.policy,
         purposeText: req.body?.purposeText,
+        environment: req.environment || 'SANDBOX',
       }));
       return res.status(201).json(result);
     } catch (error) {
@@ -1346,7 +1347,7 @@ export function createApp() {
 
   api.get('/documents', requireSession, async (req, res, next) => {
     try {
-      const documents = await listDocuments(req.session.current_org_id || GLOBAL_ORG_ID);
+      const documents = await listDocuments(req.session.current_org_id || GLOBAL_ORG_ID, undefined, req.environment || null);
       return res.status(200).json({
         documents: documents.map((document) => ({
           id: document.id,
@@ -1637,7 +1638,7 @@ export function createApp() {
 
   api.get('/payees', requireSession, async (req, res, next) => {
     try {
-      const payees = await listPayees(req.session.current_org_id || GLOBAL_ORG_ID);
+      const payees = await listPayees(req.session.current_org_id || GLOBAL_ORG_ID, undefined, req.environment || null);
       return res.status(200).json({ payees: payees.map((payee) => publicPayee(payee)) });
     } catch (error) {
       return next(error);
@@ -1662,6 +1663,7 @@ export function createApp() {
         kind,
         ...identifiers,
         trust: 'PENDING_REVIEW',
+        environment: req.environment || 'SANDBOX',
       });
       return res.status(201).json({ payee: publicPayee(payee) });
     } catch (error) {

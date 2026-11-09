@@ -459,7 +459,7 @@ export function Footer({ t, className = '' }) {
   );
 }
 
-function Sidebar({ pathname, t, onNavigate }) {
+function Sidebar({ pathname, t, onNavigate, isLive, setEnvironment }) {
   const [openGroups, setOpenGroups] = useState({});
   return (
     <aside className={styles.sidebar} data-testid="sidebar">
@@ -470,6 +470,33 @@ function Sidebar({ pathname, t, onNavigate }) {
         <button aria-label={t('app.dismiss') || 'Close navigation'} className={styles.drawerCloseBtn} onClick={onNavigate} type="button">
           <X aria-hidden="true" size={20} />
         </button>
+      </div>
+      <div className={styles.sidebarEnvCard} data-testid="sidebar-env-card">
+        <div className={styles.sidebarEnvHeader}>
+          <span className={styles.sidebarEnvLabel}>{isLive ? 'MODE: LIVE' : 'MODE: SANDBOX'}</span>
+        </div>
+        <div className={styles.sidebarEnvGroup} role="group" aria-label="Environment Selection">
+          <button
+            type="button"
+            className={`${styles.sidebarEnvBtn} ${!isLive ? styles.sidebarEnvActiveSandbox : ''}`}
+            onClick={() => setEnvironment('SANDBOX')}
+            data-testid="sidebar-env-sandbox-btn"
+            aria-pressed={!isLive}
+          >
+            <span className={styles.envDotSandbox} aria-hidden="true" />
+            Sandbox
+          </button>
+          <button
+            type="button"
+            className={`${styles.sidebarEnvBtn} ${isLive ? styles.sidebarEnvActiveLive : ''}`}
+            onClick={() => setEnvironment('LIVE')}
+            data-testid="sidebar-env-live-btn"
+            aria-pressed={isLive}
+          >
+            <span className={styles.envDotLive} aria-hidden="true" />
+            Live
+          </button>
+        </div>
       </div>
       <CreateMenu t={t} />
       <SideNavigation
@@ -542,7 +569,13 @@ export default function AppShell({
     <div className={`${styles.appShell} ${fixture ? styles.parityShell : ''}`}>
       {drawerOpen ? <button aria-label="Close navigation" className={styles.drawerBackdrop} onClick={closeDrawer} type="button" /> : null}
       <div className={`${styles.sidebarFrame} ${drawerOpen ? styles.sidebarOpen : ''}`}>
-        <Sidebar onNavigate={closeDrawer} pathname={location.pathname} t={t} />
+        <Sidebar
+          isLive={isLive}
+          onNavigate={closeDrawer}
+          pathname={location.pathname}
+          setEnvironment={setEnvironment}
+          t={t}
+        />
       </div>
       <div className={styles.mainColumn}>
         <header className={styles.header} data-testid="header">
@@ -559,16 +592,35 @@ export default function AppShell({
             </div>
           </div>
           <div className={styles.headerActions}>
-            <button
-              type="button"
-              className={`${isLive ? styles.liveChip : styles.sandboxChip} ${styles.envToggleBtn}`}
+            <div
+              className={styles.environmentSwitcher}
               data-testid="sandbox-chip"
-              onClick={() => setEnvironment(isLive ? 'SANDBOX' : 'LIVE')}
-              title={isLive ? 'Switch to Sandbox' : 'Switch to Live'}
-              aria-label={`Current environment: ${environment}. Click to toggle.`}
+              role="group"
+              aria-label="Environment Mode"
             >
-              {isLive ? 'LIVE' : t('app.sandbox')}
-            </button>
+              <button
+                type="button"
+                className={`${styles.envSwitchOption} ${!isLive ? styles.envSwitchActiveSandbox : styles.envSwitchInactive}`}
+                onClick={() => setEnvironment('SANDBOX')}
+                data-testid="env-sandbox-btn"
+                aria-pressed={!isLive}
+                title="Switch to Sandbox testing mode"
+              >
+                <span className={styles.envDotSandbox} aria-hidden="true" />
+                <span>Sandbox</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.envSwitchOption} ${isLive ? styles.envSwitchActiveLive : styles.envSwitchInactive}`}
+                onClick={() => setEnvironment('LIVE')}
+                data-testid="env-live-btn"
+                aria-pressed={isLive}
+                title="Switch to Live production mode"
+              >
+                <span className={styles.envDotLive} aria-hidden="true" />
+                <span>Live</span>
+              </button>
+            </div>
             <RouterLink aria-label={t('app.developer')} className={styles.headerIconButton} to="/developer">
               <Code2 aria-hidden="true" size={24} strokeWidth={1.5} />
             </RouterLink>

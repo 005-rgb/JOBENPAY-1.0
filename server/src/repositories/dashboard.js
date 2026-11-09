@@ -1,20 +1,22 @@
 import pool from '../db/pool.js';
 
-export async function getDashboardSummary(orgId, db = pool) {
+export async function getDashboardSummary(orgId, db = pool, environment = 'SANDBOX') {
   if (!orgId) {
     throw new Error('orgId is required for dashboard repository methods.');
   }
+
+  const env = (environment || 'SANDBOX').toUpperCase();
 
   const result = await db.query(`
     WITH request_counts AS (
       SELECT
         count(*)::integer AS requests,
-        count(*) FILTER (WHERE decision = 'AUTO_APPROVE')::integer AS auto_approved,
-        count(*) FILTER (WHERE status = 'PENDING_APPROVAL')::integer AS held,
+        count(*) FILTER (WHERE metadata->>'decision' = 'AUTO_APPROVE')::integer AS auto_approved,
+        count(*) FILTER (WHERE status = 'PENDING_APPROVAL' OR status = 'NEEDS_APPROVAL')::integer AS held,
         count(*) FILTER (WHERE status = 'REJECTED')::integer AS blocked,
-        count(*) FILTER (WHERE status = 'RECONCILED')::integer AS reconciled
-      FROM payment_requests
-      WHERE org_id = $1
+        count(*) FILTER (WHERE reconciliation_status = 'RECONCILED')::integer AS reconciled
+      FROM transaction_intents
+      WHERE org_id = $1 AND environment = $2
     ), active_budget AS (
       SELECT
         GREATEST(period.limit_minor - period.reserved_minor - period.spent_minor, 0)::text AS remaining_minor,
@@ -30,6 +32,7 @@ export async function getDashboardSummary(orgId, db = pool) {
         ON period.org_id = version.org_id
        AND period.version_id = version.id
       WHERE mandate.org_id = $1
+        AND mandate.environment = $2
         AND mandate.status = 'ACTIVE'
         AND period.period_start <= now()
         AND period.period_end > now()
@@ -52,14 +55,14 @@ export async function getDashboardSummary(orgId, db = pool) {
       ) AS paypal_connected,
       EXISTS (
         SELECT 1 FROM agents
-        WHERE org_id = $1 AND status = 'ACTIVE'
+        WHERE org_id = $1 AND environment = $2 AND status = 'ACTIVE'
       ) AS has_agent,
       EXISTS (
         SELECT 1 FROM mandates
-        WHERE org_id = $1 AND status = 'ACTIVE'
+        WHERE org_id = $1 AND environment = $2 AND status = 'ACTIVE'
       ) AS has_active_mandate
     FROM request_counts
-  `, [orgId]);
+  `, [orgId, env]);
 
   const row = result.rows[0];
   return {
