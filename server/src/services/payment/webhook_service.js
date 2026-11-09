@@ -96,6 +96,8 @@ export class PaymentWebhookService {
       const row = existingCheck.rows[0];
       logger.info({ gateway: gw, gatewayEventId, eventType }, 'Idempotent duplicate webhook event ignored');
       return {
+        success: true,
+        received: true,
         duplicate: true,
         eventId: row.event_id,
         eventType: row.event_type,
@@ -173,6 +175,7 @@ export class PaymentWebhookService {
 
     return {
       success: true,
+      received: true,
       duplicate: false,
       eventId,
       eventType,

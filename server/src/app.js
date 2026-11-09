@@ -47,6 +47,8 @@ import { createDipRouter } from './routes/dip.js';
 import { createCplRouter } from './routes/cpl.js';
 import { createJplRouter } from './routes/jpl.js';
 import { createOpsRouter } from './routes/ops.js';
+import { createPaymentsRouter } from './routes/payments.js';
+import { postWebhookHandler } from './controllers/payment_controller.js';
 import { environmentMiddleware } from './middleware/environment.js';
 import { createAgentsRouter } from './routes/agents.js';
 import { createOrgRouter } from './routes/org.js';
@@ -505,6 +507,7 @@ export function createApp() {
   }));
   app.use(cookieParser());
   app.use('/webhooks/paypal', express.raw({ type: 'application/json', limit: '1mb' }));
+  app.use('/webhooks/payments', express.raw({ type: 'application/json', limit: '1mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(environmentMiddleware);
   if (!existsSync(WEB_INDEX_FILE)) {
@@ -548,6 +551,10 @@ export function createApp() {
   app.post('/agent/v1/transactions', agentAuth, handleAgentTransaction);
 
   app.post('/mcp', mcpOriginGuard, agentAuth, mcpHandler);
+
+  app.post('/webhooks/payments/:gateway', (req, res, next) => {
+    postWebhookHandler(req, res, next);
+  });
 
 
   app.post('/webhooks/paypal/:webhookToken', async (req, res, next) => {
@@ -644,6 +651,7 @@ export function createApp() {
   api.use(createCplRouter({ requireSession, requireCsrf }));
   api.use(createJplRouter({ requireSession, requireCsrf }));
   api.use(createOpsRouter({ requireSession }));
+  api.use(createPaymentsRouter({ requireSession, requireCsrf }));
   api.use(createAgentsRouter({ requireSession }));
   api.use(createOrgRouter({ requireSession }));
 

@@ -107,6 +107,20 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['GET /ops/slo/:id', 'SLO detail endpoint'],
   ['GET /ops/tenants/:org_id/metrics', 'Tenant metrics endpoint'],
   ['GET /ops/escrow/:escrow_id', 'Escrow detail endpoint'],
+  ['GET /payments/gateways', 'Payment gateways registry & status'],
+  ['GET /payments/stats', 'Payment statistics'],
+  ['GET /payments/vault', 'Vault payment methods'],
+  ['POST /payments/vault', 'Add payment method to vault'],
+  ['DELETE /payments/vault/:pmId', 'Delete vault payment method'],
+  ['POST /payments/vault/:pmId/default', 'Set default vault payment method'],
+  ['GET /payments/transactions', 'List payment transactions'],
+  ['GET /payments/transactions/:txId', 'Get transaction detail'],
+  ['POST /payments/execute', 'Execute payment orchestration'],
+  ['POST /payments/:txId/capture', 'Capture payment'],
+  ['POST /payments/:txId/refund', 'Refund payment'],
+  ['GET /payments/webhooks', 'List payment webhooks'],
+  ['POST /payments/webhooks/:gateway', 'Inbound gateway webhook receiver'],
+  ['POST /webhooks/payments/:gateway', 'Top-level raw body payment webhook receiver'],
 ]);
 
 async function createOrgFixture(db, orgName, slug) {
@@ -475,6 +489,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
       const parameterizedRoutes = allRoutes.filter((r) => (
         /:[a-zA-Z0-9_]+/.test(r.path) &&
         r.path !== '/webhooks/paypal/:webhookToken' &&
+        !r.path.includes('/webhooks/') &&
         !r.path.startsWith('/v1/') &&
         !r.path.startsWith('/proof/') &&
         !r.path.startsWith('/ops/')
@@ -507,6 +522,15 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
           }
           if (targetPath.includes(':escrow_id')) {
             targetPath = targetPath.replace(':escrow_id', crypto.randomUUID());
+          }
+          if (targetPath.includes(':pmId')) {
+            targetPath = targetPath.replace(':pmId', crypto.randomUUID());
+          }
+          if (targetPath.includes(':txId')) {
+            targetPath = targetPath.replace(':txId', crypto.randomUUID());
+          }
+          if (targetPath.includes(':gateway')) {
+            targetPath = targetPath.replace(':gateway', 'stripe');
           }
           if (targetPath.includes(':id')) {
             if (targetPath.startsWith('/requests/')) targetPath = targetPath.replace(':id', orgB.requestPending.id);

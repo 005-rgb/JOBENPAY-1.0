@@ -66,6 +66,7 @@ const DipPage = lazy(() => import('./pages/DipPages.jsx').then((p) => ({ default
 const CplPage = lazy(() => import('./pages/CplPages.jsx').then((p) => ({ default: p.CplPage })));
 const JplPage = lazy(() => import('./pages/JplPages.jsx').then((p) => ({ default: p.JplPage })));
 const OpsPage = lazy(() => import('./pages/OpsPages.jsx'));
+const PaymentsPage = lazy(() => import('./pages/PaymentsPage.jsx'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -158,6 +159,11 @@ function AuthenticatedApp() {
           <Route element={<OpsPage tab="circuit-breakers" />} path="/ops/circuit-breakers" />
           <Route element={<OpsPage tab="runbooks" />} path="/ops/runbooks" />
           <Route element={<OpsPage tab="secrets" />} path="/ops/secrets" />
+          <Route element={<PaymentsPage tab="overview" />} path="/payments" />
+          <Route element={<PaymentsPage tab="vault" />} path="/payments/vault" />
+          <Route element={<PaymentsPage tab="transactions" />} path="/payments/transactions" />
+          <Route element={<PaymentsPage tab="simulator" />} path="/payments/simulator" />
+          <Route element={<PaymentsPage tab="webhooks" />} path="/payments/webhooks" />
           <Route element={<ComingSoonPage />} path="*" />
         </Routes>
       </Suspense>

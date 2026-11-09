@@ -23,6 +23,8 @@ function assertOrgAndEnv(orgId, environment) {
  * VaultService: Mengelola tokenized payment methods tanpa menyimpan nomor kartu (PAN) mentah.
  * Memenuhi standar PCI DSS v4.0 (PRD 4.1 §0 Rule 2).
  */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export class VaultService {
   /**
    * Menyimpan payment method tokenized.
@@ -125,6 +127,9 @@ export class VaultService {
     if (!pmId) {
       throw new AppError('VALIDATION_FAILED', 400, 'pmId is required');
     }
+    if (!UUID_REGEX.test(pmId)) {
+      throw new AppError('PAYMENT_METHOD_NOT_FOUND', 404, `Payment method ${pmId} not found`);
+    }
 
     const res = await dbClient.query(
       `SELECT * FROM payment_methods
@@ -154,8 +159,46 @@ export class VaultService {
        ORDER BY is_default DESC, created_at DESC`,
       [orgId, env, customerId],
     );
-
     return res.rows;
+  }
+
+  /**
+   * Menampilkan daftar seluruh payment methods milik organisasi
+   */
+  static async listOrgPaymentMethods(orgId, environment, dbClient = pool) {
+    const env = assertOrgAndEnv(orgId, environment);
+    const res = await dbClient.query(
+      `SELECT * FROM payment_methods
+       WHERE org_id = $1 AND environment = $2
+       ORDER BY is_default DESC, created_at DESC`,
+      [orgId, env],
+    );
+    return res.rows;
+  }
+
+  /**
+   * Mengatur payment method sebagai default
+   */
+  static async setDefaultPaymentMethod(orgId, environment, pmId, dbClient = pool) {
+    const env = assertOrgAndEnv(orgId, environment);
+    const existing = await VaultService.getPaymentMethod(orgId, env, pmId, dbClient);
+
+    await dbClient.query(
+      `UPDATE payment_methods
+       SET is_default = FALSE
+       WHERE org_id = $1 AND environment = $2 AND customer_id = $3`,
+      [orgId, env, existing.customer_id],
+    );
+
+    const res = await dbClient.query(
+      `UPDATE payment_methods
+       SET is_default = TRUE
+       WHERE org_id = $1 AND environment = $2 AND pm_id = $3
+       RETURNING *`,
+      [orgId, env, pmId],
+    );
+
+    return res.rows[0];
   }
 
   /**
@@ -165,6 +208,9 @@ export class VaultService {
     const env = assertOrgAndEnv(orgId, environment);
     if (!pmId) {
       throw new AppError('VALIDATION_FAILED', 400, 'pmId is required');
+    }
+    if (!UUID_REGEX.test(pmId)) {
+      throw new AppError('PAYMENT_METHOD_NOT_FOUND', 404, `Payment method ${pmId} not found`);
     }
 
     const res = await dbClient.query(
@@ -181,5 +227,35 @@ export class VaultService {
     return { success: true, pm_id: pmId };
   }
 }
+
+export const savePaymentMethod = (orgId, environment, customerId, gateway, token, cardMeta = {}) =>
+  VaultService.savePaymentMethod({
+    orgId,
+    environment,
+    customerId,
+    gateway,
+    token,
+    cardBrand: cardMeta.brand || cardMeta.cardBrand,
+    cardLast4: cardMeta.last4 || cardMeta.cardLast4,
+    cardExpMonth: cardMeta.expMonth || cardMeta.cardExpMonth,
+    cardExpYear: cardMeta.expYear || cardMeta.cardExpYear,
+    isDefault: cardMeta.isDefault ?? true,
+  });
+
+export const getPaymentMethod = (orgId, environment, pmId) =>
+  VaultService.getPaymentMethod(orgId, environment, pmId);
+
+export const listPaymentMethods = (orgId, environment, customerId = null) => {
+  if (customerId) {
+    return VaultService.listPaymentMethods(orgId, environment, customerId);
+  }
+  return VaultService.listOrgPaymentMethods(orgId, environment);
+};
+
+export const deletePaymentMethod = (orgId, environment, pmId) =>
+  VaultService.deletePaymentMethod(orgId, environment, pmId);
+
+export const setDefaultPaymentMethod = (orgId, environment, pmId) =>
+  VaultService.setDefaultPaymentMethod(orgId, environment, pmId);
 
 export default VaultService;

@@ -32,6 +32,8 @@ test('route table protects session mutations and parameterized reads', () => {
     '/agent/v1/dispute-accept-requests',
     '/mcp',
     '/webhooks/paypal/:webhookToken',
+    '/webhooks/payments/:gateway',
+    '/payments/webhooks/:gateway',
     // test-changed: PRD 1.6 Open Trust Exchange, PRD 1.9 Secret Rotation & PRD 2.0 Ops endpoints are sessionless
     '/v1/verify/receipt',
     '/v1/verify/batch',

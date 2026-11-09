@@ -43,6 +43,7 @@ const english = {
     payees: 'Payees',
     documents: 'Documents',
     disputes: 'Disputes',
+    paymentOrchestration: 'Payment Orchestration (POL)',
     agents: 'Agents',
     mandates: 'Mandates',
     intentAnchors: 'Intent Anchors',
@@ -394,6 +395,7 @@ const indonesian = {
   ...english,
   app: {
     ...english.app,
+    paymentOrchestration: 'Orkestrasi Pembayaran (POL)',
   },
   transactions: {
     ...english.transactions,
