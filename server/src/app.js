@@ -1920,7 +1920,12 @@ export function createApp() {
   });
 
   const resolveEnvHeader = (req) => {
-    const raw = req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || req.environment || 'SANDBOX';
+    const raw = req.query?.environment
+      || req.query?.env
+      || req.headers['x-jobenpay-environment']
+      || req.headers['x-environment']
+      || req.environment
+      || 'SANDBOX';
     return String(raw).toUpperCase() === 'LIVE' || String(raw).toUpperCase() === 'PRODUCTION' ? 'LIVE' : 'SANDBOX';
   };
 
@@ -1929,7 +1934,7 @@ export function createApp() {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       const targetEnv = resolveEnvHeader(req);
       const connection = await getPaypalConnection(orgId, targetEnv);
-      if (!connection) {
+      if (!connection || (connection.environment && connection.environment !== targetEnv)) {
         return res.status(200).json({
           client_id_masked: null,
           status: 'UNTESTED',
@@ -1950,7 +1955,7 @@ export function createApp() {
         : '';
       const { membership } = await loadSessionUser(req);
       const canViewWebhookUrl = membership?.role === 'OWNER' && !membership.is_judge;
-      const isLegacyCall = req.path.endsWith('/paypal/connection') && !req.headers['x-jobenpay-environment'] && !req.headers['x-environment'];
+      const isLegacyCall = targetEnv === 'SANDBOX' && req.path.endsWith('/paypal/connection') && !req.headers['x-jobenpay-environment'] && !req.headers['x-environment'] && !req.query?.environment;
       return res.status(200).json({
         client_id_masked: clientId.length > 4 ? `****${clientId.slice(-4)}` : '****',
         status: connection.status || 'UNTESTED',
@@ -1976,12 +1981,19 @@ export function createApp() {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       const targetEnv = resolveEnvHeader(req);
-      const current = await getPaypalCredentials(orgId, targetEnv);
+      const rawCurrent = await getPaypalCredentials(orgId, targetEnv);
+      const current = (rawCurrent && rawCurrent.environment === targetEnv) ? rawCurrent : null;
       const clientIdProvided = typeof req.body?.clientId === 'string' && req.body.clientId.trim().length > 0;
       const clientSecretProvided = typeof req.body?.clientSecret === 'string' && req.body.clientSecret.trim().length > 0;
       const credentialsProvided = clientIdProvided || clientSecretProvided;
       if (credentialsProvided && (!clientIdProvided || !clientSecretProvided)) {
         throw buildError('VALIDATION_FAILED', 'Both clientId and clientSecret are required.', 400);
+      }
+      if (targetEnv === 'LIVE' && clientIdProvided) {
+        const lowerId = String(req.body.clientId).trim().toLowerCase();
+        if (lowerId.startsWith('sb-') || lowerId.includes('sandbox')) {
+          throw buildError('VALIDATION_FAILED', 'Kredensial Sandbox tidak dapat digunakan untuk mode LIVE. Harap gunakan PayPal Live Client ID produksi.', 400);
+        }
       }
       if ((!current?.client_id_enc || !current?.client_secret_enc) && !credentialsProvided) {
         throw buildError('VALIDATION_FAILED', 'PayPal client credentials are required.', 400);

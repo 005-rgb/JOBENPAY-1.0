@@ -889,17 +889,25 @@ export function PaypalSettingsPage() {
     }
   };
   const owner = auth.role === 'OWNER';
+  const envQueryString = `?environment=${environment}&env=${environment}`;
+  const envHeaders = {
+    'x-jobenpay-environment': environment,
+    'x-environment': environment,
+  };
   const query = usePageQuery(['paypal-credentials', environment], async () => {
     try {
-      return await apiClient.get('/paypal/credentials');
+      return await apiClient.get(`/paypal/credentials${envQueryString}`, { headers: envHeaders });
     } catch (err) {
       if (err?.status === 404) {
-        return await apiClient.get('/paypal/connection');
+        return await apiClient.get(`/paypal/connection${envQueryString}`, { headers: envHeaders });
       }
       throw err;
     }
   });
-  const connection = query.data || {
+
+  const rawConnection = query.data;
+  const isDataMatchingEnv = rawConnection && rawConnection.environment === environment;
+  const connection = isDataMatchingEnv ? rawConnection : {
     client_id_masked: null,
     status: 'UNTESTED',
     environment,
@@ -908,6 +916,8 @@ export function PaypalSettingsPage() {
     lastTestedAt: null,
     lastErrorCode: null,
   };
+
+  const isConnected = connection.status === 'CONNECTED' && Boolean(connection.client_id_masked);
 
   const save = async (event, grantId) => {
     event?.preventDefault();
@@ -920,6 +930,10 @@ export function PaypalSettingsPage() {
       setFeedback(t('app.credentialsBothRequired'));
       return;
     }
+    if (isLive && clientId && (clientId.toLowerCase().startsWith('sb-') || clientId.toLowerCase().includes('sandbox'))) {
+      setFeedback('Peringatan: Kredensial terdeteksi sebagai Sandbox. Untuk mode Live, gunakan Client ID produksi.');
+      return;
+    }
     const body = {
       ...(clientId && clientSecret ? { clientId, clientSecret } : {}),
       webhookId,
@@ -930,10 +944,10 @@ export function PaypalSettingsPage() {
       return;
     }
     try {
-      await apiClient.put('/paypal/credentials', body, { stepUpGrant: grantId });
+      await apiClient.put(`/paypal/credentials${envQueryString}`, body, { stepUpGrant: grantId, headers: envHeaders });
     } catch (err) {
       if (err?.status === 404) {
-        await apiClient.put('/paypal/connection', body, { stepUpGrant: grantId });
+        await apiClient.put(`/paypal/connection${envQueryString}`, body, { stepUpGrant: grantId, headers: envHeaders });
       } else {
         throw err;
       }
@@ -948,10 +962,10 @@ export function PaypalSettingsPage() {
     setFeedback('');
     try {
       try {
-        await apiClient.post('/paypal/credentials/test');
+        await apiClient.post(`/paypal/credentials/test${envQueryString}`, null, { headers: envHeaders });
       } catch (err) {
         if (err?.status === 404) {
-          await apiClient.post('/paypal/connection/test');
+          await apiClient.post(`/paypal/connection/test${envQueryString}`, null, { headers: envHeaders });
         } else {
           throw err;
         }
@@ -969,9 +983,19 @@ export function PaypalSettingsPage() {
 
   return (
     <div className={styles.pageStack}>
-      {isLive ? (
+      {isLive && !isConnected ? (
+        <Banner kind="warning" title="PAYPAL LIVE — BELUM TERHUBUNG">
+          Lingkungan LIVE beroperasi dengan data dan dana nyata. Saat ini <strong>PayPal Live</strong> produksi Anda <strong>BELUM TERHUBUNG</strong>. Silakan masukkan Client ID dan Secret akun produksi Anda di bawah ini, lalu klik Simpan &amp; Uji Koneksi untuk mengaktifkan transaksi nyata. Jangan gunakan kunci Sandbox di sini.
+        </Banner>
+      ) : null}
+      {isLive && isConnected ? (
         <Banner kind="error" title="LIVE MODE WARNING">
-          You are configuring REAL credentials. Do not use Sandbox keys here. All operations will use real money.
+          Konektor <strong>PayPal Live</strong> aktif terhubung ke produksi. Seluruh transaksi dan mutasi saldo di lingkungan ini menggunakan uang nyata.
+        </Banner>
+      ) : null}
+      {!isLive ? (
+        <Banner kind="info" title="PAYPAL SANDBOX">
+          Konektor <strong>PayPal Sandbox</strong> aktif di lingkungan simulasi. Semua transaksi dan saldo bersifat simulasi aman tanpa uang riil.
         </Banner>
       ) : null}
       <Card
@@ -983,21 +1007,51 @@ export function PaypalSettingsPage() {
           <h2 style={isLive ? { color: 'var(--jp-error, #dc2626)' } : {}}>
             PayPal {isLive ? 'Live' : 'Sandbox'}
           </h2>
-          <StatusPill status={connection.status} label={connection.status} />
+          <StatusPill
+            status={isConnected ? 'COMPLETED' : (isLive ? 'FAILED' : connection.status)}
+            label={isConnected ? `CONNECTED (${isLive ? 'LIVE' : 'SANDBOX'})` : (isLive ? 'BELUM TERHUBUNG' : connection.status)}
+          />
         </div>
         <dl className={styles.detailsList}>
-          <div><dt>{t('app.connectionStatus')}</dt><dd>{connection.status}</dd></div>
-          <div><dt>{t('app.clientId')}</dt><dd>{connection.client_id_masked || t('app.noConnection')}</dd></div>
-          <div><dt>{t('app.lastTested')}</dt><dd>{connection.lastTestedAt ? new Date(connection.lastTestedAt).toLocaleString() : t('app.noData')}</dd></div>
+          <div>
+            <dt>{t('app.connectionStatus')}</dt>
+            <dd style={{ fontWeight: 600, color: isConnected ? 'var(--jp-success, #16a34a)' : (isLive ? 'var(--jp-error, #dc2626)' : 'inherit') }}>
+              {isConnected ? 'CONNECTED' : (isLive ? 'BELUM TERHUBUNG / NOT CONNECTED' : connection.status)}
+            </dd>
+          </div>
+          <div>
+            <dt>{t('app.clientId')}</dt>
+            <dd>{connection.client_id_masked || (isLive ? 'Belum terhubung (Masukkan Live Client ID)' : t('app.noConnection'))}</dd>
+          </div>
+          <div>
+            <dt>{t('app.lastTested')}</dt>
+            <dd>{connection.lastTestedAt ? new Date(connection.lastTestedAt).toLocaleString() : 'Belum pernah diuji / Never tested'}</dd>
+          </div>
           {connection.lastErrorCode ? <div><dt>{t('components.error')}</dt><dd>{connection.lastErrorCode}</dd></div> : null}
         </dl>
         {!owner ? <p className={styles.fieldHint}>{t('app.readOnlyRole')}</p> : (
           <form className={styles.formStack} onSubmit={(event) => {
             save(event).catch((error) => setFeedback(error.message));
           }} ref={formRef}>
-            <FloatingInput autoComplete="off" label={t('app.clientId')} name="clientId" />
-            <FloatingInput autoComplete="new-password" label={t('app.clientSecret')} name="clientSecret" type="password" />
-            <FloatingInput key={environment} defaultValue={connection.webhookId || ''} label={t('app.webhookId')} name="webhookId" />
+            <FloatingInput
+              autoComplete="off"
+              label={isLive ? 'Client ID (PayPal Live)' : t('app.clientId')}
+              name="clientId"
+              placeholder={isLive ? 'Masukkan Live Client ID produksi' : ''}
+            />
+            <FloatingInput
+              autoComplete="new-password"
+              label={isLive ? 'Client Secret (PayPal Live)' : t('app.clientSecret')}
+              name="clientSecret"
+              type="password"
+              placeholder={isLive ? 'Masukkan Live Client Secret produksi' : ''}
+            />
+            <FloatingInput
+              key={`${environment}-${connection.webhookId || 'empty'}`}
+              defaultValue={connection.webhookId || ''}
+              label={isLive ? 'Webhook ID (PayPal Live)' : t('app.webhookId')}
+              name="webhookId"
+            />
             {feedback ? <p className={styles.formFeedback} role="status">{feedback}</p> : null}
             <div className={styles.inlineActions}>
               <Button type="submit">{t('app.saveConnection')}</Button>
@@ -1005,11 +1059,30 @@ export function PaypalSettingsPage() {
             </div>
           </form>
         )}
-        {connection.webhookUrl ? <div className={styles.webhookBlock}><h3>{t('app.webhookUrl')}</h3><CodeBlock value={connection.webhookUrl} /></div> : null}
+        {connection.webhookUrl ? (
+          <div className={styles.webhookBlock}>
+            <h3>{isLive ? 'PayPal Live Webhook URL' : t('app.webhookUrl')}</h3>
+            <p className={styles.fieldHint}>
+              {isLive
+                ? 'Daftarkan webhook URL ini pada dashboard pengembang mode Live untuk menerima event mutasi nyata.'
+                : 'Daftarkan webhook URL ini pada dashboard pengembang mode Sandbox untuk menerima event simulasi.'}
+            </p>
+            <CodeBlock value={connection.webhookUrl} />
+          </div>
+        ) : (
+          <div className={styles.webhookBlock}>
+            <h3>{isLive ? 'PayPal Live Webhook URL' : t('app.webhookUrl')}</h3>
+            <p className={styles.fieldHint} style={{ color: 'var(--jp-muted, #64748b)' }}>
+              {isLive
+                ? 'Webhook URL Live akan otomatis dibuat dan aktif setelah kredensial PayPal Live Anda disimpan.'
+                : 'Webhook URL Sandbox akan otomatis dibuat dan aktif setelah kredensial PayPal Sandbox Anda disimpan.'}
+            </p>
+          </div>
+        )}
       </Card>
       <Card className={styles.formCard} padding="form">
         <div className={styles.cardHeading}>
-          <h2>{t('app.preflightTitle') || 'Real-Payout Preflight Checks'}</h2>
+          <h2>{isLive ? 'Live Real-Payout Preflight Checks' : (t('app.preflightTitle') || 'Real-Payout Preflight Checks')}</h2>
           {preflightResult ? (
             <StatusPill
               status={preflightResult.ready ? 'COMPLETED' : 'FAILED'}
@@ -1018,7 +1091,9 @@ export function PaypalSettingsPage() {
           ) : null}
         </div>
         <p className={styles.fieldHint}>
-          {t('app.preflightDesc') || 'Verify all 12 operational readiness checks (PF-01 to PF-12) before executing payouts against PayPal Sandbox.'}
+          {isLive
+            ? 'Verifikasi seluruh 12 pemeriksaan kesiapan operasional (PF-01 s/d PF-12) sebelum mengeksekusi payout uang nyata pada PayPal Live.'
+            : (t('app.preflightDesc') || 'Verify all 12 operational readiness checks (PF-01 to PF-12) before executing payouts against PayPal Sandbox.')}
         </p>
         <div className={styles.inlineActions}>
           <Button disabled={preflightLoading} onClick={runPreflight} type="button">

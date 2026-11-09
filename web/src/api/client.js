@@ -1,5 +1,11 @@
 let csrfToken = '';
 let currentEnvironment = 'SANDBOX';
+try {
+  const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('jobenpay_environment') : null;
+  if (saved && (saved === 'LIVE' || saved === 'SANDBOX')) {
+    currentEnvironment = saved;
+  }
+} catch {}
 
 export function setCsrfToken(token) {
   csrfToken = token || '';
@@ -34,9 +40,9 @@ async function request(path, { method = 'GET', body, headers = {}, stepUpGrant }
   }
   if (stepUpGrant) requestHeaders.set('x-step-up-grant', stepUpGrant);
 
-  const cleanPath = path.startsWith('/api/v1') ? path : `/api/v1${path.startsWith('/') ? path : `/${path}`}`;
+  let cleanPath = path.startsWith('/api/v1') ? path : `/api/v1${path.startsWith('/') ? path : `/${path}`}`;
 
-  // Attach environment header for operational routes (skip global routes)
+  // Attach environment header and query parameter for operational routes (skip global routes)
   const GLOBAL_PREFIXES = ['/api/v1/org', '/api/v1/members', '/api/v1/billing', '/api/v1/auth'];
   const isGlobal = GLOBAL_PREFIXES.some((prefix) => cleanPath.startsWith(prefix));
   if (!isGlobal) {
@@ -45,6 +51,10 @@ async function request(path, { method = 'GET', body, headers = {}, stepUpGrant }
     }
     if (!requestHeaders.has('x-environment')) {
       requestHeaders.set('x-environment', currentEnvironment);
+    }
+    if (!cleanPath.includes('environment=') && !cleanPath.includes('env=')) {
+      const sep = cleanPath.includes('?') ? '&' : '?';
+      cleanPath = `${cleanPath}${sep}environment=${currentEnvironment}`;
     }
   }
 
