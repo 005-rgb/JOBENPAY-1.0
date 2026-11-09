@@ -86,7 +86,7 @@ DROP TRIGGER IF EXISTS trg_payment_transaction_state ON payment_transactions;
 CREATE TRIGGER trg_payment_transaction_state
   BEFORE UPDATE ON payment_transactions
   FOR EACH ROW
-  EXECUTE FUNCTION fn_payment_transaction_state_transition();
+  EXECUTE PROCEDURE fn_payment_transaction_state_transition();
 
 -- 2.3 Tabel Webhook Events (Untuk Deduplikasi)
 CREATE TABLE IF NOT EXISTS payment_webhook_events (
