@@ -6,7 +6,7 @@
 import React, { useId, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowLeft,
@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { useEnvironment } from '../context/EnvironmentContext.jsx';
+import { useToast } from '../components/primitives.jsx';
 import {
   TRANSACTION_CATEGORIES,
   CATEGORY_SUBTYPES,
@@ -54,6 +55,8 @@ function generateClientUuid() {
 export function NewTransactionPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { notify } = useToast();
   const [searchParams] = useSearchParams();
   const { environment, isLive } = useEnvironment();
   const [isDelayingLive, setIsDelayingLive] = useState(false);
@@ -180,7 +183,10 @@ export function NewTransactionPage() {
         },
       });
     },
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
+      notify({ message: `Transaction proposal submitted successfully in ${environment} mode.` });
+      await queryClient.invalidateQueries({ queryKey: ['transactions', environment] });
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       const intentId = res.data?.intent_id || res.data?.id;
       if (intentId) {
         navigate(`/transactions/${intentId}`);
@@ -190,6 +196,7 @@ export function NewTransactionPage() {
     },
     onError: (err) => {
       setFormError(err.message || 'Transaction proposal failed.');
+      notify({ message: `Proposal failed: ${err.message}`, kind: 'error' });
     },
   });
 

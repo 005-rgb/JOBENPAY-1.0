@@ -107,8 +107,9 @@ export function TransactionDetailPage() {
       };
       const res = await apiClient.post('/proofs', payload);
       setProofUrl(res.proof_url);
+      notify({ message: 'Public cryptographic proof generated successfully.' });
     } catch (err) {
-      alert(`Failed to share proof: ${err.message}`);
+      notify({ message: `Failed to share proof: ${err.message}`, kind: 'error' });
     } finally {
       setSharing(false);
     }
@@ -134,15 +135,17 @@ export function TransactionDetailPage() {
         stepUpGrantId: grantId,
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (_, variables) => {
       setActionError('');
       setDecisionComment('');
+      notify({ message: `Transaction decision (${variables.choice}) submitted successfully.` });
       await queryClient.invalidateQueries({ queryKey: ['transaction', id, environment] });
       await queryClient.invalidateQueries({ queryKey: ['transactions', environment] });
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
     onError: (err) => {
       setActionError(err.message || 'Decision failed');
+      notify({ message: `Decision failed: ${err.message}`, kind: 'error' });
     },
   });
 
@@ -345,8 +348,17 @@ export function TransactionDetailPage() {
                   style={{ background: '#0c6b3c' }}
                   data-testid="approve-btn"
                 >
-                  <CheckCircle2 size={16} />
-                  Approve Transaction
+                  {decideMutation.isPending && decideMutation.variables?.choice === 'APPROVE' ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Approving Transaction...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={16} />
+                      Approve Transaction
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -356,8 +368,17 @@ export function TransactionDetailPage() {
                   style={{ color: '#9b1c2a', borderColor: '#f8b4be' }}
                   data-testid="reject-btn"
                 >
-                  <XCircle size={16} />
-                  Reject Transaction
+                  {decideMutation.isPending && decideMutation.variables?.choice === 'REJECT' ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Rejecting Transaction...
+                    </>
+                  ) : (
+                    <>
+                      <XCircle size={16} />
+                      Reject Transaction
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -569,7 +590,10 @@ export function TransactionDetailPage() {
               </div>
               <button
                 className={styles.secondaryButton}
-                onClick={() => { navigator.clipboard.writeText(proofUrl); alert('Proof URL copied!'); }}
+                onClick={() => {
+                  navigator.clipboard.writeText(proofUrl);
+                  notify({ message: 'Public proof URL copied to clipboard!' });
+                }}
                 style={{ fontSize: '12px', padding: '4px 8px' }}
               >
                 <Copy size={14} /> Copy

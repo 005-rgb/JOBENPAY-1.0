@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { RotateCcw, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Copy, Cpu, Eye, Layers } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { RotateCcw, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Copy, Cpu, Eye, Layers, RefreshCw } from 'lucide-react';
+import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
+import { Button, EmptyState, Skeleton, useToast } from '../components/primitives.jsx';
 import styles from './TransactionPages.module.css';
 
 /**
@@ -59,6 +63,7 @@ export function RsGauge({ score = 0, size = 110 }) {
  * Displays Cognitive Snapshot and allows Deterministic Replay (PRD 1.7 §8.1)
  */
 export function CplDisplayCard({ requestId }) {
+  const { notify } = useToast();
   const [snapshot, setSnapshot] = useState(null);
   const [replay, setReplay] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -74,19 +79,19 @@ export function CplDisplayCard({ requestId }) {
       setError(null);
 
       // Fetch snapshot
-      const snapRes = await fetch(`/api/v1/requests/${requestId}/snapshot`);
-      if (snapRes.ok) {
-        const snapData = await snapRes.json();
+      try {
+        const snapData = await apiClient.get(`/requests/${requestId}/snapshot`);
         setSnapshot(snapData.snapshot || snapData);
-      } else if (snapRes.status !== 404) {
-        throw new Error(`Snapshot error: HTTP ${snapRes.status}`);
+      } catch (err) {
+        if (err.status !== 404) throw err;
       }
 
       // Fetch replay if exists
-      const repRes = await fetch(`/api/v1/requests/${requestId}/replay`);
-      if (repRes.ok) {
-        const repData = await repRes.json();
+      try {
+        const repData = await apiClient.get(`/requests/${requestId}/replay`);
         setReplay(repData.replay || repData);
+      } catch {
+        // ignore 404 replay
       }
     } catch (err) {
       setError(err.message);
@@ -103,34 +108,42 @@ export function CplDisplayCard({ requestId }) {
     try {
       setReplaying(true);
       setActionMsg('');
-      const res = await fetch(`/api/v1/requests/${requestId}/replay`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || `Replay failed: HTTP ${res.status}`);
-      }
+      const data = await apiClient.post(`/requests/${requestId}/replay`, {});
       setReplay(data.replay || data);
       setActionMsg('Replay executed successfully!');
+      notify({
+        title: 'Replay Executed',
+        message: 'Cognitive Provenance replay executed successfully.',
+        kind: 'info',
+      });
       setTimeout(() => setActionMsg(''), 4000);
     } catch (err) {
-      alert(`Replay error: ${err.message}`);
+      notify({
+        title: 'Replay Failed',
+        message: err.message || 'Failed to execute replay.',
+        kind: 'error',
+      });
     } finally {
       setReplaying(false);
     }
   };
 
   const copyToClipboard = (text, label) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard?.writeText(text);
     setActionMsg(`${label} copied to clipboard!`);
+    notify({
+      title: 'Copied',
+      message: `${label} copied to clipboard.`,
+      kind: 'info',
+    });
     setTimeout(() => setActionMsg(''), 3000);
   };
 
   if (loading) {
     return (
       <div className={styles.formCard} style={{ maxWidth: '100%' }}>
-        <p className={styles.pageSubtitle}>Loading Cognitive Provenance Layer (CPL) data...</p>
+        <Skeleton style={{ height: '32px', width: '280px', marginBottom: '12px' }} />
+        <Skeleton style={{ height: '120px', width: '100%' }} />
       </div>
     );
   }
@@ -374,9 +387,7 @@ export function CplDisplayCard({ requestId }) {
  */
 export function CplPage({ initialTab = 'snapshots' }) {
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [snapshots, setSnapshots] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { environment } = useEnvironment();
   const [filterScore, setFilterScore] = useState('ALL');
   const [selectedSnapshot, setSelectedSnapshot] = useState(null);
 
@@ -384,24 +395,12 @@ export function CplPage({ initialTab = 'snapshots' }) {
   const [targetRequestId, setTargetRequestId] = useState('');
   const [activeReplayId, setActiveReplayId] = useState('');
 
-  const fetchSnapshots = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch('/api/v1/cpl/snapshots');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setSnapshots(data.snapshots || []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading: loading, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ['cpl-snapshots', environment],
+    queryFn: () => apiClient.get('/cpl/snapshots'),
+  });
 
-  useEffect(() => {
-    fetchSnapshots();
-  }, []);
+  const snapshots = data?.snapshots || [];
 
   const handleRunReplayFromTable = (requestId) => {
     setTargetRequestId(requestId);
@@ -523,11 +522,21 @@ export function CplPage({ initialTab = 'snapshots' }) {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px' }}>Loading cognitive snapshots...</td></tr>
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      <td colSpan={7} style={{ padding: '16px' }}>
+                        <Skeleton style={{ height: '24px', width: '100%' }} />
+                      </td>
+                    </tr>
+                  ))
                 ) : filteredSnapshots.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--jp-text-muted)' }}>
-                      No cognitive snapshots recorded yet. When transactions pass AI evaluation with CPL, immutable snapshots will appear here.
+                    <td colSpan={7} style={{ padding: '40px 20px', textAlign: 'center' }}>
+                      <EmptyState
+                        icon={Cpu}
+                        title="No Cognitive Snapshots Found"
+                        description={`No cognitive provenance snapshots recorded in ${environment} environment.`}
+                      />
                     </td>
                   </tr>
                 ) : (

@@ -436,4 +436,14 @@
   .formGrid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .tableScroll {
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .dataTable {
+    min-width: 580px;
+  }
 }

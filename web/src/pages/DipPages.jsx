@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, AlertTriangle, FileCheck, CheckCircle2, XCircle, ArrowLeft, Eye, Award } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ShieldCheck, AlertTriangle, FileCheck, CheckCircle2, XCircle, ArrowLeft, Eye, Award, RefreshCw, Trash2 } from 'lucide-react';
+import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
+import { Button, EmptyState, Skeleton, useToast } from '../components/primitives.jsx';
 import styles from './TransactionPages.module.css';
 
 /**
@@ -66,11 +70,7 @@ export function DipDisplayCard({ requestId }) {
   useEffect(() => {
     if (!requestId) return;
     setLoading(true);
-    fetch(`/api/v1/requests/${requestId}/dip`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
+    apiClient.get(`/requests/${requestId}/dip`)
       .then((data) => {
         setDip(data);
         setLoading(false);
@@ -84,7 +84,8 @@ export function DipDisplayCard({ requestId }) {
   if (loading) {
     return (
       <div className={styles.formCard} style={{ maxWidth: '100%' }}>
-        <p className={styles.pageSubtitle}>Loading Decision Integrity Proof data...</p>
+        <Skeleton style={{ height: '32px', width: '240px', marginBottom: '12px' }} />
+        <Skeleton style={{ height: '80px', width: '100%' }} />
       </div>
     );
   }
@@ -271,6 +272,7 @@ export function DipDisplayCard({ requestId }) {
  * Intent Anchor Builder Page (PRD 1.6 §8.1)
  */
 export function IntentAnchorBuilderPage() {
+  const { notify } = useToast();
   const [naturalLanguageInput, setNaturalLanguageInput] = useState('');
   const [purpose, setPurpose] = useState('equipment_purchase');
   const [minAmount, setMinAmount] = useState('0');
@@ -334,21 +336,20 @@ export function IntentAnchorBuilderPage() {
     };
 
     try {
-      const res = await fetch('/api/v1/intents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
+      const data = await apiClient.post('/intents', payload);
       setResult(data);
+      notify({
+        title: 'Intent Anchor Created',
+        message: `Intent ${data.intent?.id || data.id || ''} created and active.`,
+        kind: 'info',
+      });
     } catch (err) {
       setError(err.message);
+      notify({
+        title: 'Creation Failed',
+        message: err.message || 'Could not create Intent Anchor.',
+        kind: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -566,11 +567,12 @@ export function IntentAnchorBuilderPage() {
  */
 export function IntentAnchorsPage({ initialTab = 'anchors' }) {
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [intents, setIntents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { environment } = useEnvironment();
+  const { notify } = useToast();
+  const queryClient = useQueryClient();
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [selectedIntent, setSelectedIntent] = useState(null);
+  const [revokingId, setRevokingId] = useState(null);
 
   // DIS Inspector Interactive State
   const [inspectPurpose, setInspectPurpose] = useState(1.0);
@@ -581,36 +583,32 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
   const [inspectEvidence, setInspectEvidence] = useState(1.0);
   const [hardRuleTrigger, setHardRuleTrigger] = useState('NONE');
 
-  const fetchIntents = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch('/api/v1/intents');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setIntents(data.intents || []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading: loading, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ['intents', environment],
+    queryFn: () => apiClient.get('/intents'),
+  });
 
-  useEffect(() => {
-    fetchIntents();
-  }, []);
+  const intents = data?.intents || [];
 
   const handleRevoke = async (intentId) => {
     if (!window.confirm('Are you sure you want to revoke this Intent Anchor?')) return;
     try {
-      const res = await fetch(`/api/v1/intents/${intentId}/revoke`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      setRevokingId(intentId);
+      await apiClient.post(`/intents/${intentId}/revoke`, {});
+      notify({
+        title: 'Intent Revoked',
+        message: `Intent Anchor ${intentId.slice(0, 8)}... successfully revoked.`,
+        kind: 'info',
       });
-      if (!res.ok) throw new Error(`Revocation failed: HTTP ${res.status}`);
-      await fetchIntents();
+      await queryClient.invalidateQueries({ queryKey: ['intents', environment] });
     } catch (err) {
-      alert(err.message);
+      notify({
+        title: 'Revocation Failed',
+        message: err.message || 'Could not revoke intent anchor.',
+        kind: 'error',
+      });
+    } finally {
+      setRevokingId(null);
     }
   };
 
@@ -652,7 +650,16 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
             Cryptographically signed human intent anchors bounding autonomous agent decisions with Ground-Truth verification.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => refetch()}
+            loading={isFetching}
+          >
+            <RefreshCw size={14} className={isFetching ? 'spin' : ''} />
+            <span>Refresh</span>
+          </Button>
           <a
             href="/intents/new"
             className={styles.primaryLink}
@@ -728,11 +735,21 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px' }}>Loading intent anchors...</td></tr>
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      <td colSpan={7} style={{ padding: '16px' }}>
+                        <Skeleton style={{ height: '24px', width: '100%' }} />
+                      </td>
+                    </tr>
+                  ))
                 ) : filteredIntents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--jp-text-muted)' }}>
-                      No intent anchors found. Click <strong>+ New Intent Anchor</strong> to create one.
+                    <td colSpan={7} style={{ padding: '40px 20px', textAlign: 'center' }}>
+                      <EmptyState
+                        icon={Award}
+                        title="No Intent Anchors Found"
+                        description={`No intent anchors recorded with status ${filterStatus} in ${environment} environment.`}
+                      />
                     </td>
                   </tr>
                 ) : (
@@ -780,14 +797,16 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
                               <Eye size={12} /> View
                             </button>
                             {item.status === 'ACTIVE' && (
-                              <button
-                                type="button"
-                                className={styles.secondaryLink}
+                              <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={() => handleRevoke(item.intent_id)}
+                                loading={revokingId === item.intent_id}
+                                disabled={Boolean(revokingId)}
                                 style={{ padding: '2px 8px', height: '28px', fontSize: '11px', color: '#ef4444' }}
                               >
                                 Revoke
-                              </button>
+                              </Button>
                             )}
                           </div>
                         </td>

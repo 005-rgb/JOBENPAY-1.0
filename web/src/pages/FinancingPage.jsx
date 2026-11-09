@@ -6,8 +6,8 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link, useParams } from 'react-router-dom';
 import {
   AlertCircle,
   AlertTriangle,
@@ -28,34 +28,63 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { useEnvironment } from '../context/EnvironmentContext.jsx';
+import { useToast } from '../components/primitives.jsx';
 import styles from './TransactionPages.module.css';
 
-export function FinancingPage({ financingId = null }) {
+export function FinancingPage({ financingId: propFinancingId = null }) {
   const { t } = useTranslation();
+  const params = useParams();
+  const effectiveFinancingId = propFinancingId || params.id || null;
   const { environment, isLive } = useEnvironment();
+  const { notify } = useToast();
+  const queryClient = useQueryClient();
+
   const [facilityType, setFacilityType] = useState('PO');
   const [principalAmount, setPrincipalAmount] = useState('50000');
   const [collateralValue, setCollateralValue] = useState('100000');
   const [currency, setCurrency] = useState('USD');
   const [tenorMonths, setTenorMonths] = useState(3);
-  const [counterpartyId, setCounterpartyId] = useState('');
+  const [counterpartyId, setCounterpartyId] = useState('00000000-0000-4000-8000-000000000002');
   const [counterpartyHistory, setCounterpartyHistory] = useState(4);
   const [interestBps, setInterestBps] = useState(1200); // 12% p.a.
   const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
+  const [selectedTxId, setSelectedTxId] = useState(effectiveFinancingId);
 
+  // 1. Single Financing Query
   const {
     data: financingData,
-    isLoading,
-    isError,
-    error,
+    isLoading: isFinancingLoading,
+    isError: isFinancingError,
+    error: financingError,
+    refetch: refetchFinancing,
   } = useQuery({
-    queryKey: ['financing', financingId, environment],
+    queryKey: ['financing', effectiveFinancingId, environment],
     queryFn: async () => {
-      if (!financingId) return null;
-      return apiClient.get(`/financing/${financingId}`);
+      if (!effectiveFinancingId) return null;
+      return apiClient.get(`/financing/${effectiveFinancingId}`);
     },
-    enabled: Boolean(financingId),
+    enabled: Boolean(effectiveFinancingId),
+  });
+
+  // 2. Financing List Query
+  const {
+    data: listData,
+    isLoading: isListLoading,
+  } = useQuery({
+    queryKey: ['financing-list', environment],
+    queryFn: async () => {
+      try {
+        const res = await apiClient.get('/financing');
+        return res?.facilities || res?.transactions || [];
+      } catch {
+        try {
+          const res = await apiClient.get('/transactions?category=FINANCING&limit=50');
+          return res?.transactions || [];
+        } catch {
+          return [];
+        }
+      }
+    },
   });
 
   const parsedPrincipal = parseFloat(principalAmount) || 0;
@@ -79,10 +108,50 @@ export function FinancingPage({ financingId = null }) {
     maximumFractionDigits: 2,
   });
 
+  // Submit Financing Proposal Mutation
+  const submitFinancingMutation = useMutation({
+    mutationFn: async (payload) => {
+      const idemp = `fin_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      return apiClient.post('/financing', payload, {
+        headers: { 'Idempotency-Key': idemp },
+      });
+    },
+    onSuccess: async (res) => {
+      const intentId = res?.intent?.intent_id || res?.data?.intent_id;
+      if (intentId) setSelectedTxId(intentId);
+      notify({ message: 'Supply chain financing proposal successfully submitted for Underwriting and Maker/Checker approval.' });
+      setFormError('');
+      await queryClient.invalidateQueries({ queryKey: ['financing-list', environment] });
+      await queryClient.invalidateQueries({ queryKey: ['transactions', environment] });
+    },
+    onError: (err) => {
+      setFormError(err.message || 'Financing proposal submission failed.');
+      notify({ message: err.message || 'Submission failed.', kind: 'error' });
+    },
+  });
+
+  // Maker/Checker Decision Mutation
+  const decisionMutation = useMutation({
+    mutationFn: async ({ txId, decision }) => {
+      return apiClient.post(`/transactions/${txId}/decision`, {
+        decision,
+        comment: `Tier C Supply Chain Financing Maker/Checker ${decision.toLowerCase()} via UI`,
+      });
+    },
+    onSuccess: async (_, variables) => {
+      notify({ message: `Financing facility successfully ${variables.decision === 'APPROVE' ? 'APPROVED' : 'REJECTED'}.` });
+      await queryClient.invalidateQueries({ queryKey: ['financing', selectedTxId, environment] });
+      await queryClient.invalidateQueries({ queryKey: ['financing-list', environment] });
+      await queryClient.invalidateQueries({ queryKey: ['transactions', environment] });
+    },
+    onError: (err) => {
+      notify({ message: `Decision failed: ${err.message}`, kind: 'error' });
+    },
+  });
+
   const handleValidateForm = (e) => {
     e.preventDefault();
     setFormError('');
-    setFormSuccess('');
 
     if (parsedPrincipal <= 0) {
       setFormError('Principal financing amount must be greater than zero.');
@@ -109,10 +178,28 @@ export function FinancingPage({ financingId = null }) {
       return;
     }
 
-    setFormSuccess('Facility parameters successfully validated against underwriting policy.');
+    submitFinancingMutation.mutate({
+      facilityType,
+      principalAmountMinor: principalMinor.toString(),
+      collateralValueMinor: BigInt(Math.round(parsedCollateral * 100)).toString(),
+      currency,
+      tenorMonths,
+      counterpartyId,
+      counterpartyHistoryCount: counterpartyHistory,
+      interestBps,
+    });
   };
 
-  if (isLoading) {
+  const handleCheckerDecision = (decision) => {
+    const txId = selectedTxId || effectiveFinancingId;
+    if (!txId) {
+      notify({ message: 'Please select or submit a financing facility first to perform Checker decision.', kind: 'info' });
+      return;
+    }
+    decisionMutation.mutate({ txId, decision });
+  };
+
+  if (isFinancingLoading) {
     return (
       <div className={styles.emptyCard} data-testid="financing-loading">
         <Loader2 className="animate-spin" size={32} />
@@ -121,14 +208,14 @@ export function FinancingPage({ financingId = null }) {
     );
   }
 
-  if (isError) {
+  if (isFinancingError) {
     return (
       <div className={styles.pageStack} data-testid="financing-error">
         <div className={styles.errorBanner}>
           <AlertCircle size={20} />
           <div>
             <strong>Failed to Load Financing Facility</strong>
-            <p style={{ margin: '4px 0 0 0' }}>{error?.message || 'A system error occurred while contacting the server.'}</p>
+            <p style={{ margin: '4px 0 0 0' }}>{financingError?.message || 'A system error occurred while contacting the server.'}</p>
           </div>
         </div>
       </div>
@@ -178,13 +265,6 @@ export function FinancingPage({ financingId = null }) {
               <div className={styles.errorBanner}>
                 <AlertCircle size={16} />
                 <span>{formError}</span>
-              </div>
-            )}
-
-            {formSuccess && (
-              <div className={styles.successBanner}>
-                <CheckCircle2 size={16} />
-                <span>{formSuccess}</span>
               </div>
             )}
 
@@ -307,10 +387,18 @@ export function FinancingPage({ financingId = null }) {
             <div className={styles.formActions}>
               <button
                 type="submit"
+                disabled={submitFinancingMutation.isPending}
                 className={styles.primaryLink}
                 data-testid="submit-financing-button"
               >
-                Validate & Simulate Underwriting
+                {submitFinancingMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Underwriting & Submitting...
+                  </>
+                ) : (
+                  'Validate & Simulate Underwriting'
+                )}
               </button>
             </div>
           </form>
@@ -338,26 +426,34 @@ export function FinancingPage({ financingId = null }) {
                     const month = i + 1;
                     const isFinal = month === tenorMonths;
                     const amt = isFinal ? monthlyBaseMinor + residueMinor : monthlyBaseMinor;
+                    const feePortion = month === 1 ? adminFeeMinor : 0n;
+                    const interestPortion = totalInterestMinor / N;
+                    const principalPortion = amt - feePortion - interestPortion;
+
                     return (
                       <tr key={month}>
-                        <td style={{ fontWeight: '600' }}>
-                          Month {month} {isFinal && <span style={{ color: 'var(--jp-blue)', fontSize: '11px', fontWeight: 'bold' }}>(Residue)</span>}
-                        </td>
+                        <td className={styles.mono} style={{ fontWeight: 'bold' }}>Cycle #{month}</td>
                         <td className={styles.mono} style={{ fontWeight: 'bold' }}>${formatMoney(amt)}</td>
-                        <td className={styles.mono}>{month === 1 ? `$${formatMoney(adminFeeMinor)}` : '$0.00'}</td>
-                        <td className={styles.mono}>${formatMoney(totalInterestMinor / N)}</td>
-                        <td className={styles.mono}>${formatMoney(amt - (month === 1 ? adminFeeMinor : 0n) - (totalInterestMinor / N))}</td>
+                        <td className={styles.mono} style={{ color: feePortion > 0n ? 'var(--jp-blue-dark)' : 'var(--jp-text-muted)' }}>
+                          ${formatMoney(feePortion)}
+                        </td>
+                        <td className={styles.mono} style={{ color: 'var(--jp-badge-purple)' }}>
+                          ${formatMoney(interestPortion)}
+                        </td>
+                        <td className={styles.mono} style={{ color: 'var(--jp-success)' }}>
+                          ${formatMoney(principalPortion)}
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--jp-surface-sidebar)', fontWeight: 'bold' }}>
-                    <td style={{ padding: '12px 16px' }}>Total Obligation</td>
-                    <td className={styles.mono} style={{ padding: '12px 16px', color: 'var(--jp-blue)' }}>${formatMoney(totalObligationMinor)}</td>
-                    <td className={styles.mono} style={{ padding: '12px 16px' }}>${formatMoney(adminFeeMinor)}</td>
-                    <td className={styles.mono} style={{ padding: '12px 16px' }}>${formatMoney(totalInterestMinor)}</td>
-                    <td className={styles.mono} style={{ padding: '12px 16px' }}>${formatMoney(principalMinor)}</td>
+                    <td>Total Facility Obligation</td>
+                    <td className={styles.mono}>${formatMoney(totalObligationMinor)} {currency}</td>
+                    <td className={styles.mono}>${formatMoney(adminFeeMinor)}</td>
+                    <td className={styles.mono}>${formatMoney(totalInterestMinor)}</td>
+                    <td className={styles.mono}>${formatMoney(principalMinor)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -371,12 +467,12 @@ export function FinancingPage({ financingId = null }) {
           <div className={styles.formCard}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
               <Layers size={18} />
-              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Disbursement Double-Entry Ledger</h2>
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Settlement Double-Entry Ledger</h2>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ padding: '10px 12px', background: '#e8f5ee', border: '1px solid #a3d9b8', borderRadius: '8px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0c6b3c' }}>DEBIT org:main (Net Cash In)</span>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0c6b3c' }}>DEBIT org:main (Disbursed Cash)</span>
                 <p className={styles.mono} style={{ margin: '4px 0 0 0', color: '#0c6b3c', fontWeight: 'bold' }}>
                   ${formatMoney(principalMinor - adminFeeMinor)} {currency}
                 </p>
@@ -415,27 +511,50 @@ export function FinancingPage({ financingId = null }) {
 
             <p className={styles.pageSubtitle} style={{ margin: 0 }}>
               Tier C FINANCING strictly mandates human Checker authorization before funds can be released by the partner simulator.
+              {selectedTxId ? ` Active Target: ${selectedTxId.slice(0, 8)}...` : ' Select or submit a facility to decide.'}
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
                 type="button"
+                onClick={() => handleCheckerDecision('APPROVE')}
+                disabled={decisionMutation.isPending}
                 className={styles.primaryLink}
                 style={{ width: '100%', background: '#0c6b3c' }}
                 data-testid="checker-approve-button"
               >
-                <CheckCircle2 size={16} />
-                Approve Disbursement (Checker)
+                {decisionMutation.isPending && decisionMutation.variables?.decision === 'APPROVE' ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Approving Disbursement...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    Approve Disbursement (Checker)
+                  </>
+                )}
               </button>
 
               <button
                 type="button"
+                onClick={() => handleCheckerDecision('REJECT')}
+                disabled={decisionMutation.isPending}
                 className={styles.secondaryLink}
                 style={{ width: '100%', color: '#9b1c2a', borderColor: '#f8b4be' }}
                 data-testid="checker-reject-button"
               >
-                <XCircle size={16} />
-                Reject Facility (Checker)
+                {decisionMutation.isPending && decisionMutation.variables?.decision === 'REJECT' ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Rejecting Facility...
+                  </>
+                ) : (
+                  <>
+                    <XCircle size={16} />
+                    Reject Facility (Checker)
+                  </>
+                )}
               </button>
             </div>
           </div>

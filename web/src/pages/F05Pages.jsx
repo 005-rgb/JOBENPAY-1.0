@@ -8,6 +8,7 @@ import { ERROR_CODES } from '@shared/error-codes.js';
 
 import { apiClient } from '../api/client.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import {
   Banner,
   Button,
@@ -24,12 +25,13 @@ import styles from './F05Pages.module.css';
 const PAGE_SIZE = 25;
 
 function useCursorPage(key, path, filters = {}) {
+  const { environment } = useEnvironment();
   const [cursors, setCursors] = useState([]);
   const cursor = cursors.at(-1);
   const query = new URLSearchParams({ limit: String(PAGE_SIZE), ...filters });
   if (cursor) query.set('cursor', cursor);
   const result = useQuery({
-    queryKey: [key, filters, cursor],
+    queryKey: [key, filters, cursor, environment],
     queryFn: () => apiClient.get(`${path}?${query.toString()}`),
   });
   return {

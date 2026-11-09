@@ -18,12 +18,14 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '../api/client.js';
+import { useToast } from '../components/primitives.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
 import styles from './TransactionPages.module.css';
 
 export default function MembersPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { notify } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
@@ -69,6 +71,7 @@ export default function MembersPage() {
     mutationFn: (body) => apiClient.post('/members/invite', body),
     onSuccess: () => {
       setFeedback({ type: 'success', message: 'Invitation sent successfully.' });
+      notify({ message: 'Team member invitation sent successfully.' });
       setInviteModalOpen(false);
       setInviteEmail('');
       queryClient.invalidateQueries({ queryKey: ['members', 'invitations'] });
@@ -76,6 +79,7 @@ export default function MembersPage() {
     },
     onError: (err) => {
       setFeedback({ type: 'error', message: err.message || 'Failed to send invitation.' });
+      notify({ message: err.message || 'Failed to send invitation.', kind: 'error' });
     },
   });
 
@@ -83,6 +87,7 @@ export default function MembersPage() {
     mutationFn: ({ userId, role }) => apiClient.patch(`/members/${userId}/role`, { role }),
     onSuccess: () => {
       setFeedback({ type: 'success', message: 'Member role updated successfully.' });
+      notify({ message: 'Member role updated successfully.' });
       setRoleModalOpen(false);
       setSelectedMember(null);
       queryClient.invalidateQueries({ queryKey: ['members'] });
@@ -90,6 +95,7 @@ export default function MembersPage() {
     },
     onError: (err) => {
       setFeedback({ type: 'error', message: err.message || 'Failed to update member role.' });
+      notify({ message: err.message || 'Failed to update member role.', kind: 'error' });
     },
   });
 
@@ -98,6 +104,7 @@ export default function MembersPage() {
       apiClient.delete(`/members/${userId}`, undefined, { stepUpGrant }),
     onSuccess: () => {
       setFeedback({ type: 'success', message: 'Member removed successfully.' });
+      notify({ message: 'Team member removed successfully.' });
       setMemberToRemove(null);
       setStepUpOpen(false);
       queryClient.invalidateQueries({ queryKey: ['members'] });
@@ -105,6 +112,7 @@ export default function MembersPage() {
     },
     onError: (err) => {
       setFeedback({ type: 'error', message: err.message || 'Failed to remove member.' });
+      notify({ message: err.message || 'Failed to remove member.', kind: 'error' });
     },
   });
 
@@ -112,11 +120,13 @@ export default function MembersPage() {
     mutationFn: (invitationId) => apiClient.delete(`/members/invitations/${invitationId}`),
     onSuccess: () => {
       setFeedback({ type: 'success', message: 'Invitation revoked.' });
+      notify({ message: 'Pending invitation revoked.' });
       queryClient.invalidateQueries({ queryKey: ['members', 'invitations'] });
       setTimeout(() => setFeedback({ type: '', message: '' }), 4000);
     },
     onError: (err) => {
       setFeedback({ type: 'error', message: err.message || 'Failed to revoke invitation.' });
+      notify({ message: err.message || 'Failed to revoke invitation.', kind: 'error' });
     },
   });
 

@@ -13,7 +13,11 @@ import {
   Copy,
   Eye,
   Layers,
+  RefreshCw,
 } from 'lucide-react';
+import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
+import { Button, EmptyState, Skeleton, useToast } from '../components/primitives.jsx';
 import styles from './TransactionPages.module.css';
 
 const TEMPLATES = {
@@ -127,6 +131,7 @@ const TEMPLATES = {
 
 export function JplPage() {
   const [activeTab, setActiveTab] = useState('studio');
+  const { notify } = useToast();
 
   // Studio State
   const [policyJson, setPolicyJson] = useState(JSON.stringify(TEMPLATES.minimal.policy, null, 2));
@@ -144,9 +149,8 @@ export function JplPage() {
   const [selectedVector, setSelectedVector] = useState(null);
 
   useEffect(() => {
-    fetch('/api/v1/jpl/vectors')
-      .then((res) => (res.ok ? res.json() : { vectors: [] }))
-      .then((data) => setVectors(data.vectors || []))
+    apiClient.get('/jpl/vectors')
+      .then((data) => setVectors(data?.vectors || []))
       .catch(() => {});
   }, []);
 
@@ -167,16 +171,20 @@ export function JplPage() {
       setStudioLoading(true);
       setStudioError(null);
       const parsedPolicy = JSON.parse(policyJson);
-      const res = await fetch('/api/v1/jpl/compile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ policy: parsedPolicy }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const data = await apiClient.post('/jpl/compile', { policy: parsedPolicy });
       setCompileResult(data);
+      notify({
+        title: 'Policy Compiled',
+        message: 'JPL Policy successfully compiled and validated.',
+        kind: 'info',
+      });
     } catch (err) {
       setStudioError(`Compile Error: ${err.message}`);
+      notify({
+        title: 'Compilation Failed',
+        message: err.message,
+        kind: 'error',
+      });
     } finally {
       setStudioLoading(false);
     }
@@ -188,15 +196,20 @@ export function JplPage() {
       setStudioError(null);
       const parsedPolicy = JSON.parse(policyJson);
       const parsedContext = JSON.parse(contextJson);
-      const res = await fetch('/api/v1/jpl/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ policy: parsedPolicy, context: parsedContext }),
-      });
-      const data = await res.json();
+      const data = await apiClient.post('/jpl/evaluate', { policy: parsedPolicy, context: parsedContext });
       setEvalResult(data);
+      notify({
+        title: 'Evaluation Complete',
+        message: `Policy outcome: ${data?.outcome || 'EVALUATED'}`,
+        kind: data?.outcome === 'APPROVE' ? 'info' : 'warning',
+      });
     } catch (err) {
       setStudioError(`Evaluation Error: ${err.message}`);
+      notify({
+        title: 'Evaluation Failed',
+        message: err.message,
+        kind: 'error',
+      });
     } finally {
       setStudioLoading(false);
     }
@@ -207,15 +220,20 @@ export function JplPage() {
       setStudioLoading(true);
       setStudioError(null);
       const parsedPolicy = JSON.parse(policyJson);
-      const res = await fetch('/api/v1/jpl/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ policy: parsedPolicy }),
-      });
-      const data = await res.json();
+      const data = await apiClient.post('/jpl/verify', { policy: parsedPolicy });
       setVerifyResult(data);
+      notify({
+        title: 'Signature Verified',
+        message: data.valid ? 'Policy cryptographic signature is valid.' : 'Invalid signature detected.',
+        kind: data.valid ? 'info' : 'error',
+      });
     } catch (err) {
       setStudioError(`Verification Error: ${err.message}`);
+      notify({
+        title: 'Verification Failed',
+        message: err.message,
+        kind: 'error',
+      });
     } finally {
       setStudioLoading(false);
     }
@@ -231,30 +249,28 @@ export function JplPage() {
         let actual = 'ERROR';
 
         if (v.test_type === 'schema_validation' || v.test_type === 'backward_compatibility') {
-          const compRes = await fetch('/api/v1/jpl/compile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ policy: c.policy }),
-          });
-          actual = compRes.ok ? 'VALID' : 'INVALID';
+          try {
+            await apiClient.post('/jpl/compile', { policy: c.policy });
+            actual = 'VALID';
+          } catch {
+            actual = 'INVALID';
+          }
           pass = (actual === v.expected_outcome);
         } else if (v.test_type === 'evaluation') {
-          const evalRes = await fetch('/api/v1/jpl/evaluate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ policy: c.policy, context: c.context }),
-          });
-          const evalData = await evalRes.json();
-          actual = evalData.outcome;
+          try {
+            const evalData = await apiClient.post('/jpl/evaluate', { policy: c.policy, context: c.context });
+            actual = evalData?.outcome || 'ERROR';
+          } catch {
+            actual = 'ERROR';
+          }
           pass = (actual === v.expected_outcome);
         } else if (v.test_type === 'signature_verification') {
-          const verRes = await fetch('/api/v1/jpl/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ policy: c.policy }),
-          });
-          const verData = await verRes.json();
-          actual = verData.valid ? 'VALID' : 'INVALID';
+          try {
+            const verData = await apiClient.post('/jpl/verify', { policy: c.policy });
+            actual = verData?.valid ? 'VALID' : 'INVALID';
+          } catch {
+            actual = 'INVALID';
+          }
           pass = (actual === v.expected_outcome);
         }
 

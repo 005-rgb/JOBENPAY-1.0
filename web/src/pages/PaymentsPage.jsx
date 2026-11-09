@@ -27,9 +27,13 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
+import { Button, EmptyState, Skeleton, useToast } from '../components/primitives.jsx';
 import styles from './TransactionPages.module.css';
 
 export default function PaymentsPage({ tab = 'overview' }) {
+  const { environment } = useEnvironment();
+  const { notify } = useToast();
   const [activeTab, setActiveTab] = useState(tab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -70,10 +74,10 @@ export default function PaymentsPage({ tab = 'overview' }) {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Initial load
+  // Initial & Environment change load
   useEffect(() => {
     loadAllData();
-  }, []);
+  }, [environment]);
 
   async function loadAllData() {
     setLoading(true);

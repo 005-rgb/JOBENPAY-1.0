@@ -20,6 +20,9 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
+import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
+import { Button, EmptyState, Skeleton, useToast } from '../components/primitives.jsx';
 import styles from './TransactionPages.module.css';
 
 const DEFAULT_SLOS = [
@@ -285,6 +288,8 @@ const ALERTS = [
 ];
 
 export default function OpsPages({ tab = 'overview' }) {
+  const { environment } = useEnvironment();
+  const { notify } = useToast();
   const [activeTab, setActiveTab] = useState(
     tab === 'slo'
       ? 'slo'
@@ -344,31 +349,22 @@ export default function OpsPages({ tab = 'overview' }) {
       }
 
       // 2. SLOs
-      const sloRes = await fetch('/api/v1/ops/slo').catch(() => null);
-      if (sloRes && sloRes.ok) {
-        const sloData = await sloRes.json();
-        if (sloData?.slos && Array.isArray(sloData.slos)) {
-          setSlos(sloData.slos);
-        }
+      const sloData = await apiClient.get('/ops/slo').catch(() => null);
+      if (sloData?.slos && Array.isArray(sloData.slos)) {
+        setSlos(sloData.slos);
       }
 
       // 3. Circuit Breakers
-      const cbRes = await fetch('/api/v1/ops/circuit-breakers').catch(() => null);
-      if (cbRes && cbRes.ok) {
-        const cbData = await cbRes.json();
-        if (cbData?.circuit_breakers && Array.isArray(cbData.circuit_breakers)) {
-          setCircuitBreakers(cbData.circuit_breakers);
-        }
+      const cbData = await apiClient.get('/ops/circuit-breakers').catch(() => null);
+      if (cbData?.circuit_breakers && Array.isArray(cbData.circuit_breakers)) {
+        setCircuitBreakers(cbData.circuit_breakers);
       }
 
       // 4. Tenant metrics
       if (tenantOrgId) {
-        const metRes = await fetch(`/api/v1/ops/tenants/${tenantOrgId}/metrics?window=${metricWindow}`).catch(() => null);
-        if (metRes && metRes.ok) {
-          const metData = await metRes.json();
-          if (metData?.metrics) {
-            setTenantMetrics(metData.metrics);
-          }
+        const metData = await apiClient.get(`/ops/tenants/${tenantOrgId}/metrics?window=${metricWindow}`).catch(() => null);
+        if (metData?.metrics) {
+          setTenantMetrics(metData.metrics);
         }
       }
     } catch {
@@ -380,11 +376,16 @@ export default function OpsPages({ tab = 'overview' }) {
 
   useEffect(() => {
     fetchOpsData();
-  }, [metricWindow]);
+  }, [metricWindow, environment]);
 
   const handleCopy = (text, label) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard?.writeText(text);
     setCopySuccess(label);
+    notify({
+      title: 'Copied',
+      message: `${label} copied to clipboard.`,
+      kind: 'info',
+    });
     setTimeout(() => setCopySuccess(''), 2500);
   };
 
@@ -404,6 +405,11 @@ export default function OpsPages({ tab = 'overview' }) {
         return cb;
       }),
     );
+    notify({
+      title: 'Circuit Failure Simulated',
+      message: `Injected 1 simulated failure into breaker: ${breakerName}`,
+      kind: 'warning',
+    });
   };
 
   const handleResetCircuit = (breakerName) => {
@@ -420,28 +426,24 @@ export default function OpsPages({ tab = 'overview' }) {
         return cb;
       }),
     );
+    notify({
+      title: 'Circuit Breaker Reset',
+      message: `Breaker ${breakerName} has been reset to CLOSED state.`,
+      kind: 'info',
+    });
   };
 
   const handleRotateAgentKey = async () => {
     try {
-      const res = await fetch(`/api/v1/agents/${rotationAgentId}/keys/rotate`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
+      const data = await apiClient.post(`/agents/${rotationAgentId}/keys/rotate`, {});
+      setRotationResult(data);
+      notify({
+        title: 'Agent Key Rotated',
+        message: `Agent ${rotationAgentId} key rotated with grace period.`,
+        kind: 'info',
       });
-      if (res.ok) {
-        const data = await res.json();
-        setRotationResult(data);
-      } else {
-        // simulation fallback
-        setRotationResult({
-          agent_id: rotationAgentId,
-          key_id: `key_${Math.random().toString(36).substring(2, 9)}`,
-          new_api_key: `jp_live_${Math.random().toString(36).substring(2, 18)}_${Math.random().toString(36).substring(2, 18)}`,
-          grace_until: new Date(Date.now() + 3600000).toISOString(),
-          message: 'Key successfully rotated with 1-hour grace period.',
-        });
-      }
-    } catch {
+    } catch (err) {
+      // simulation fallback
       setRotationResult({
         agent_id: rotationAgentId,
         key_id: `key_${Math.random().toString(36).substring(2, 9)}`,
@@ -449,35 +451,36 @@ export default function OpsPages({ tab = 'overview' }) {
         grace_until: new Date(Date.now() + 3600000).toISOString(),
         message: 'Key successfully rotated with 1-hour grace period (simulated).',
       });
+      notify({
+        title: 'Agent Key Rotated (Simulated)',
+        message: 'Key rotated with 1-hour grace period.',
+        kind: 'info',
+      });
     }
   };
 
   const handleRotateLedgerKey = async () => {
     try {
-      const res = await fetch('/api/v1/org/ledger-keys/rotate', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
+      const data = await apiClient.post('/org/ledger-keys/rotate', {});
+      setLedgerRotationResult(data);
+      notify({
+        title: 'Ledger Key Rotated',
+        message: `New signing key ${data.new_kid || ''} generated and active.`,
+        kind: 'info',
       });
-      if (res.ok) {
-        const data = await res.json();
-        setLedgerRotationResult(data);
-      } else {
-        // simulation fallback
-        setLedgerRotationResult({
-          status: 'SUCCESS',
-          new_kid: `kid_ed25519_${Math.random().toString(36).substring(2, 10)}`,
-          algorithm: 'Ed25519',
-          created_at: new Date().toISOString(),
-          message: 'New Ed25519 ledger signing key generated and set to ACTIVE.',
-        });
-      }
-    } catch {
+    } catch (err) {
+      // simulation fallback
       setLedgerRotationResult({
         status: 'SUCCESS',
         new_kid: `kid_ed25519_${Math.random().toString(36).substring(2, 10)}`,
         algorithm: 'Ed25519',
         created_at: new Date().toISOString(),
         message: 'New Ed25519 ledger signing key generated and set to ACTIVE (simulated).',
+      });
+      notify({
+        title: 'Ledger Key Rotated (Simulated)',
+        message: 'New Ed25519 signing key generated.',
+        kind: 'info',
       });
     }
   };

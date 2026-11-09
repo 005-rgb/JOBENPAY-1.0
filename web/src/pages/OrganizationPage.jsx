@@ -16,12 +16,14 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '../api/client.js';
+import { useToast } from '../components/primitives.jsx';
 import StepUpDialog from '../components/StepUpDialog.jsx';
 import styles from './TransactionPages.module.css';
 
 export default function OrganizationPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { notify } = useToast();
 
   const [displayName, setDisplayName] = useState('');
   const [legalName, setLegalName] = useState('');
@@ -69,12 +71,14 @@ export default function OrganizationPage() {
       apiClient.patch('/org/profile', payload, { stepUpGrant }),
     onSuccess: (data) => {
       setFeedback({ type: 'success', message: 'Organization profile updated successfully.' });
+      notify({ message: 'Organization profile saved successfully.' });
       setInitialBillingEmail(data.billing_email || billingEmail);
       queryClient.invalidateQueries({ queryKey: ['org', 'profile'] });
       setTimeout(() => setFeedback({ type: '', message: '' }), 4000);
     },
     onError: (err) => {
       setFeedback({ type: 'error', message: err.message || 'Failed to update organization profile.' });
+      notify({ message: err.message || 'Failed to update profile.', kind: 'error' });
     },
   });
 

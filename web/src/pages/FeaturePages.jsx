@@ -204,7 +204,7 @@ export function LoginPage() {
         </form>
         {import.meta.env.VITE_SHOW_DEMO_HINT === '1' ? <p className={styles.demoHint}>{t('app.demoAccountsHint')}</p> : null}
         <p className={styles.paypalDisclaimer}>{t('app.paypalDisclaimer')}</p>
-        <Link className={styles.loginLink} to="/coming-soon">{t('app.help')}</Link>
+        <Link className={styles.loginLink} to="/terms">{t('app.help')}</Link>
       </Card>
     </main>
   );
@@ -481,7 +481,14 @@ export function DashboardPage() {
           <Card className={styles.setupCard} key={card.key} padding="tile">
             <div className={styles.setupCardTop}>
               <span aria-hidden="true" className={styles.setupIcon}><Plus /></span>
-              <button aria-label={`${card.title} ${t('app.actions')}`} className={styles.iconAction} type="button"><Ellipsis /></button>
+              <button
+                aria-label={`${card.title} ${t('app.actions')}`}
+                className={styles.iconAction}
+                type="button"
+                onClick={() => navigate(card.to)}
+              >
+                <ChevronRight />
+              </button>
             </div>
             <Link to={card.to}>{card.title}</Link>
             <p>{card.description}</p>
@@ -497,7 +504,18 @@ export function DashboardPage() {
       <section className={styles.quickSection}>
         <div className={styles.sectionHeading}>
           <h2>{t('app.quickAccess')}</h2>
-          <Link aria-label={t('app.editQuickAccess')} className={styles.iconAction} to="/coming-soon"><Pencil aria-hidden="true" /></Link>
+          <button
+            aria-label={t('app.editQuickAccess')}
+            className={styles.iconAction}
+            type="button"
+            onClick={() => notify({
+              title: 'Quick Access',
+              message: 'Quick access items are automatically synchronized based on your frequently accessed operational modules.',
+              kind: 'info',
+            })}
+          >
+            <Pencil aria-hidden="true" />
+          </button>
         </div>
         <div className={styles.quickItems}>
           {quickLinks.map(([key, to, labelKey = key]) => (
