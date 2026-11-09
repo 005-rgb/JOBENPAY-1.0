@@ -6,37 +6,43 @@ function assertOrgId(orgId) {
   }
 }
 
-export async function listAgents(orgId, db = pool) {
+export async function listAgents(orgId, db = pool, environment = null) {
   assertOrgId(orgId);
-  const result = await db.query(
-    `SELECT id, org_id, name, description, status, created_at
+  let query = `SELECT COALESCE(agent_id, id) AS agent_id, id, org_id, name, description, status, environment, created_at
      FROM agents
-     WHERE org_id = $1
-     ORDER BY created_at DESC, id`,
-    [orgId],
-  );
+     WHERE org_id = $1`;
+  const params = [orgId];
+  if (environment) {
+    query += ` AND environment = $2`;
+    params.push(environment);
+  }
+  query += ` ORDER BY created_at DESC, id`;
+  const result = await db.query(query, params);
   return result.rows;
 }
 
-export async function getAgent(orgId, agentId, db = pool) {
+export async function getAgent(orgId, agentId, db = pool, environment = null) {
   assertOrgId(orgId);
-  const result = await db.query(
-    `SELECT id, org_id, name, description, status, created_at
+  let query = `SELECT COALESCE(agent_id, id) AS agent_id, id, org_id, name, description, status, environment, created_at
      FROM agents
-     WHERE org_id = $1 AND id = $2
-     LIMIT 1`,
-    [orgId, agentId],
-  );
+     WHERE org_id = $1 AND (id = $2 OR agent_id = $2)`;
+  const params = [orgId, agentId];
+  if (environment) {
+    query += ` AND environment = $3`;
+    params.push(environment);
+  }
+  query += ` LIMIT 1`;
+  const result = await db.query(query, params);
   return result.rows[0] ?? null;
 }
 
-export async function createAgent(orgId, { name, description, status = 'ACTIVE' }, db = pool) {
+export async function createAgent(orgId, { name, description, status = 'ACTIVE', environment = 'SANDBOX' }, db = pool) {
   assertOrgId(orgId);
   const result = await db.query(
-    `INSERT INTO agents (org_id, name, description, status)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, org_id, name, description, status, created_at`,
-    [orgId, name, description ?? null, status],
+    `INSERT INTO agents (org_id, name, description, status, environment)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING COALESCE(agent_id, id) AS agent_id, id, org_id, name, description, status, environment, created_at`,
+    [orgId, name, description ?? null, status, environment || 'SANDBOX'],
   );
   return result.rows[0];
 }

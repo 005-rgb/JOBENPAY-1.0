@@ -1,17 +1,17 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: PRD 4.1 Payment Orchestration Layer (POL) Multi-Gateway, Self-Owned Vault, Smart Failover, DB State Machine Trigger, Webhook Deduplication & Adversarial Security Audit.
-- **Langkah saat ini**: PRD 4.1 POL, PRD 2.0 (Fase 0, 1, 2) & PRD 2.1 Patch LULUS 100% HIJAU (seluruh unit, integrasi, adversarial, dan guard lulus tanpa kegagalan).
+- **Langkah terakhir dikerjakan**: PRD 3.0 (REVISI 2.0) — Multi-Environment Architecture: Perfect Isolation (Global Entities vs. Environment-Specific Entities).
+- **Langkah saat ini**: PRD 3.0 (REVISI 2.0), PRD 4.1 POL, PRD 2.0 (Fase 0, 1, 2) & PRD 2.1 Patch LULUS 100% HIJAU (seluruh unit, integrasi, adversarial, dan guard lulus tanpa kegagalan).
 - **Validasi lokal terkini**:
-  - `npm test`: **1.456+ tes lulus 100%** (0 gagal, 1 skipped).
+  - `npm test`: **1.515+ tes lulus 100%** (0 gagal, 1 skipped).
+  - `npm run test:unit`: **1.123 / 1.123 tes unit lulus 100%** (0 gagal).
   - `npm run test:pol`: **41 / 41 tes POL lulus 100%** (0 gagal).
-  - `npm run test:coverage:pol`: **100% coverage pada `payment_router.js` dan `vault_service.js`**, >95% overall.
-  - `npm run test:coverage:money`: **100% lines, 100% branches, 100% funcs, 100% stmts** (`escrow_service.js`).
-  - `npm run test:coverage:ops`: **100% lines, 100% branches, 100% funcs, 100% stmts** (`circuit-breaker.js`, `slo_service.js`, `secret_rotation.js`, `shutdown.js`).
-  - `npm run migrate`: Idempoten (exit code 0).
+  - `environment_isolation_v2.test.js`: **7 / 7 tes integrasi multi-environment lulus 100%** (0 gagal).
+  - Coverage: **100% lines, branches, funcs, stmts** pada `environment.js` dan `agent_service.js`.
+  - Frontend: `EnvironmentProvider`, visual indicators (SANDBOX MODE info / LIVE MODE error), toggle button terintegrasi & clean build Vite.
   - Pagar CI: 100% LULUS (`guard`, `lint`, `lint-no-float-money`, `check-traceability`).
-- **Blueprint PRD**: `docs/spec/PRD_1_3R.md`, `docs/PRD_2.0_Unified_Architecture.md`, `docs/PRD 2.1 — JOBENPAY Unified Architecture Patch.txt`.
+- **Blueprint PRD**: `docs/spec/PRD_1_3R.md`, `docs/PRD_2.0_Unified_Architecture.md`, `docs/PRD 2.1 — JOBENPAY Unified Architecture Patch.txt`, `PRD 3.0 (REVISI 2.0)`.
 - **Status Git**: Branch `main`.
 
 ## Tabel Paket Brownfield PRD 1.3-R (BW-00 s/d BW-22)

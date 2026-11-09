@@ -1,7 +1,18 @@
 let csrfToken = '';
+let currentEnvironment = 'SANDBOX';
 
 export function setCsrfToken(token) {
   csrfToken = token || '';
+}
+
+export function setEnvironment(env) {
+  if (env && ['SANDBOX', 'LIVE', 'PRODUCTION', 'SIMULATED'].includes(String(env).toUpperCase())) {
+    currentEnvironment = String(env).toUpperCase();
+  }
+}
+
+export function getEnvironment() {
+  return currentEnvironment;
 }
 
 export class ApiError extends Error {
@@ -24,6 +35,18 @@ async function request(path, { method = 'GET', body, headers = {}, stepUpGrant }
   if (stepUpGrant) requestHeaders.set('x-step-up-grant', stepUpGrant);
 
   const cleanPath = path.startsWith('/api/v1') ? path : `/api/v1${path.startsWith('/') ? path : `/${path}`}`;
+
+  // Attach environment header for operational routes (skip global routes)
+  const GLOBAL_PREFIXES = ['/api/v1/org', '/api/v1/members', '/api/v1/billing', '/api/v1/auth'];
+  const isGlobal = GLOBAL_PREFIXES.some((prefix) => cleanPath.startsWith(prefix));
+  if (!isGlobal) {
+    if (!requestHeaders.has('x-jobenpay-environment')) {
+      requestHeaders.set('x-jobenpay-environment', currentEnvironment);
+    }
+    if (!requestHeaders.has('x-environment')) {
+      requestHeaders.set('x-environment', currentEnvironment);
+    }
+  }
 
   let response;
   try {
@@ -59,9 +82,16 @@ export const apiClient = {
   upload: (path, file, onProgress) => new Promise((resolve, reject) => {
     const xhr = new globalThis.XMLHttpRequest();
     const cleanPath = path.startsWith('/api/v1') ? path : `/api/v1${path.startsWith('/') ? path : `/${path}`}`;
+
     xhr.open('POST', cleanPath);
     xhr.withCredentials = true;
     if (csrfToken) xhr.setRequestHeader('x-csrf-token', csrfToken);
+    const GLOBAL_PREFIXES = ['/api/v1/org', '/api/v1/members', '/api/v1/billing', '/api/v1/auth'];
+    const isGlobal = GLOBAL_PREFIXES.some((prefix) => cleanPath.startsWith(prefix));
+    if (!isGlobal) {
+      xhr.setRequestHeader('x-jobenpay-environment', currentEnvironment);
+      xhr.setRequestHeader('x-environment', currentEnvironment);
+    }
     xhr.upload.addEventListener('progress', (event) => {
       if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
     });

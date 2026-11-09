@@ -78,5 +78,7 @@ export const ERROR_CODES = {
   CHALLENGE_WINDOW_EXPIRED: { httpStatus: 400, message: 'Challenge window has expired.' },
   INVALID_VERDICT: { httpStatus: 400, message: 'Invalid verification verdict.' },
   ESCROW_UNBALANCED: { httpStatus: 422, message: 'Escrow balance violation.' },
+  ENVIRONMENT_HEADER_MISSING: { httpStatus: 400, message: 'X-Jobenpay-Environment header is missing or invalid.' },
+  INVALID_ENVIRONMENT: { httpStatus: 400, message: 'Invalid environment specified.' },
   INTERNAL: { httpStatus: 500, message: 'Internal server error.' },
 };

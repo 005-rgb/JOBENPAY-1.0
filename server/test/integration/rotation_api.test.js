@@ -47,6 +47,7 @@ test('rotation_api integration test', async (t) => {
       headers: {
         'content-type': 'application/json',
         'x-org-id': orgId,
+        'x-jobenpay-environment': 'SANDBOX', // test-changed: PRD 3.0 requires X-Jobenpay-Environment header on operational routes
       },
       body: JSON.stringify({ org_id: orgId }),
     });
@@ -71,6 +72,7 @@ test('rotation_api integration test', async (t) => {
       headers: {
         'content-type': 'application/json',
         'x-org-id': orgId,
+        'x-jobenpay-environment': 'SANDBOX', // test-changed: PRD 3.0 requires X-Jobenpay-Environment header on operational routes
       },
       body: JSON.stringify({ org_id: orgId }),
     });

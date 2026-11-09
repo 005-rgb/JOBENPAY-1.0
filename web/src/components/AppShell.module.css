@@ -275,6 +275,30 @@
   padding: 0 var(--jp-header-sandbox-pad-x);
 }
 
+.liveChip {
+  align-items: center;
+  background: #fee2e2;
+  border-radius: var(--jp-radius-pill);
+  color: #dc2626;
+  display: inline-flex;
+  font-size: var(--jp-sandbox-chip-font-size);
+  font-weight: var(--jp-font-weight-bold);
+  height: var(--jp-header-sandbox-h);
+  justify-content: center;
+  letter-spacing: var(--jp-sandbox-letter-spacing);
+  padding: 0 var(--jp-header-sandbox-pad-x);
+}
+
+.envToggleBtn {
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: opacity 0.2s ease;
+}
+
+.envToggleBtn:hover {
+  opacity: 0.85;
+}
+
 .headerIconButton {
   align-items: center;
   background: var(--jp-transparent);

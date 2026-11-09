@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import AppShell, { FixtureMain } from './components/AppShell.jsx';
 import { AuthProvider, useAuth } from './auth/AuthProvider.jsx';
+import { EnvironmentProvider } from './context/EnvironmentContext.jsx';
 import { RequireAuth, RequireRole } from './auth/RequireAuth.jsx';
 import BrandLoadingScreen from './components/BrandLoadingScreen.jsx';
 import { ToastProvider } from './components/primitives.jsx';
@@ -241,9 +242,11 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <ToastProvider>
-            <AppRoutes />
-          </ToastProvider>
+          <EnvironmentProvider>
+            <ToastProvider>
+              <AppRoutes />
+            </ToastProvider>
+          </EnvironmentProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

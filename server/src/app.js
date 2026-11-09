@@ -1477,7 +1477,7 @@ export function createApp() {
   api.get('/agents', requireSession, requireRole('OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'), async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const agents = await listAgents(orgId);
+      const agents = await listAgents(orgId, undefined, req.environment || null);
       return res.status(200).json({ agents });
     } catch (error) {
       return next(error);
@@ -1498,6 +1498,7 @@ export function createApp() {
         name,
         description: description == null ? null : description.trim(),
         status,
+        environment: req.environment || 'SANDBOX',
       });
       return res.status(201).json({ agent });
     } catch (error) {
@@ -1511,7 +1512,7 @@ export function createApp() {
       if (!validUuid(req.params.id)) {
         return next(buildError('NOT_FOUND', 'Agent not found.', 404));
       }
-      const agent = await getAgent(orgId, req.params.id);
+      const agent = await getAgent(orgId, req.params.id, undefined, req.environment || null);
       if (!agent) {
         return next(buildError('NOT_FOUND', 'Agent not found.', 404));
       }

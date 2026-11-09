@@ -102,6 +102,7 @@ function headers(session, extra = {}) {
   return {
     cookie: `jp_sid=${session.token}`,
     'x-csrf-token': session.csrfToken,
+    'x-jobenpay-environment': 'SANDBOX', // test-changed: PRD 3.0 requires X-Jobenpay-Environment header on operational routes
     ...extra,
   };
 }

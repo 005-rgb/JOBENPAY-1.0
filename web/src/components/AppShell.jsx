@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '../api/client.js';
+import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import wordmarkUrl from '../assets/jobenpay-logo.svg';
 import {
   Banner,
@@ -497,6 +498,13 @@ export default function AppShell({
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
+  let envCtx = null;
+  try {
+    envCtx = useEnvironment();
+  } catch {}
+  const environment = envCtx?.environment || 'SANDBOX';
+  const isLive = envCtx?.isLive || false;
+  const setEnvironment = envCtx?.setEnvironment || (() => {});
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const routeTitle = useMemo(
@@ -551,7 +559,16 @@ export default function AppShell({
             </div>
           </div>
           <div className={styles.headerActions}>
-            <span className={styles.sandboxChip} data-testid="sandbox-chip">{t('app.sandbox')}</span>
+            <button
+              type="button"
+              className={`${isLive ? styles.liveChip : styles.sandboxChip} ${styles.envToggleBtn}`}
+              data-testid="sandbox-chip"
+              onClick={() => setEnvironment(isLive ? 'SANDBOX' : 'LIVE')}
+              title={isLive ? 'Switch to Sandbox' : 'Switch to Live'}
+              aria-label={`Current environment: ${environment}. Click to toggle.`}
+            >
+              {isLive ? 'LIVE' : t('app.sandbox')}
+            </button>
             <RouterLink aria-label={t('app.developer')} className={styles.headerIconButton} to="/developer">
               <Code2 aria-hidden="true" size={24} strokeWidth={1.5} />
             </RouterLink>
@@ -562,6 +579,15 @@ export default function AppShell({
         </header>
         <main className={styles.mainContent}>
           <div className={styles.globalBanners}>
+            {isLive ? (
+              <Banner kind="error" title="LIVE MODE — Real money">
+                You are operating in the LIVE production environment. All transactions and funds are real.
+              </Banner>
+            ) : (
+              <Banner kind="info" title="SANDBOX MODE">
+                You are operating in the SANDBOX testing environment. All transactions and funds are simulated.
+              </Banner>
+            )}
             {frozen ? <Banner kind="error" title={t('app.killSwitch')}>{t('app.frozenNotice')}</Banner> : null}
             {aiMode === 'replay' ? <Banner className={styles.replayBanner} kind="warning" title={t('app.replayMode')} /> : null}
           </div>
