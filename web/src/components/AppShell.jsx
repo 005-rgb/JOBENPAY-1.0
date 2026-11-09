@@ -197,7 +197,7 @@ function isActivePath(pathname, item) {
   return pathname === item.path || pathname.startsWith(`${item.path}/`);
 }
 
-function SideNavigation({ pathname, t, openGroups, setOpenGroups, onNavigate }) {
+function SideNavigation({ pathname, t, openGroups, setOpenGroups, onNavigate, isLive = false }) {
   return (
     <nav className={styles.navigation} aria-label={t('app.primaryNavigation')} data-testid="nav-list">
       {navigation.map((item) => {
@@ -254,7 +254,9 @@ function SideNavigation({ pathname, t, openGroups, setOpenGroups, onNavigate }) 
                     onClick={onNavigate}
                     to={child.path}
                   >
-                    {t(`app.${child.title}`)}
+                    {child.path === '/settings/paypal'
+                      ? (isLive ? 'PayPal Live' : 'PayPal Sandbox')
+                      : t(`app.${child.title}`)}
                   </RouterLink>
                 ))}
               </div>
@@ -475,6 +477,7 @@ function Sidebar({ pathname, t, onNavigate, isLive, setEnvironment }) {
       <EnvironmentToggle variant="sidebar" />
       <CreateMenu t={t} />
       <SideNavigation
+        isLive={isLive}
         onNavigate={onNavigate}
         openGroups={openGroups}
         pathname={pathname}
@@ -516,7 +519,9 @@ export default function AppShell({
   const title = pageTitle
     || (location.pathname === '/' || location.pathname === '/dashboard'
       ? user?.display_name || user?.email || t(`app.${routeTitle}`)
-      : t(`app.${routeTitle}`));
+      : (location.pathname === '/settings/paypal'
+        ? (isLive ? 'PayPal Live' : 'PayPal Sandbox')
+        : t(`app.${routeTitle}`)));
 
   const { notify } = useToast();
   const handleLogout = async (token) => {

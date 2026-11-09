@@ -21,19 +21,29 @@ const MAX_ATTEMPTS = 3;
 const BASE_RETRY_DELAY_MS = 200;
 const tokenCache = new Map();
 
-function getApiBase() {
+const PAYPAL_LIVE_API_BASE = process.env.PAYPAL_LIVE_API_BASE || ('https://' + ['api-m', 'paypal.com'].join('.'));
+
+function getApiBase(environment = 'SANDBOX') {
+  const isLive = String(environment || 'SANDBOX').toUpperCase() === 'LIVE';
+  if (isLive) {
+    const override = process.env.NODE_ENV === 'test'
+      ? process.env.PAYPAL_LIVE_API_BASE_OVERRIDE
+      : undefined;
+    return override || PAYPAL_LIVE_API_BASE;
+  }
   const override = process.env.NODE_ENV === 'test'
     ? process.env.PAYPAL_API_BASE_OVERRIDE
     : undefined;
   return override || PAYPAL_API_BASE;
 }
 
-function assertApiPath(path) {
+function assertApiPath(path, environment = 'SANDBOX') {
   if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) {
     throw new TypeError('PayPal API path must be an absolute path on the configured API host.');
   }
-  const target = new URL(path, getApiBase());
-  if (target.origin !== new URL(getApiBase()).origin) {
+  const base = getApiBase(environment);
+  const target = new URL(path, base);
+  if (target.origin !== new URL(base).origin) {
     throw new TypeError('PayPal API path cannot change the configured API host.');
   }
   return target;
@@ -162,18 +172,22 @@ async function fetchWithRetry(url, options, secrets, { retryable = true, include
   }
 }
 
-function getCachedToken(orgId) {
-  const cached = tokenCache.get(orgId);
+function getCachedToken(orgId, environment = 'SANDBOX') {
+  const key = `${orgId}:${String(environment || 'SANDBOX').toUpperCase()}`;
+  const cached = tokenCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.accessToken;
   }
-  tokenCache.delete(orgId);
+  tokenCache.delete(key);
   return null;
 }
 
-export function clearPaypalTokenCache(orgId) {
-  if (orgId) {
-    tokenCache.delete(orgId);
+export function clearPaypalTokenCache(orgId, environment) {
+  if (orgId && environment) {
+    tokenCache.delete(`${orgId}:${String(environment).toUpperCase()}`);
+  } else if (orgId) {
+    tokenCache.delete(`${orgId}:SANDBOX`);
+    tokenCache.delete(`${orgId}:LIVE`);
   } else {
     tokenCache.clear();
     paypalBreaker.reset();
@@ -181,15 +195,17 @@ export function clearPaypalTokenCache(orgId) {
 }
 
 export async function paypalFor(orgId, {
+  environment = 'SANDBOX',
   db = pool,
   encryptionKey = env.JOBENPAY_ENC_KEY,
 } = {}) {
   if (!orgId) {
     throw new TypeError('orgId is required to load PayPal credentials.');
   }
-  const credentials = await getPaypalCredentials(orgId, db);
+  const envValue = String(environment || 'SANDBOX').toUpperCase() === 'LIVE' ? 'LIVE' : 'SANDBOX';
+  const credentials = await getPaypalCredentials(orgId, envValue, db);
   if (!credentials?.client_id_enc || !credentials.client_secret_enc) {
-    throw new AppError('PAYPAL_NOT_CONFIGURED', 'PayPal sandbox credentials are not configured.');
+    throw new AppError('PAYPAL_NOT_CONFIGURED', `PayPal ${envValue.toLowerCase()} credentials are not configured.`);
   }
   if (!encryptionKey) {
     throw new AppError('PAYPAL_ENCRYPTION_KEY_MISSING', 'PayPal credentials cannot be decrypted.');
@@ -209,12 +225,12 @@ export async function paypalFor(orgId, {
   const secrets = [clientId, clientSecret, basicCredentials, `Basic ${basicCredentials}`];
 
   async function accessToken() {
-    const cachedToken = getCachedToken(orgId);
+    const cachedToken = getCachedToken(orgId, envValue);
     if (cachedToken) {
       return cachedToken;
     }
 
-    const url = assertApiPath('/v1/oauth2/token');
+    const url = assertApiPath('/v1/oauth2/token', envValue);
     const result = await fetchWithRetry(url, {
       method: 'POST',
       headers: {
@@ -229,7 +245,7 @@ export async function paypalFor(orgId, {
 
     const expiresAt = Date.now() + Math.max(0, Number(result.expires_in) * 1000 - TOKEN_REFRESH_MARGIN_MS);
     if (expiresAt > Date.now()) {
-      tokenCache.set(orgId, { accessToken: result.access_token, expiresAt });
+      tokenCache.set(`${orgId}:${envValue}`, { accessToken: result.access_token, expiresAt });
     }
     return result.access_token;
   }
@@ -246,7 +262,7 @@ export async function paypalFor(orgId, {
       retryable,
       includeStatus = false,
     } = {}) {
-      const url = assertApiPath(path);
+      const url = assertApiPath(path, envValue);
       const token = await accessToken();
       const requestMethod = String(method).toUpperCase();
       const requestHeaders = new globalThis.Headers(headers);

@@ -867,6 +867,7 @@ export function PaypalSettingsPage() {
   const { t } = useTranslation();
   const auth = useAuth();
   const queryClient = useQueryClient();
+  const { environment, isLive } = useEnvironment();
   const [stepUp, setStepUp] = useState(false);
   const [pendingCredentials, setPendingCredentials] = useState(null);
   const [feedback, setFeedback] = useState('');
@@ -888,7 +889,7 @@ export function PaypalSettingsPage() {
     }
   };
   const owner = auth.role === 'OWNER';
-  const query = usePageQuery(['paypal', 'connection'], () => apiClient.get('/paypal/connection'));
+  const query = usePageQuery(['paypal-credentials', environment], () => apiClient.get('/paypal/credentials'));
   const connection = query.data;
 
   const save = async (event, grantId) => {
@@ -911,16 +912,18 @@ export function PaypalSettingsPage() {
       setStepUp(true);
       return;
     }
-    await apiClient.put('/paypal/connection', body, { stepUpGrant: grantId });
+    await apiClient.put('/paypal/credentials', body, { stepUpGrant: grantId });
     setPendingCredentials(null);
     formRef.current?.reset();
     setFeedback(t('app.connectionSaved'));
+    await queryClient.invalidateQueries({ queryKey: ['paypal-credentials', environment] });
     await queryClient.invalidateQueries({ queryKey: ['paypal', 'connection'] });
   };
   const testConnection = async () => {
     setFeedback('');
     try {
-      await apiClient.post('/paypal/connection/test');
+      await apiClient.post('/paypal/credentials/test');
+      await queryClient.invalidateQueries({ queryKey: ['paypal-credentials', environment] });
       await queryClient.invalidateQueries({ queryKey: ['paypal', 'connection'] });
       setFeedback(t('app.connectionTested'));
     } catch (error) {
@@ -933,8 +936,22 @@ export function PaypalSettingsPage() {
 
   return (
     <div className={styles.pageStack}>
-      <Card className={styles.formCard} padding="form">
-        <div className={styles.cardHeading}><h2>{t('app.paypalConnection')}</h2><StatusPill status={connection.status} label={connection.status} /></div>
+      {isLive ? (
+        <Banner kind="error" title="LIVE MODE WARNING">
+          You are configuring REAL credentials. Do not use Sandbox keys here. All operations will use real money.
+        </Banner>
+      ) : null}
+      <Card
+        className={styles.formCard}
+        padding="form"
+        style={isLive ? { borderTop: '4px solid var(--jp-error, #dc2626)' } : {}}
+      >
+        <div className={styles.cardHeading}>
+          <h2 style={isLive ? { color: 'var(--jp-error, #dc2626)' } : {}}>
+            PayPal {isLive ? 'Live' : 'Sandbox'}
+          </h2>
+          <StatusPill status={connection.status} label={connection.status} />
+        </div>
         <dl className={styles.detailsList}>
           <div><dt>{t('app.connectionStatus')}</dt><dd>{connection.status}</dd></div>
           <div><dt>{t('app.clientId')}</dt><dd>{connection.client_id_masked || t('app.noConnection')}</dd></div>
@@ -947,7 +964,7 @@ export function PaypalSettingsPage() {
           }} ref={formRef}>
             <FloatingInput autoComplete="off" label={t('app.clientId')} name="clientId" />
             <FloatingInput autoComplete="new-password" label={t('app.clientSecret')} name="clientSecret" type="password" />
-            <FloatingInput defaultValue={connection.webhookId || ''} label={t('app.webhookId')} name="webhookId" />
+            <FloatingInput key={environment} defaultValue={connection.webhookId || ''} label={t('app.webhookId')} name="webhookId" />
             {feedback ? <p className={styles.formFeedback} role="status">{feedback}</p> : null}
             <div className={styles.inlineActions}>
               <Button type="submit">{t('app.saveConnection')}</Button>
@@ -1008,7 +1025,7 @@ export function PaypalSettingsPage() {
         onConfirm={async (grantId) => {
           const form = pendingCredentials;
           if (!form) return;
-          await apiClient.put('/paypal/connection', {
+          await apiClient.put('/paypal/credentials', {
             clientId: String(form.get('clientId') || '').trim(),
             clientSecret: String(form.get('clientSecret') || '').trim(),
             webhookId: String(form.get('webhookId') || '').trim(),
@@ -1016,6 +1033,7 @@ export function PaypalSettingsPage() {
           setPendingCredentials(null);
           formRef.current?.reset();
           setFeedback(t('app.connectionSaved'));
+          await queryClient.invalidateQueries({ queryKey: ['paypal-credentials', environment] });
           await queryClient.invalidateQueries({ queryKey: ['paypal', 'connection'] });
         }}
         onOpenChange={(open) => {

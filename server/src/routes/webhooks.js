@@ -6,6 +6,7 @@ import { env } from '../config.js';
 import { logger } from '../lib/logger.js';
 import { AppError } from '../lib/errors.js';
 import { insertVerifiedWebhookEvent } from '../repositories/webhookEvents.js';
+import { findPaypalConnectionByWebhookToken } from '../repositories/paypalConnections.js';
 import { enqueue } from '../jobs/queue.js';
 import { withTx } from '../db/tx.js';
 
@@ -125,8 +126,36 @@ function createPaypalWebhookHandler(targetEnv) {
         }
       }
 
-      // 4. Log and record event
-      const orgId = req.headers['x-org-id'] || event.resource?.custom || '00000000-0000-4000-8000-000000000001';
+      // 4. Token validation and Org identification
+      const webhookToken = req.params?.webhookToken;
+      let matchedOrgId = req.headers['x-org-id'] || event.resource?.custom || null;
+      if (webhookToken) {
+        const conn = await findPaypalConnectionByWebhookToken(webhookToken);
+        if (!conn) {
+          return res.status(404).json({
+            error: {
+              code: 'WEBHOOK_TOKEN_NOT_FOUND',
+              message: 'Webhook connection not found for given token.',
+            },
+          });
+        }
+        if (conn.environment !== targetEnv) {
+          logger.warn(
+            { tokenEnv: conn.environment, targetEnv, webhookToken },
+            'Cross-environment webhook token access blocked'
+          );
+          return res.status(403).json({
+            error: {
+              code: 'CROSS_ENVIRONMENT_MUTATION_BLOCKED',
+              message: `Webhook token belongs to ${conn.environment}, cannot access ${targetEnv} webhook endpoint.`,
+            },
+          });
+        }
+        matchedOrgId = conn.org_id;
+      }
+
+      // 5. Log and record event
+      const orgId = matchedOrgId || '00000000-0000-4000-8000-000000000001';
       try {
         await pool.query(
           `INSERT INTO payment_webhook_events (
@@ -149,10 +178,12 @@ function createPaypalWebhookHandler(targetEnv) {
   };
 }
 
-// Sandbox: POST /api/v1/webhooks/sbx/paypal
+// Sandbox: POST /api/v1/webhooks/sbx/paypal and /api/v1/webhooks/sbx/paypal/:webhookToken
 webhooksRouter.post('/sbx/paypal', createPaypalWebhookHandler('SANDBOX'));
+webhooksRouter.post('/sbx/paypal/:webhookToken', createPaypalWebhookHandler('SANDBOX'));
 
-// Live: POST /api/v1/webhooks/live/paypal
+// Live: POST /api/v1/webhooks/live/paypal and /api/v1/webhooks/live/paypal/:webhookToken
 webhooksRouter.post('/live/paypal', createPaypalWebhookHandler('LIVE'));
+webhooksRouter.post('/live/paypal/:webhookToken', createPaypalWebhookHandler('LIVE'));
 
 export default webhooksRouter;

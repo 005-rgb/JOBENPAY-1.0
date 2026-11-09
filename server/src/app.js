@@ -96,6 +96,7 @@ import {
   savePaypalConnection,
   updatePaypalConnectionStatus,
 } from './repositories/paypalConnections.js';
+import { buildPaypalWebhookUrl } from './services/paypal_service.js';
 import { listNotifications, markNotificationRead } from './repositories/notifications.js';
 import {
   getActiveAgentBudget,
@@ -1918,14 +1919,21 @@ export function createApp() {
     }
   });
 
-  api.get('/paypal/connection', requireSession, async (req, res, next) => {
+  const resolveEnvHeader = (req) => {
+    const raw = req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || req.environment || 'SANDBOX';
+    return String(raw).toUpperCase() === 'LIVE' || String(raw).toUpperCase() === 'PRODUCTION' ? 'LIVE' : 'SANDBOX';
+  };
+
+  const handleGetPaypalCredentials = async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const connection = await getPaypalConnection(orgId);
+      const targetEnv = resolveEnvHeader(req);
+      const connection = await getPaypalConnection(orgId, targetEnv);
       if (!connection) {
         return res.status(200).json({
           client_id_masked: null,
           status: 'UNTESTED',
+          environment: targetEnv,
           webhookUrl: null,
           webhookId: null,
           lastTestedAt: null,
@@ -1942,11 +1950,15 @@ export function createApp() {
         : '';
       const { membership } = await loadSessionUser(req);
       const canViewWebhookUrl = membership?.role === 'OWNER' && !membership.is_judge;
+      const isLegacyCall = req.path.endsWith('/paypal/connection') && !req.headers['x-jobenpay-environment'] && !req.headers['x-environment'];
       return res.status(200).json({
         client_id_masked: clientId.length > 4 ? `****${clientId.slice(-4)}` : '****',
         status: connection.status || 'UNTESTED',
+        environment: targetEnv,
         webhookUrl: canViewWebhookUrl && connection.webhook_token
-          ? `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/paypal/${connection.webhook_token}`
+          ? (isLegacyCall
+            ? `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/paypal/${connection.webhook_token}`
+            : buildPaypalWebhookUrl(targetEnv, connection.webhook_token))
           : null,
         webhookId: connection.webhook_id,
         lastTestedAt: connection.last_tested_at,
@@ -1955,12 +1967,16 @@ export function createApp() {
     } catch (error) {
       return next(error);
     }
-  });
+  };
 
-  api.put('/paypal/connection', requireSession, requireCsrf, requireRole('OWNER'), async (req, res, next) => {
+  api.get('/paypal/connection', requireSession, handleGetPaypalCredentials);
+  api.get('/paypal/credentials', requireSession, handleGetPaypalCredentials);
+
+  const handlePutPaypalCredentials = async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const current = await getPaypalCredentials(orgId);
+      const targetEnv = resolveEnvHeader(req);
+      const current = await getPaypalCredentials(orgId, targetEnv);
       const clientIdProvided = typeof req.body?.clientId === 'string' && req.body.clientId.trim().length > 0;
       const clientSecretProvided = typeof req.body?.clientSecret === 'string' && req.body.clientSecret.trim().length > 0;
       const credentialsProvided = clientIdProvided || clientSecretProvided;
@@ -2016,20 +2032,25 @@ export function createApp() {
         clientSecretEnc,
         webhookId,
         webhookToken: current?.webhook_token || randomToken(32),
+        environment: targetEnv,
       });
       if (credentialsProvided) {
-        clearPaypalTokenCache(orgId);
+        clearPaypalTokenCache(orgId, targetEnv);
       }
       await appendAudit({
         orgId,
         actorId: req.user.id,
         action: 'PAYPAL_CONNECTION_UPDATED',
-        details: { credentialsChanged: credentialsProvided, webhookIdSet: Boolean(connection.webhook_id) },
+        details: { credentialsChanged: credentialsProvided, webhookIdSet: Boolean(connection.webhook_id), environment: targetEnv },
       });
+      const isLegacyCall = req.path.endsWith('/paypal/connection') && !req.headers['x-jobenpay-environment'] && !req.headers['x-environment'];
       return res.status(200).json({
         client_id_masked: clientId.length > 4 ? `****${clientId.slice(-4)}` : '****',
         status: connection.status,
-        webhookUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/paypal/${connection.webhook_token}`,
+        environment: targetEnv,
+        webhookUrl: isLegacyCall
+          ? `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/webhooks/paypal/${connection.webhook_token}`
+          : buildPaypalWebhookUrl(targetEnv, connection.webhook_token),
         webhookId: connection.webhook_id,
         lastTestedAt: connection.last_tested_at,
         lastErrorCode: connection.last_error_code,
@@ -2037,9 +2058,12 @@ export function createApp() {
     } catch (error) {
       return next(error);
     }
-  });
+  };
 
-  api.delete('/paypal/connection', requireSession, requireCsrf, requireRole('OWNER'), async (req, res, next) => {
+  api.put('/paypal/connection', requireSession, requireCsrf, requireRole('OWNER'), handlePutPaypalCredentials);
+  api.put('/paypal/credentials', requireSession, requireCsrf, requireRole('OWNER'), handlePutPaypalCredentials);
+
+  const handleDeletePaypalCredentials = async (req, res, next) => {
     try {
       const grant = await useGrant(GLOBAL_ORG_ID, {
         grantId: req.get('x-step-up-grant') || req.body?.grantId,
@@ -2050,33 +2074,39 @@ export function createApp() {
         throw buildError('STEP_UP_REQUIRED', 'Step-up authentication required.', 403);
       }
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      await deletePaypalConnection(orgId);
-      clearPaypalTokenCache(orgId);
+      const targetEnv = resolveEnvHeader(req);
+      await deletePaypalConnection(orgId, targetEnv);
+      clearPaypalTokenCache(orgId, targetEnv);
       await appendAudit({
         orgId,
         actorId: req.user.id,
         action: 'PAYPAL_CONNECTION_DELETED',
-        details: {},
+        details: { environment: targetEnv },
       });
       return res.status(204).end();
     } catch (error) {
       return next(error);
     }
-  });
+  };
 
-  api.post('/paypal/connection/test', requireSession, requireCsrf, requireRole('OWNER'), async (req, res, next) => {
+  api.delete('/paypal/connection', requireSession, requireCsrf, requireRole('OWNER'), handleDeletePaypalCredentials);
+  api.delete('/paypal/credentials', requireSession, requireCsrf, requireRole('OWNER'), handleDeletePaypalCredentials);
+
+  const handleTestPaypalCredentials = async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      if (!(await getPaypalConnection(orgId))) {
-        throw buildError('PAYPAL_NOT_CONFIGURED', 'PayPal sandbox credentials are not configured.', 400);
+      const targetEnv = resolveEnvHeader(req);
+      if (!(await getPaypalConnection(orgId, targetEnv))) {
+        throw buildError('PAYPAL_NOT_CONFIGURED', `PayPal ${targetEnv.toLowerCase()} credentials are not configured.`, 400);
       }
 
       try {
-        const paypal = await paypalFor(orgId);
+        const paypal = await paypalFor(orgId, { environment: targetEnv });
         await paypal.testConnection();
-        const connection = await updatePaypalConnectionStatus(orgId, { status: 'CONNECTED' });
+        const connection = await updatePaypalConnectionStatus(orgId, { status: 'CONNECTED', environment: targetEnv });
         return res.status(200).json({
           status: connection.status,
+          environment: targetEnv,
           lastTestedAt: connection.last_tested_at,
           lastErrorCode: connection.last_error_code,
         });
@@ -2084,9 +2114,11 @@ export function createApp() {
         const connection = await updatePaypalConnectionStatus(orgId, {
           status: 'ERROR',
           lastErrorCode: error?.code || 'PAYPAL_CONNECTION_FAILED',
+          environment: targetEnv,
         });
         return res.status(400).json({
           status: connection.status,
+          environment: targetEnv,
           lastTestedAt: connection.last_tested_at,
           lastErrorCode: connection.last_error_code,
         });
@@ -2094,7 +2126,10 @@ export function createApp() {
     } catch (error) {
       return next(error);
     }
-  });
+  };
+
+  api.post('/paypal/connection/test', requireSession, requireCsrf, requireRole('OWNER'), handleTestPaypalCredentials);
+  api.post('/paypal/credentials/test', requireSession, requireCsrf, requireRole('OWNER'), handleTestPaypalCredentials);
 
   registerAuthRoutes(api);
 
