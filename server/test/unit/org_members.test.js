@@ -26,7 +26,7 @@ import {
 } from '../../src/services/member_service.js';
 import { validateStepUp } from '../../src/services/sca_service.js';
 
-async function createOrgAndUser(slugPrefix, role = 'OWNER') {
+async function createOrgAndUser(slugPrefix, role = 'OWNER', isJudge = false) {
   const orgId = crypto.randomUUID();
   const slug = `${slugPrefix}-${orgId.slice(0, 8)}`;
   await pool.query(
@@ -43,7 +43,7 @@ async function createOrgAndUser(slugPrefix, role = 'OWNER') {
 
   await pool.query(
     'INSERT INTO memberships (org_id, user_id, role, is_judge) VALUES ($1, $2, $3, $4)',
-    [orgId, userId, role, false],
+    [orgId, userId, role, isJudge],
   );
 
   const csrfToken = crypto.randomUUID();
@@ -204,6 +204,18 @@ test('ADENDUM-01 (PRD 1.4) Organization & Member Management Suite', async (t) =>
       body: JSON.stringify({ display_name: 'Hacked' }),
     });
     assert.equal(resPatch.status, 403);
+  });
+
+  await t.test('test_org_profile_judge_access: JUDGE in jobenpay-demo org can access /org/profile', async () => {
+    const { headers, orgId } = await createOrgAndUser('jobenpay-demo', 'OWNER', true);
+
+    const resGet = await fetch(`${url}/api/v1/org/profile`, {
+      method: 'GET',
+      headers,
+    });
+    assert.equal(resGet.status, 200);
+    const data = await resGet.json();
+    assert.equal(data.org_id, orgId);
   });
 
   await t.test('test_update_org_logo: POST /api/v1/org/logo updates logo successfully', async () => {

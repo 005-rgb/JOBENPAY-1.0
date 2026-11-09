@@ -134,13 +134,18 @@ export default function OrganizationPage() {
   }
 
   if (error) {
+    const isForbidden = error.status === 403 || error.code === 'FORBIDDEN';
     return (
       <div className={styles.pageStack}>
         <div className={styles.errorBanner}>
           <AlertCircle size={20} />
           <div>
-            <strong>Failed to Load Organization Profile</strong>
-            <p style={{ margin: '4px 0 0 0' }}>{error.message}</p>
+            <strong>{isForbidden ? 'Access Restricted' : 'Failed to Load Organization Profile'}</strong>
+            <p style={{ margin: '4px 0 0 0' }}>
+              {isForbidden
+                ? 'You do not have permission to view or manage the organization profile. Please contact an organization Owner or Administrator.'
+                : (error.message || 'The request could not be completed.')}
+            </p>
           </div>
         </div>
       </div>

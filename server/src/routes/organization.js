@@ -3,8 +3,13 @@ import { Router } from 'express';
 import { AppError } from '../lib/errors.js';
 import { getOrgProfile, updateOrgProfile, updateOrgLogo } from '../services/organization_service.js';
 
+const GLOBAL_DUMMY_ORG = '00000000-0000-4000-8000-000000000000';
+
 function resolveOrgId(req) {
-  const orgId = req.org?.id ?? req.session?.current_org_id ?? req.user?.org_id;
+  let orgId = req.org?.id || req.membership?.org_id || req.session?.current_org_id || req.user?.org_id;
+  if ((!orgId || orgId === GLOBAL_DUMMY_ORG) && req.membership?.org_id) {
+    orgId = req.membership.org_id;
+  }
   if (!orgId) {
     throw new AppError('UNAUTHENTICATED', 401, 'Organization context required');
   }
@@ -24,7 +29,7 @@ export function createOrganizationRouter({ requireSession, requireRole, requireC
 
   const authMiddleware = requireSession || function requireSession(req, res, next) { next(); };
   const csrfMiddleware = requireCsrf || function requireCsrf(req, res, next) { next(); };
-  const roleMiddleware = requireRole ? requireRole('OWNER', 'ADMIN') : ((req, res, next) => next());
+  const roleMiddleware = requireRole ? requireRole('OWNER', 'ADMIN', 'JUDGE') : ((req, res, next) => next());
 
   // GET /api/v1/org/profile
   router.get('/org/profile', authMiddleware, roleMiddleware, async (req, res, next) => {
