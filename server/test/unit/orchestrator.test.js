@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import pool from '../../src/db/pool.js';
 import { PaymentOrchestrator, defaultOrchestrator } from '../../src/services/payment/orchestrator.js';
 import { PaymentRouter } from '../../src/services/payment/payment_router.js';
+import { VaultService } from '../../src/services/payment/vault_service.js';
 
 test('PRD 4.1: Orchestrator Unit & Edge Case Tests', async (t) => {
   let orgId;
@@ -86,6 +87,53 @@ test('PRD 4.1: Orchestrator Unit & Edge Case Tests', async (t) => {
     assert.equal(dbTx.rows.length, 1);
     assert.equal(dbTx.rows[0].status, 'FAILED');
     assert.equal(dbTx.rows[0].error_code, 'HARD_DECLINE');
+  });
+
+  await t.test('createPayment success with paymentMethodId and idempotency replay', async () => {
+    // 1. Save payment method in Vault
+    const custId = crypto.randomUUID();
+    const pm = await VaultService.savePaymentMethod({
+      orgId,
+      environment: 'SANDBOX',
+      customerId: custId,
+      gateway: 'STRIPE',
+      token: 'tok_visa_valid',
+      cardBrand: 'visa',
+      cardLast4: '4242',
+    });
+
+    const reqId = crypto.randomUUID();
+    const idemKey = `idem_succ_pm_${testRunId}`;
+
+    // 2. Execute createPayment with paymentMethodId
+    const res1 = await orchestrator.createPayment({
+      orgId,
+      environment: 'SANDBOX',
+      requestId: reqId,
+      amountMinor: 3000n,
+      currency: 'USD',
+      paymentMethodId: pm.pm_id,
+      idempotencyKey: idemKey,
+    });
+
+    assert.equal(res1.success, true);
+    assert.equal(res1.transaction.status, 'AUTHORIZED');
+    assert.equal(res1.transaction.idempotency_key, idemKey);
+
+    // 3. Replay with identical idempotencyKey -> returns cached transaction
+    const res2 = await orchestrator.createPayment({
+      orgId,
+      environment: 'SANDBOX',
+      requestId: reqId,
+      amountMinor: 3000n,
+      currency: 'USD',
+      paymentMethodId: pm.pm_id,
+      idempotencyKey: idemKey,
+    });
+
+    assert.equal(res2.idempotent, true);
+    assert.equal(res2.transaction.tx_id, res1.transaction.tx_id);
+    assert.equal(res2.transaction.status, 'AUTHORIZED');
   });
 
   await t.test('capturePayment validations: rejects missing params, non-existent, and invalid state', async () => {

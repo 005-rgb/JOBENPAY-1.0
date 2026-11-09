@@ -3,7 +3,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import pool from '../../src/db/pool.js';
-import { VaultService } from '../../src/services/payment/vault_service.js';
+import {
+  VaultService,
+  savePaymentMethod,
+  getPaymentMethod,
+  listPaymentMethods,
+  deletePaymentMethod,
+  setDefaultPaymentMethod,
+} from '../../src/services/payment/vault_service.js';
 
 test('PRD 4.1: VaultService Unit Tests (100% Coverage Target)', async (t) => {
   let orgId;
@@ -241,5 +248,60 @@ test('PRD 4.1: VaultService Unit Tests (100% Coverage Target)', async (t) => {
       async () => VaultService.deletePaymentMethod(orgId, 'SANDBOX', crypto.randomUUID()),
       /Payment method .* not found/,
     );
+  });
+
+  await t.test('test_vault_helpers_and_defaults: covers setDefault, listOrg, and exported helpers', async () => {
+    // 1. Save payment method using exported helper savePaymentMethod
+    const tok1 = `tok_helper_${crypto.randomBytes(6).toString('hex')}`;
+    const pm1 = await savePaymentMethod(orgId, 'SANDBOX', customerId, 'STRIPE', tok1, {
+      brand: 'mastercard',
+      last4: '5555',
+      expMonth: 10,
+      expYear: 2027,
+      isDefault: false,
+    });
+    assert.ok(pm1.pm_id);
+    assert.equal(pm1.card_last4, '5555');
+    assert.equal(pm1.is_default, false);
+
+    // 2. Set default via VaultService.setDefaultPaymentMethod
+    const setDef1 = await VaultService.setDefaultPaymentMethod(orgId, 'SANDBOX', pm1.pm_id);
+    assert.equal(setDef1.is_default, true);
+
+    // 3. Save second payment method
+    const tok2 = `tok_helper2_${crypto.randomBytes(6).toString('hex')}`;
+    const pm2 = await savePaymentMethod(orgId, 'SANDBOX', customerId, 'PAYPAL', tok2, {
+      cardBrand: 'visa',
+      cardLast4: '1111',
+      cardExpMonth: 5,
+      cardExpYear: 2030,
+      isDefault: false,
+    });
+
+    // 4. Set default via exported helper setDefaultPaymentMethod
+    const setDef2 = await setDefaultPaymentMethod(orgId, 'SANDBOX', pm2.pm_id);
+    assert.equal(setDef2.is_default, true);
+
+    // Verify pm1 is no longer default
+    const checkPm1 = await getPaymentMethod(orgId, 'SANDBOX', pm1.pm_id);
+    assert.equal(checkPm1.is_default, false);
+
+    // 5. Test listOrgPaymentMethods on class and exported listPaymentMethods without customerId
+    const orgListClass = await VaultService.listOrgPaymentMethods(orgId, 'SANDBOX');
+    assert.ok(orgListClass.length >= 2);
+
+    const orgListHelper = await listPaymentMethods(orgId, 'SANDBOX');
+    assert.ok(orgListHelper.length >= 2);
+
+    // 6. Test exported listPaymentMethods with customerId
+    const custListHelper = await listPaymentMethods(orgId, 'SANDBOX', customerId);
+    assert.ok(custListHelper.length >= 2);
+
+    // 7. Delete via exported helper deletePaymentMethod
+    const del1 = await deletePaymentMethod(orgId, 'SANDBOX', pm1.pm_id);
+    assert.equal(del1.success, true);
+
+    const del2 = await deletePaymentMethod(orgId, 'SANDBOX', pm2.pm_id);
+    assert.equal(del2.success, true);
   });
 });
