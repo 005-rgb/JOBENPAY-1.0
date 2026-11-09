@@ -54,6 +54,7 @@ import { createAgentsRouter } from './routes/agents.js';
 import { createOrgRouter } from './routes/org.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { createDxRouter, dxRouter } from './routes/dx.js';
+import { createSecurityRouter } from './routes/security.js';
 import { handleAgentTransaction } from './controllers/dip_controller.js';
 import { withTx } from './db/tx.js';
 import { AppError, errorHandler } from './lib/errors.js';
@@ -661,6 +662,7 @@ export function createApp() {
   api.use(createOrgRouter({ requireSession }));
   api.use('/webhooks', webhooksRouter);
   api.use(createDxRouter({ requireSession, requireCsrf }));
+  api.use(createSecurityRouter({ requireSession, requireRole, requireCsrf }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,
