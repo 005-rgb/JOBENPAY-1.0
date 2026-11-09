@@ -444,6 +444,13 @@ function FeedbackDialog({ open, onOpenChange, csrfToken, t }) {
 }
 
 export function Footer({ t, className = '' }) {
+  let isLive = false;
+  try {
+    const envCtx = useEnvironment();
+    isLive = Boolean(envCtx?.isLive);
+  } catch {
+    isLive = false;
+  }
   const firstRowLinks = ['help', 'contact', 'sitemap', 'fees', 'security', 'about', 'developers', 'partners'];
   return (
     <footer className={`${styles.footer} ${className}`.trim()}>
@@ -459,7 +466,9 @@ export function Footer({ t, className = '' }) {
           <RouterLink to="/privacy">{t('app.privacy')}</RouterLink><RouterLink to="/terms">{t('app.legal')}</RouterLink><a href="#policy">{t('app.policyUpdates')}</a>
         </nav>
       </div>
-      <p className={styles.footerLegal} data-testid="footer-legal">{t('app.legalNotice')}</p>
+      <p className={styles.footerLegal} data-testid="footer-legal">
+        {isLive ? t('app.legalNoticeLive') : t('app.legalNotice')}
+      </p>
     </footer>
   );
 }

@@ -33,6 +33,7 @@ import styles from './TransactionPages.module.css';
 
 export default function PaymentsPage({ tab = 'overview' }) {
   const { environment } = useEnvironment();
+  const isLive = String(environment || '').toUpperCase() === 'LIVE';
   const { notify } = useToast();
   const [activeTab, setActiveTab] = useState(tab);
   const [loading, setLoading] = useState(false);
@@ -276,8 +277,11 @@ export default function PaymentsPage({ tab = 'overview' }) {
         <div className={styles.pageTitleGroup}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--jp-space-2)' }}>
             <h1 className={styles.pageTitle}>Payment Orchestration Layer (POL)</h1>
-            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
-              {gatewaysData?.environment || 'SANDBOX'}
+            <span
+              className={`${styles.providerBadge} ${isLive ? styles.badgeLive : styles.badgeSandbox}`}
+              style={isLive ? { backgroundColor: '#fdecef', border: '1px solid #fca5a5', color: 'var(--jp-error)' } : undefined}
+            >
+              {isLive ? 'LIVE' : 'SANDBOX'}
             </span>
             <span
               style={{
@@ -1028,7 +1032,7 @@ export default function PaymentsPage({ tab = 'overview' }) {
                 <Terminal size={16} /> POL Test Terminal
               </h3>
               <p style={{ fontSize: '12px', color: 'var(--jp-text-muted)', margin: '4px 0 0' }}>
-                Test smart failover logic and multi-gateway state transitions in Sandbox mode.
+                Test smart failover logic and multi-gateway state transitions in {isLive ? 'Live' : 'Sandbox'} mode.
               </p>
             </div>
 

@@ -225,8 +225,11 @@ function formatMinor(minor, currency) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value / 100);
 }
 
-function payeeKindKey(kind) {
-  return kind === 'PAYPAL_ID' ? 'paypalIdKind' : `${String(kind).toLowerCase()}Kind`;
+function payeeKindKey(kind, isLive = false) {
+  if (kind === 'PAYPAL_ID') {
+    return isLive ? 'paypalIdKindLive' : 'paypalIdKind';
+  }
+  return `${String(kind).toLowerCase()}Kind`;
 }
 
 function MetricCard({ label, value, hasData, t }) {
@@ -790,6 +793,7 @@ export function AgentDetailPage() {
 
 export function PayeesPage({ initialCreate = false }) {
   const { t } = useTranslation();
+  const { isLive } = useEnvironment();
   const auth = useAuth();
   const canWrite = ['OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'].includes(auth.role);
   const canTrust = ['OWNER', 'ADMIN', 'JUDGE'].includes(auth.role);
@@ -865,7 +869,7 @@ export function PayeesPage({ initialCreate = false }) {
             <tbody>{pageRows.map((payee) => (
               <tr key={payee.id}>
                 <td><Link to={`/payees/${payee.id}`}>{payee.displayName}</Link></td>
-                <td>{t(`app.${payeeKindKey(payee.kind)}`)}</td>
+                <td>{t(`app.${payeeKindKey(payee.kind, isLive)}`)}</td>
                 <td><code>{payee.identifierMasked || '—'}</code></td>
                 <td><StatusPill status={payee.trust} label={t(`app.${payee.trust.toLowerCase() === 'pending_review' ? 'untrusted' : payee.trust.toLowerCase() === 'blocked' ? 'blockedTrust' : 'trusted'}`)} /></td>
                 <td className={styles.tableActions}>
@@ -896,7 +900,7 @@ export function PayeesPage({ initialCreate = false }) {
           <FloatingInput defaultValue={editing?.displayName || ''} label={t('app.displayName')} name="displayName" required />
           <FloatingSelect defaultValue={editing?.kind || 'EMAIL'} label={t('app.payeeType')} name="kind">
             <option value="EMAIL">{t('app.emailKind')}</option>
-            <option value="PAYPAL_ID">{t('app.paypalIdKind')}</option>
+            <option value="PAYPAL_ID">{isLive ? t('app.paypalIdKindLive') : t('app.paypalIdKind')}</option>
             <option value="PHONE">{t('app.phoneKind')}</option>
           </FloatingSelect>
           <FloatingInput label={t('app.identifier')} name="identifier" required={!editing} type="text" />
@@ -922,6 +926,7 @@ export function PayeesPage({ initialCreate = false }) {
 export function PayeeDetailPage() {
   const { id } = useParams();
   const { t } = useTranslation();
+  const { isLive } = useEnvironment();
   const query = usePageQuery(['payees', id], () => apiClient.get(`/payees/${id}`));
   if (query.isPending) return <LoadingState />;
   if (query.error || !query.data) return <PageError error={query.error} onRetry={query.refetch} />;
@@ -931,7 +936,7 @@ export function PayeeDetailPage() {
       <Card className={styles.formCard} padding="form">
         <div className={styles.cardHeading}><h2>{payee.displayName}</h2><StatusPill status={payee.trust} label={payee.trust} /></div>
         <dl className={styles.detailsList}>
-          <div><dt>{t('app.payeeType')}</dt><dd>{t(`app.${payeeKindKey(payee.kind)}`)}</dd></div>
+          <div><dt>{t('app.payeeType')}</dt><dd>{t(`app.${payeeKindKey(payee.kind, isLive)}`)}</dd></div>
           <div><dt>{t('app.identifierMasked')}</dt><dd><code>{payee.identifierMasked || '—'}</code></dd></div>
           <div><dt>{t('app.createdAt')}</dt><dd>{new Date(payee.createdAt).toLocaleString()}</dd></div>
         </dl>
