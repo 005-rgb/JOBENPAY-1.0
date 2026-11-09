@@ -1,8 +1,17 @@
 import pool from '../db/pool.js';
 
-export async function getDashboardSummary(orgId, db = pool, environment = 'SANDBOX') {
+export async function getDashboardSummary(orgId, dbOrEnv = pool, maybeEnv = 'SANDBOX') {
   if (!orgId) {
     throw new Error('orgId is required for dashboard repository methods.');
+  }
+
+  let db = pool;
+  let environment = 'SANDBOX';
+  if (typeof dbOrEnv === 'string') {
+    environment = dbOrEnv;
+  } else {
+    db = dbOrEnv || pool;
+    environment = maybeEnv || 'SANDBOX';
   }
 
   const env = (environment || 'SANDBOX').toUpperCase();
@@ -38,6 +47,28 @@ export async function getDashboardSummary(orgId, db = pool, environment = 'SANDB
         AND period.period_end > now()
       ORDER BY mandate.created_at DESC, period.period_start DESC
       LIMIT 1
+    ), recent_txs AS (
+      SELECT COALESCE(
+        json_agg(
+          json_build_object(
+            'id', t.intent_id,
+            'category', t.category,
+            'sub_type', t.sub_type,
+            'amount_minor', t.amount_minor::text,
+            'currency', t.currency,
+            'status', t.status,
+            'created_at', t.created_at
+          ) ORDER BY t.created_at DESC
+        ),
+        '[]'::json
+      ) AS list
+      FROM (
+        SELECT intent_id, category, sub_type, amount_minor, currency, status, created_at
+        FROM transaction_intents
+        WHERE org_id = $1 AND environment = $2
+        ORDER BY created_at DESC
+        LIMIT 5
+      ) t
     )
     SELECT
       COALESCE((SELECT remaining_minor FROM active_budget), '0') AS remaining_budget_minor,
@@ -57,15 +88,30 @@ export async function getDashboardSummary(orgId, db = pool, environment = 'SANDB
         SELECT 1 FROM agents
         WHERE org_id = $1 AND environment = $2 AND status = 'ACTIVE'
       ) AS has_agent,
+      (
+        SELECT count(*)::integer FROM agents
+        WHERE org_id = $1 AND environment = $2 AND status = 'ACTIVE'
+      ) AS total_agents,
       EXISTS (
         SELECT 1 FROM mandates
         WHERE org_id = $1 AND environment = $2 AND status = 'ACTIVE'
-      ) AS has_active_mandate
+      ) AS has_active_mandate,
+      (
+        SELECT count(*)::integer FROM mandates
+        WHERE org_id = $1 AND environment = $2 AND status = 'ACTIVE'
+      ) AS active_mandates,
+      (SELECT list FROM recent_txs) AS recent_transactions
     FROM request_counts
   `, [orgId, env]);
 
   const row = result.rows[0];
+  const paypalConnected = Boolean(row.paypal_connected);
+  const hasAgent = Boolean(row.has_agent);
+  const hasActiveMandate = Boolean(row.has_active_mandate);
+  const completedSetupCount = (paypalConnected ? 1 : 0) + (hasAgent ? 1 : 0) + (hasActiveMandate ? 1 : 0);
+
   return {
+    environment: env,
     remainingBudgetMinor: row.remaining_budget_minor,
     currency: row.currency.trim(),
     counts: {
@@ -74,10 +120,25 @@ export async function getDashboardSummary(orgId, db = pool, environment = 'SANDB
       held: row.held,
       blocked: row.blocked,
       reconciled: row.reconciled,
+      pendingApprovals: row.held,
+      totalAgents: row.total_agents,
+      activeMandates: row.active_mandates,
     },
     budgetUsedPct: row.budget_used_pct,
-    paypalConnected: row.paypal_connected,
-    hasAgent: row.has_agent,
-    hasActiveMandate: row.has_active_mandate,
+    paypalConnected,
+    hasAgent,
+    totalAgents: row.total_agents,
+    hasActiveMandate,
+    activeMandates: row.active_mandates,
+    pendingApprovals: row.held,
+    recentTransactions: row.recent_transactions || [],
+    setupReadiness: {
+      paypalConnected,
+      hasAgent,
+      hasActiveMandate,
+      completedCount: completedSetupCount,
+      totalCount: 3,
+      isReady: completedSetupCount === 3,
+    },
   };
 }

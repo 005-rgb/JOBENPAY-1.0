@@ -17,6 +17,7 @@ export async function runRealPreflight(orgId, options = {}) {
 
   const db = options.db ?? pool;
   const env = options.env ?? process.env;
+  const targetEnvironment = String(options.environment || options.targetEnv || 'SANDBOX').toUpperCase();
   const now = options.now ?? new Date();
   const paypalFor = options.paypalFor ?? defaultPaypalFor;
   const encryptionKey = options.encryptionKey ?? configEnv.JOBENPAY_ENC_KEY ?? configEnv.ENCRYPTION_KEY;
@@ -37,7 +38,7 @@ export async function runRealPreflight(orgId, options = {}) {
     checks.push({
       id: 'PF-01',
       status: 'FAIL',
-      detail: `PAYPAL_API_BASE_OVERRIDE is set ('${paypalOverride}'). Real sandbox payouts require production mode without overrides.`,
+      detail: `PAYPAL_API_BASE_OVERRIDE is set ('${paypalOverride}'). Real payouts require production mode without overrides.`,
     });
   } else {
     checks.push({
@@ -49,8 +50,8 @@ export async function runRealPreflight(orgId, options = {}) {
 
   // PF-02: PayPal connection status CONNECTED, webhook_id set, webhookUrl is https and not localhost/IP
   const connResult = await db.query(
-    'SELECT org_id, status, webhook_id, webhook_token FROM paypal_connections WHERE org_id = $1 LIMIT 1',
-    [orgId],
+    'SELECT org_id, status, webhook_id, webhook_token FROM paypal_connections WHERE org_id = $1 AND environment = $2 LIMIT 1',
+    [orgId, targetEnvironment],
   );
   const conn = connResult.rows[0] ?? null;
   const publicBaseUrl = options.publicBaseUrl ?? env.PUBLIC_BASE_URL ?? configEnv.PUBLIC_BASE_URL ?? '';
@@ -86,7 +87,9 @@ export async function runRealPreflight(orgId, options = {}) {
     checks.push({
       id: 'PF-02',
       status: 'FAIL',
-      detail: 'No PayPal connection found for this organization. Konfigurasi kredensial Sandbox di /settings/paypal atau via CLI setup.',
+      detail: targetEnvironment === 'LIVE'
+        ? 'No PayPal connection found for this organization in LIVE environment. Masukkan Client ID dan Secret PayPal Live di /settings/paypal.'
+        : 'No PayPal connection found for this organization. Konfigurasi kredensial Sandbox di /settings/paypal atau via CLI setup.',
     });
   } else if (conn.status !== 'CONNECTED') {
     checks.push({
@@ -110,7 +113,7 @@ export async function runRealPreflight(orgId, options = {}) {
     checks.push({
       id: 'PF-02',
       status: 'PASS',
-      detail: `PayPal connection is CONNECTED, webhook_id is set (${conn.webhook_id}), and webhook URL is valid HTTPS.`,
+      detail: `PayPal connection is CONNECTED (${targetEnvironment}), webhook_id is set (${conn.webhook_id}), and webhook URL is valid HTTPS.`,
     });
   }
 
@@ -177,24 +180,24 @@ export async function runRealPreflight(orgId, options = {}) {
     SELECT a.id, a.name, count(k.id)::integer AS active_key_count
     FROM agents a
     JOIN agent_api_keys k ON k.agent_id = a.id AND k.org_id = a.org_id
-    WHERE a.org_id = $1 AND a.status = 'ACTIVE' AND k.revoked_at IS NULL
+    WHERE a.org_id = $1 AND a.environment = $2 AND a.status = 'ACTIVE' AND k.revoked_at IS NULL
     GROUP BY a.id, a.name
     ORDER BY a.created_at ASC
     LIMIT 1
-  `, [orgId]);
+  `, [orgId, targetEnvironment]);
   const activeAgent = agentResult.rows[0] ?? null;
 
   if (!activeAgent) {
     checks.push({
       id: 'PF-06',
       status: 'FAIL',
-      detail: 'No ACTIVE agent with an unrevoked API key found in this organization.',
+      detail: `No ACTIVE agent with an unrevoked API key found in ${targetEnvironment} environment for this organization.`,
     });
   } else {
     checks.push({
       id: 'PF-06',
       status: 'PASS',
-      detail: `Active agent '${activeAgent.name}' has ${activeAgent.active_key_count} active API key(s).`,
+      detail: `Active agent '${activeAgent.name}' has ${activeAgent.active_key_count} active API key(s) in ${targetEnvironment}.`,
     });
   }
 
@@ -213,31 +216,31 @@ export async function runRealPreflight(orgId, options = {}) {
              v.id AS version_id, v.policy, v.valid_from, v.valid_to
       FROM mandates m
       JOIN mandate_versions v ON v.id = m.current_version_id
-      WHERE m.org_id = $1 AND m.agent_id = $2 AND m.status = 'ACTIVE'
+      WHERE m.org_id = $1 AND m.environment = $2 AND m.agent_id = $3 AND m.status = 'ACTIVE'
       ORDER BY m.created_at DESC
       LIMIT 1
-    `, [orgId, activeAgent.id]);
+    `, [orgId, targetEnvironment, activeAgent.id]);
     activeMandate = mandateResult.rows[0] ?? null;
 
     if (!activeMandate) {
       let draftDetail = '';
       try {
         const anyMandateRes = await db.query(
-          'SELECT id, name, status FROM mandates WHERE org_id = $1 AND agent_id = $2 ORDER BY created_at DESC LIMIT 1',
-          [orgId, activeAgent.id],
+          'SELECT id, name, status FROM mandates WHERE org_id = $1 AND environment = $2 AND agent_id = $3 ORDER BY created_at DESC LIMIT 1',
+          [orgId, targetEnvironment, activeAgent.id],
         );
         if (anyMandateRes.rows[0]) {
           const m = anyMandateRes.rows[0];
           draftDetail = ` Mandat '${m.name}' ditemukan berstatus '${m.status}' — aktifkan mandat dengan tanda tangan Ed25519 agar berstatus ACTIVE.`;
         } else {
-          draftDetail = ' Belum ada mandat untuk agen ini. Buat mandat di /mandates/new atau jalankan real:setup.';
+          draftDetail = ` Belum ada mandat untuk agen ini di ${targetEnvironment}. Buat mandat di /mandates/new atau jalankan real:setup.`;
         }
       } catch {}
 
       checks.push({
         id: 'PF-07',
         status: 'FAIL',
-        detail: `No ACTIVE mandate found for agent '${activeAgent.name}'.${draftDetail}`,
+        detail: `No ACTIVE mandate found for agent '${activeAgent.name}' in ${targetEnvironment}.${draftDetail}`,
       });
     } else {
       activePolicy = activeMandate.policy;
@@ -415,8 +418,8 @@ export async function runRealPreflight(orgId, options = {}) {
 
   // PF-11: Encryption key can decrypt stored PayPal credentials without returning them
   const credsResult = await db.query(
-    'SELECT client_id_enc, client_secret_enc FROM paypal_connections WHERE org_id = $1 LIMIT 1',
-    [orgId],
+    'SELECT client_id_enc, client_secret_enc FROM paypal_connections WHERE org_id = $1 AND environment = $2 LIMIT 1',
+    [orgId, targetEnvironment],
   );
   const creds = credsResult.rows[0] ?? null;
 
@@ -424,7 +427,7 @@ export async function runRealPreflight(orgId, options = {}) {
     checks.push({
       id: 'PF-11',
       status: 'FAIL',
-      detail: 'No encrypted PayPal credentials found for this organization. Masukkan Client ID dan Secret di /settings/paypal atau via CLI setup.',
+      detail: `No encrypted PayPal credentials found for this organization in ${targetEnvironment} environment. Masukkan Client ID dan Secret di /settings/paypal atau via CLI setup.`,
     });
   } else {
     try {
@@ -441,7 +444,7 @@ export async function runRealPreflight(orgId, options = {}) {
       checks.push({
         id: 'PF-11',
         status: 'PASS',
-        detail: 'Stored PayPal credentials decrypted successfully with configured ENCRYPTION_KEY.',
+        detail: `Stored PayPal ${targetEnvironment} credentials decrypted successfully with configured ENCRYPTION_KEY.`,
       });
     } catch {
       checks.push({
@@ -452,26 +455,27 @@ export async function runRealPreflight(orgId, options = {}) {
     }
   }
 
-  // PF-12: PayPal Sandbox OAuth endpoint reachable (read-only, no connection status update)
+  // PF-12: PayPal OAuth endpoint reachable (read-only, no connection status update)
   try {
-    const client = await paypalFor(orgId, { db, encryptionKey });
+    const client = await paypalFor(orgId, { db, encryptionKey, environment: targetEnvironment });
     await client.testConnection();
     checks.push({
       id: 'PF-12',
       status: 'PASS',
-      detail: 'PayPal Sandbox OAuth endpoint reached and token acquired successfully.',
+      detail: `PayPal ${targetEnvironment === 'LIVE' ? 'Live' : 'Sandbox'} OAuth endpoint reached and token acquired successfully.`,
     });
   } catch (err) {
     checks.push({
       id: 'PF-12',
       status: 'FAIL',
-      detail: `PayPal Sandbox OAuth endpoint unreachable: ${err.message}`,
+      detail: `PayPal ${targetEnvironment === 'LIVE' ? 'Live' : 'Sandbox'} OAuth endpoint unreachable: ${err.message}`,
     });
   }
 
   const ready = checks.every((check) => check.status !== 'FAIL');
 
   return {
+    environment: targetEnvironment,
     ready,
     checks,
   };

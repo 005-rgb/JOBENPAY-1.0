@@ -996,7 +996,8 @@ export function createApp() {
   api.get('/admin/real-preflight', requireSession, requireRole('OWNER', 'JUDGE'), async (req, res) => {
     try {
       const orgId = req.membership?.org_id || req.session?.current_org_id || GLOBAL_ORG_ID;
-      const result = await runRealPreflight(orgId);
+      const targetEnv = (req.environment || req.query?.environment || 'SANDBOX').toUpperCase();
+      const result = await runRealPreflight(orgId, { environment: targetEnv });
       return res.status(200).json(result);
     } catch (error) {
       return res.status(200).json({

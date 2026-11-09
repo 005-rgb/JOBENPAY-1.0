@@ -252,7 +252,7 @@ function QueueMetricCard({ label, value }) {
   );
 }
 
-function BrandCard({ auth, data, setupCards, t }) {
+function BrandCard({ auth, data, setupCards, t, isLive }) {
   const completedSetupCount = setupCards.filter((card) => card.done).length;
   const orgName = auth.org?.name || t('app.name');
   const roleName = auth.role || 'VIEWER';
@@ -313,11 +313,15 @@ function BrandCard({ auth, data, setupCards, t }) {
                 <h2>{t('app.brandCardTitle')}</h2>
               </div>
             </div>
-            <p className={styles.brandDescription}>{t('app.brandCardDescription')}</p>
+            <p className={styles.brandDescription}>
+              {isLive
+                ? 'JOBENPAY brings live production control, mandate governance, and audit-ready workflows into one calm operating surface.'
+                : t('app.brandCardDescription')}
+            </p>
             <div className={styles.brandSignals}>
               <span className={styles.signalBadge}>
                 <span className={styles.signalDot} />
-                {t('app.brandCardSandbox')}
+                {isLive ? 'Live production' : t('app.brandCardSandbox')}
               </span>
               <span className={styles.signalBadge}>
                 <span className={styles.signalDot} />
@@ -359,11 +363,19 @@ export function DashboardPage() {
   const { t } = useTranslation();
   const auth = useAuth();
   const navigate = useNavigate();
-  const { isLive } = useEnvironment();
+  const { environment, isLive } = useEnvironment();
   const { notify } = useToast();
   const [seeding, setSeeding] = useState(false);
 
-  const summaryQuery = usePageQuery(['dashboard', 'summary'], () => apiClient.get('/dashboard/summary'));
+  const summaryQuery = usePageQuery(
+    ['dashboard', 'summary', environment],
+    () => apiClient.get('/dashboard/summary', {
+      headers: {
+        'x-jobenpay-environment': environment,
+        'x-environment': environment,
+      },
+    })
+  );
   const { data, error, isPending, refetch } = summaryQuery;
 
   const handleSeedSandbox = async () => {
@@ -394,24 +406,30 @@ export function DashboardPage() {
   const setupCards = [
     {
       key: 'paypal',
-      title: t('app.connectPaypal'),
-      description: t('app.connectSandboxDescription'),
+      title: `Connect PayPal ${isLive ? 'Live' : 'Sandbox'}`,
+      description: isLive
+        ? 'Connect a live PayPal production account to execute real transactions.'
+        : t('app.connectSandboxDescription'),
       to: '/settings/paypal',
-      done: data.paypalConnected,
+      done: Boolean(data.paypalConnected),
     },
     {
       key: 'agent',
       title: t('app.createAgent'),
-      description: t('app.createAgentDescription'),
+      description: isLive
+        ? 'Create an agent for live operation before assigning a mandate.'
+        : t('app.createAgentDescription'),
       to: '/agents',
-      done: data.hasAgent,
+      done: Boolean(data.hasAgent),
     },
     {
       key: 'mandate',
       title: t('app.activateMandate'),
-      description: t('app.activateMandateDescription'),
+      description: isLive
+        ? 'Set guarded limits before a live agent can propose a transaction.'
+        : t('app.activateMandateDescription'),
       to: '/mandates',
-      done: data.hasActiveMandate,
+      done: Boolean(data.hasActiveMandate),
     },
   ];
   const quickLinks = [
@@ -451,7 +469,7 @@ export function DashboardPage() {
           </Button>
         </div>
       </section>
-      <BrandCard auth={auth} data={data} setupCards={setupCards} t={t} />
+      <BrandCard auth={auth} data={data} setupCards={setupCards} t={t} isLive={isLive} />
       {['OWNER', 'ADMIN', 'JUDGE'].includes(auth.role) && data.aiDailyUsage?.warning ? (
         <Banner title="AI daily budget warning">
           AI usage is at {data.aiDailyUsage.usedPct}% of the daily budget ({data.aiDailyUsage.usedUsd.toFixed(2)} of {data.aiDailyUsage.budgetUsd.toFixed(2)} USD).
@@ -503,6 +521,53 @@ export function DashboardPage() {
           {metrics.map(([label, value]) => <MetricCard hasData={hasData} key={label} label={label} t={t} value={value} />)}
         </div>
         {!hasData ? <EmptyState title={t('app.noData')} description={t('app.noPerformanceData')} /> : null}
+      </section>
+
+      <section className={styles.performance} aria-label="Recent Transactions">
+        <div className={styles.performanceHeading}>
+          <div>
+            <h2>Recent Activity ({isLive ? 'LIVE' : 'SANDBOX'})</h2>
+            <p>{isLive ? 'Latest real production transactions' : 'Latest simulated sandbox transactions'}</p>
+          </div>
+          <Link to="/transactions">{t('app.viewMore')}</Link>
+        </div>
+        {data.recentTransactions && data.recentTransactions.length > 0 ? (
+          <Card className={styles.tableCard} padding="none">
+            <table className={styles.dataTable} data-testid="dashboard-recent-txs-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Sub-type</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recentTransactions.map((tx) => (
+                  <tr key={tx.id}>
+                    <td>
+                      <Link to={`/transactions/${tx.id}`} style={{ fontWeight: 600 }}>
+                        {tx.category}
+                      </Link>
+                    </td>
+                    <td><span className={styles.cellDescription}>{tx.sub_type}</span></td>
+                    <td>{formatMinor(tx.amount_minor, tx.currency)}</td>
+                    <td>
+                      <StatusPill status={tx.status} label={tx.status} />
+                    </td>
+                    <td>{new Date(tx.created_at).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        ) : (
+          <EmptyState
+            title="No Recent Activity"
+            description={isLive ? 'No live transactions recorded yet in production.' : 'No sandbox transactions recorded yet. Use Seed Sandbox Data to create test transactions.'}
+          />
+        )}
       </section>
 
       {data.queue ? (
@@ -878,23 +943,24 @@ export function PaypalSettingsPage() {
   const [preflightResult, setPreflightResult] = useState(null);
   const [preflightError, setPreflightError] = useState('');
 
+  const owner = auth.role === 'OWNER';
+  const envQueryString = `?environment=${environment}&env=${environment}`;
+  const envHeaders = {
+    'x-jobenpay-environment': environment,
+    'x-environment': environment,
+  };
+
   const runPreflight = async () => {
     setPreflightLoading(true);
     setPreflightError('');
     try {
-      const data = await apiClient.get('/admin/real-preflight');
+      const data = await apiClient.get(`/admin/real-preflight${envQueryString}`, { headers: envHeaders });
       setPreflightResult(data);
     } catch (err) {
       setPreflightError(err.message);
     } finally {
       setPreflightLoading(false);
     }
-  };
-  const owner = auth.role === 'OWNER';
-  const envQueryString = `?environment=${environment}&env=${environment}`;
-  const envHeaders = {
-    'x-jobenpay-environment': environment,
-    'x-environment': environment,
   };
   const query = usePageQuery(['paypal-credentials', environment], async () => {
     try {
