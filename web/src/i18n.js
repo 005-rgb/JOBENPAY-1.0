@@ -134,6 +134,8 @@ const english = {
     signIn: 'Sign in',
     closeDialog: 'Close dialog',
     notificationsCount: '{{count}} notifications',
+    signInTo: 'Sign in to',
+    signUpFor: 'Sign up for',
     loginTitle: 'Sign in to JOBENPAY',
     email: 'Email',
     password: 'Password',

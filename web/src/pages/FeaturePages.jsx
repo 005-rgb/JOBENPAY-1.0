@@ -156,10 +156,14 @@ export function LoginPage() {
   return (
     <main className={styles.loginPage}>
       <Card className={styles.loginCard} padding="section">
-        <Link aria-label={t('app.name')} className={styles.loginWordmark} to="/">
-          <img alt={t('app.name')} className={styles.loginLogo} src={logoUrl} />
-        </Link>
-        <h1>{t('app.loginTitle')}</h1>
+        <div className={styles.loginHeader}>
+          <h1 className={styles.loginTitle}>
+            <span>{t('app.signInTo', 'Sign in to')}</span>
+            <Link aria-label={t('app.name')} className={styles.inlineLogoLink} to="/">
+              <img alt={t('app.name')} className={styles.inlineLogo} src={logoUrl} />
+            </Link>
+          </h1>
+        </div>
 
         {unverified ? (
           <Banner kind="warning" title={t('app.emailNotVerified')}>

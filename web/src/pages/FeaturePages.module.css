@@ -47,11 +47,66 @@
 }
 
 .loginCard {
+  background: var(--jp-surface);
+  border: 1px solid var(--jp-border);
+  border-radius: var(--jp-radius-card);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
   gap: var(--jp-space-4);
   max-width: var(--jp-login-card-w);
   width: 100%;
+}
+
+.loginHeader {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--jp-space-1);
+}
+
+.loginTitle {
+  align-items: center;
+  color: var(--jp-text);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  font-size: var(--jp-font-size-page-title);
+  font-weight: var(--jp-font-weight-bold);
+  gap: var(--jp-space-2);
+  justify-content: center;
+  line-height: var(--jp-font-line-page-title);
+  margin: 0;
+  text-align: center;
+}
+
+.inlineLogoLink {
+  align-items: center;
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.inlineLogo {
+  display: inline-block;
+  height: 28px;
+  max-width: 100%;
+  object-fit: contain;
+  transition: transform var(--jp-transition-standard);
+  vertical-align: middle;
+  width: auto;
+}
+
+.inlineLogo:hover {
+  transform: scale(1.03);
+}
+
+@media (max-width: 480px) {
+  .loginTitle {
+    font-size: 20px;
+  }
+  .inlineLogo {
+    height: 24px;
+  }
 }
 
 .loginWordmark {

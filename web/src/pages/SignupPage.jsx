@@ -139,10 +139,14 @@ export function SignupPage() {
   return (
     <main className={styles.loginPage}>
       <Card className={styles.loginCard} padding="section">
-        <Link aria-label={t('app.name')} className={styles.loginWordmark} to="/">
-          <img alt={t('app.name')} className={styles.loginLogo} src={logoUrl} />
-        </Link>
-        <h1>{t('app.signupTitle')}</h1>
+        <div className={styles.loginHeader}>
+          <h1 className={styles.loginTitle}>
+            <span>{t('app.signUpFor', 'Sign up for')}</span>
+            <Link aria-label={t('app.name')} className={styles.inlineLogoLink} to="/">
+              <img alt={t('app.name')} className={styles.inlineLogo} src={logoUrl} />
+            </Link>
+          </h1>
+        </div>
 
         {!registrationEnabled ? (
           <div className={styles.formStack}>
