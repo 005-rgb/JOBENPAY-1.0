@@ -75,14 +75,31 @@ export function StatusPill({ status }) {
   );
 }
 
-export function ProviderBadge({ provider }) {
+export function ProviderBadge({ provider, environment: explicitEnv }) {
+  const { environment: contextEnv, isLive } = useEnvironment();
+  const env = (explicitEnv || (provider === 'LIVE' || provider === 'SANDBOX' ? provider : contextEnv) || 'SANDBOX').toUpperCase();
   const isSimulated = provider === 'SIMULATED';
+
+  let badgeClass = styles.badgeSandbox;
+  let badgeText = env;
+
+  if (isSimulated) {
+    badgeClass = styles.badgeSimulated;
+    badgeText = 'SIMULATED';
+  } else if (env === 'LIVE' || (!isSimulated && isLive && provider !== 'SANDBOX')) {
+    badgeClass = styles.badgeLive;
+    badgeText = 'LIVE';
+  } else {
+    badgeClass = styles.badgeSandbox;
+    badgeText = 'SANDBOX';
+  }
+
   return (
     <span
-      className={`${styles.providerBadge} ${isSimulated ? styles.badgeSimulated : styles.badgeSandbox}`}
+      className={`${styles.providerBadge} ${badgeClass}`}
       data-testid="provider-badge"
     >
-      {provider || 'SANDBOX'}
+      {badgeText}
     </span>
   );
 }
@@ -347,7 +364,7 @@ export function TransactionsPage() {
                       </div>
                     </td>
                     <td>
-                      <ProviderBadge provider={tx.provider || CATEGORY_PROVIDERS[tx.category] || 'SANDBOX'} />
+                      <ProviderBadge provider={tx.provider} environment={tx.environment || environment} />
                     </td>
                     <td>
                       <StatusPill status={tx.status} />

@@ -122,7 +122,7 @@ export function TransactionDetailPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['transaction', id, environment],
     queryFn: async () => {
-      return apiClient.get(`/transactions/${id}`);
+      return apiClient.get(`/transactions/${id}?environment=${encodeURIComponent(environment)}`);
     },
     enabled: Boolean(id),
   });
@@ -218,10 +218,10 @@ export function TransactionDetailPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1 className={styles.pageTitle} style={{ fontSize: '22px' }}>{intent.category}</h1>
-            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+            <span className={`${styles.providerBadge} ${isLive ? styles.badgeLive : styles.badgeSandbox}`}>
               {intent.sub_type || 'standard'}
             </span>
-            <ProviderBadge provider={intent.provider} />
+            <ProviderBadge provider={intent.provider} environment={intent.environment || environment} />
             <StatusPill status={intent.status} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -523,7 +523,7 @@ export function TransactionDetailPage() {
               <Layers size={16} />
               Double-Entry Financial Ledger Legs
             </h3>
-            <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+            <span className={`${styles.providerBadge} ${isLive ? styles.badgeLive : styles.badgeSandbox}`}>
               Balanced: SUM(DEBIT) = SUM(CREDIT)
             </span>
           </div>
@@ -628,16 +628,20 @@ export function TransactionDetailPage() {
             <div className={styles.field}>
               <span className={styles.fieldLabel}>Reconciliation Status</span>
               <div>
-                <span className={`${styles.providerBadge} ${styles.badgeSandbox}`}>
+                <span className={`${styles.providerBadge} ${isLive ? styles.badgeLive : styles.badgeSandbox}`}>
                   {intent.reconciliation_status || 'RECONCILED'}
                 </span>
               </div>
             </div>
 
             <div className={`${styles.field} ${styles.fullWidth}`}>
-              <span className={styles.fieldLabel}>Sandbox Verification Guarantee</span>
+              <span className={styles.fieldLabel}>
+                {isLive ? 'Live Environment Guarantee' : 'Sandbox Verification Guarantee'}
+              </span>
               <p className={styles.pageSubtitle} style={{ margin: 0 }}>
-                Transaction executed exclusively within PayPal Sandbox environment. No real funds or real banking networks were moved.
+                {isLive
+                  ? 'Transaction executed within Live production environment under strict multi-tenant authorization guards.'
+                  : 'Transaction executed exclusively within PayPal Sandbox environment. No real funds or real banking networks were moved.'}
               </p>
             </div>
           </div>

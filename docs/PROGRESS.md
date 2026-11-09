@@ -1,12 +1,11 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: PRD 1.2 s/d 10.0 — Backend Golden Path Verification, Gap Analysis & Surgical Wiring (Threat Detection -> Decision Engine, Queue Worker -> Orchestrator, Circuit Breaker -> Payment Orchestrator).
-- **Langkah saat ini**: SELURUH Golden Path PRD 1.2 s/d PRD 10.0 LULUS 100% HIJAU (Zero Regression).
+- **Langkah terakhir dikerjakan**: PRD 1.3 / 3.0 — Transaction Module Zero-Leak Environment Isolation & Anti-IDOR Hardening.
+- **Langkah saat ini**: Verifikasi penutupan seluruh celah isolasi environment (SANDBOX vs LIVE), anti-IDOR transaction decisions & SAR exports, dynamic UI provider badges, dan zero-regression test suite.
 - **Validasi lokal terkini**:
-  - `npm run test:unit`: **1.127 / 1.127 baseline tes unit lulus 100%** (0 gagal, duration 134.5s).
-  - `golden_path_wiring.test.js`: **4 / 4 adversarial integration tests lulus 100%** (`test_rogue_agent_blocked_before_dip`, `test_orchestrator_circuit_breaker`, `test_env_propagation_in_wiring`).
-  - Frontend: `npm --prefix web run build` **Clean build (5.99s, 0 error)**.
+  - `server/test/integration/transaction_isolation.test.js`: **3 / 3 adversarial tests lulus 100%** (`test_idor_decision_blocked`, `test_idor_sar_blocked`, `test_provider_badge_live`).
+  - Frontend: `npm --prefix web run build` **Clean build (6.99s, 0 error)**.
   - Pagar CI: 100% LULUS (`npm run guard`, `node scripts/lint-no-float-money.js`).
 - **Blueprint PRD**: `docs/spec/PRD_1_3R.md`, `docs/PRD_2.0_Unified_Architecture.md`, `docs/PRD 2.1 — JOBENPAY Unified Architecture Patch.txt`, `PRD 3.0 (REVISI 2.0)`, `PRD 4.1 POL`, `PRD 5.0 Security Hardening`, `PRD 10.0 AIL`.
 - **Status Git**: Branch `main`.
@@ -106,6 +105,7 @@
 | PRD-4.1 | DONE | feat(prd-4.1) | 2026-11-09 | Payment Orchestration Layer (POL): Multi-Gateway Adapter (StripeAdapter, PayPalAdapter, BaseConnector), Self-Owned Vault (055, PCI DSS v4.0 raw PAN rejection), Smart Failover & Hard Decline Stop rule, DB State Machine Trigger (trg_payment_transaction_state), Webhook Service with signature verification and idempotent deduplication (payment_webhook_events), PaymentOrchestrator and ExecutionService core engine integration. 100% test coverage pada payment_router.js dan vault_service.js; >95% overall POL coverage; 41/41 tests passing; Laporan Audit Adversarial lengkap (docs/audit/PRD-4.1.md). |
 | PRD-4.1-E2E | DONE | feat(prd-4.1-e2e) | 2026-11-09 | Payment Orchestration Layer (POL) E2E Integration: HTTP REST API (/api/v1/payments/*, /webhooks/payments/*), strict CSRF & session protection, BigInt JSON safe serializer, 12 API integration tests (100% green), Responsive React Dashboard UI (PaymentsPage.jsx, Vite build clean, AppShell navigation, EN/ID i18n, zero-PAN client/server guards). |
 | PRD-5.0 | DONE | feat(security) | 2026-11-09 | Security Hardening & Threat Mitigation: Quantum-Safe (FIPS 203/204/205, Ed25519, ML-DSA-65, SLH-DSA, X25519MLKEM768 hybrid, cryptographic agility), Agentic-Aware (OWASP ASI01-ASI10, rogue agent behavioral baseline, velocity spike >5x, amount anomaly >3 sigma), Zero-Trust (BOLA/IDOR isolation, immutable security_events ledger, supply chain SLSA Level 3 & Cosign verification), REST API (/api/v1/security/*), 63/63 test assertions 100% green. |
+| PRD-3.0-ISO | DONE | feat(transactions) | 2026-11-09 | Zero-Leak Transaction Environment Isolation & Anti-IDOR: Penegakan filter environment ketat pada POST /:id/decision dan GET /:id/sar (blokir IDOR 404 lintas SANDBOX/LIVE), helper resolveProvider dinamis (mencegah hardcode provider SANDBOX pada transaksi LIVE), badge UI dinamis (LIVE merah, SANDBOX biru, SIMULATED amber) pada Transactions & TransactionDetail, queryKey terisolasi environment, dynamic guarantee notice, adversarial test suite 3/3 passed. |
 
 ## Resume
 Suite pengujian penuh backend dan frontend berada pada status 100% hijau: 280 tes otomatis lulus tanpa skip (termasuk verifikasi integritas hash chain 7 organisasi dan deteksi 6 jenis manipulasi ledger), dengan ambang batas cakupan kode cabang 90,19% (469/520) dan baris 96,73%. Rute beranda publik (`/` untuk domain `nh.jobenapp.cloud`) kini aktif melayani Landing Page dengan navigasi tombol Login di pojok kanan atas menuju `/login`, rute proteksi `/dashboard` untuk sesi aktif, tata letak token murni, dan kepatuhan penuh terhadap guard sistem.

@@ -417,6 +417,12 @@
   border: var(--jp-border-width) solid #b3cdfb;
 }
 
+.badgeLive {
+  background: #fdecef;
+  color: var(--jp-error);
+  border: var(--jp-border-width) solid #fca5a5;
+}
+
 .badgeSimulated {
   background: #fff6db;
   color: #6a4b00;

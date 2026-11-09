@@ -29,6 +29,11 @@ function resolveOrgId(req) {
   return req.org?.id || req.session?.current_org_id || req.user?.org_id || GLOBAL_ORG_ID;
 }
 
+function resolveProvider(category, env) {
+  if (CATEGORY_PROVIDERS[category] === 'SIMULATED') return 'SIMULATED';
+  return String(env || '').toUpperCase() === 'LIVE' ? 'LIVE' : 'SANDBOX';
+}
+
 // ----------------------------------------------------------------------------
 // 1. GET / — List transactions with multi-select category, status & pagination
 // ----------------------------------------------------------------------------
@@ -113,7 +118,7 @@ transactionsRouter.get('/', async (req, res, next) => {
     const transactions = rows.map((row) => ({
       ...row,
       amount_minor: row.amount_minor.toString(),
-      provider: CATEGORY_PROVIDERS[row.category] || 'SANDBOX',
+      provider: resolveProvider(row.category, row.environment || env),
     }));
 
     // Get total count for summary
@@ -161,7 +166,7 @@ transactionsRouter.get('/:id', async (req, res, next) => {
 
     const intent = intentResult.rows[0];
     intent.amount_minor = intent.amount_minor.toString();
-    intent.provider = CATEGORY_PROVIDERS[intent.category] || 'SANDBOX';
+    intent.provider = resolveProvider(intent.category, intent.environment || env);
 
     // Load double-entry ledger legs
     const legsResult = await query(
@@ -513,7 +518,7 @@ transactionsRouter.post('/', async (req, res, next) => {
       data: {
         ...result.intent,
         amount_minor: result.intent.amount_minor.toString(),
-        provider: CATEGORY_PROVIDERS[result.intent.category] || 'SANDBOX',
+        provider: resolveProvider(result.intent.category, result.intent.environment || targetEnv),
       },
       replayed: result.replayed,
     });
@@ -530,6 +535,7 @@ transactionsRouter.post('/:id/decision', async (req, res, next) => {
     const orgId = resolveOrgId(req);
     const { id } = req.params;
     const { decision, comment, stepUpGrantId } = req.body;
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || req.query?.environment || 'SANDBOX').toUpperCase();
 
     if (!['APPROVE', 'REJECT'].includes(decision)) {
       throw new AppError('VALIDATION_FAILED', 'Decision must be APPROVE or REJECT', 400);
@@ -537,8 +543,8 @@ transactionsRouter.post('/:id/decision', async (req, res, next) => {
 
     const updated = await withTx(async (tx) => {
       const intentRes = await tx.query(
-        'SELECT * FROM transaction_intents WHERE org_id = $1 AND intent_id = $2 FOR UPDATE',
-        [orgId, id]
+        'SELECT * FROM transaction_intents WHERE org_id = $1 AND intent_id = $2 AND environment = $3 FOR UPDATE',
+        [orgId, id, env]
       );
       if (intentRes.rowCount === 0) {
         throw new AppError('NOT_FOUND', 'Transaction not found', 404);
@@ -570,9 +576,9 @@ transactionsRouter.post('/:id/decision', async (req, res, next) => {
       const updatedIntent = await tx.query(
         `UPDATE transaction_intents
          SET status = $1, updated_at = now()
-         WHERE org_id = $2 AND intent_id = $3
+         WHERE org_id = $2 AND intent_id = $3 AND environment = $4
          RETURNING *`,
-        [nextStatus, orgId, id]
+        [nextStatus, orgId, id, env]
       );
 
       // If approved, post ledger legs
@@ -587,14 +593,15 @@ transactionsRouter.post('/:id/decision', async (req, res, next) => {
           for (const leg of legs) {
             await tx.query(
               `INSERT INTO transaction_legs (
-                 intent_id, leg_type, amount_minor, currency, account_ref, status
-               ) VALUES ($1, $2, $3, $4, $5, 'POSTED')`,
+                 intent_id, leg_type, amount_minor, currency, account_ref, status, environment
+               ) VALUES ($1, $2, $3, $4, $5, 'POSTED', $6)`,
               [
                 id,
                 leg.legType,
                 leg.amountMinor.toString(),
                 leg.currency,
                 leg.accountRef,
+                current.environment || env,
               ]
             );
           }
@@ -639,10 +646,11 @@ transactionsRouter.get('/:id/sar', async (req, res, next) => {
   try {
     const orgId = resolveOrgId(req);
     const { id } = req.params;
+    const env = (req.environment || req.headers['x-jobenpay-environment'] || req.headers['x-environment'] || req.query?.environment || 'SANDBOX').toUpperCase();
 
     const intentRes = await query(
-      'SELECT * FROM transaction_intents WHERE org_id = $1 AND intent_id = $2',
-      [orgId, id]
+      'SELECT * FROM transaction_intents WHERE org_id = $1 AND intent_id = $2 AND environment = $3',
+      [orgId, id, env]
     );
     if (intentRes.rowCount === 0) {
       throw new AppError('NOT_FOUND', 'Transaction not found', 404);
