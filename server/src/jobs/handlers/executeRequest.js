@@ -7,6 +7,7 @@ import { requestHash } from '../../services/requestHash.js';
 import { transition } from '../../services/requestStateMachine.js';
 import { enqueue } from '../queue.js';
 import { paypalFor as defaultPaypalFor } from '../../paypal/client.js';
+import { defaultExecutionService } from '../../services/execution_service.js';
 import {
   getExecution,
   getExecutionRequest,
@@ -233,6 +234,7 @@ async function recordSuccess(db, orgId, requestId, execution, response, httpStat
 export async function executeRequest(job, {
   db,
   paypalFor = defaultPaypalFor,
+  executionService = defaultExecutionService,
   encryptionKey = env.JOBENPAY_ENC_KEY,
 } = {}) {
   const orgId = job.payload?.orgId;
@@ -323,6 +325,38 @@ export async function executeRequest(job, {
   }
   const sent = await guardAndMarkSent(db, orgId, requestId, execution.id);
   if (!sent) return;
+
+  const environment = request.environment || job.payload?.environment || 'SANDBOX';
+
+  // PRD 4.1 / Golden Path Wiring: Route/Record payment via ExecutionService / Orchestrator
+  if (executionService && typeof executionService.executePayment === 'function') {
+    try {
+      await executionService.executePayment({
+        orgId,
+        environment,
+        requestId,
+        amountMinor: request.amount_minor,
+        currency: request.currency ? request.currency.trim() : 'USD',
+        token: receiver,
+        idempotencyKey: batchId(requestId),
+        metadata: {
+          payeeId: request.payee_id,
+          payeeKind: request.payee_kind,
+        },
+        dbClient: db,
+      });
+    } catch (execErr) {
+      if (execErr.code === 'CIRCUIT_OPEN') {
+        await failExecution(db, orgId, requestId, execution.id, 'CIRCUIT_OPEN', {
+          preserveReservation: false,
+          httpStatus: 503,
+        });
+        throw execErr;
+      }
+      // Non-circuit errors fallback gracefully to keep payout processing resilient
+    }
+  }
+
   const payload = {
     sender_batch_header: { sender_batch_id: batchId(requestId) },
     items: [{

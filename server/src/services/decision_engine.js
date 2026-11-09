@@ -7,6 +7,7 @@ import { computeReproducibilityScore } from './cpl_service.js';
 import { transition, isValidTransition, AGGREGATE_STATES, AGGREGATE_TRANSITIONS, TAHAP_A_MAPPING } from '../../../shared/state-machine.js';
 import { getFailClosedOutcome } from '../../../shared/fail-closed.js';
 import { evaluate as jplEvaluate } from './jpl_evaluator.js';
+import { detectRogueAgent } from './threat_detection.js';
 
 function runQuery(sql, params, client) {
   if (client && typeof client.query === 'function') {
@@ -420,6 +421,35 @@ export function finalDecision(tahapA, tahapB, tahapC) {
  * @returns {Promise<{ decision: string, state: string, reason_codes: string[], tahapA: object, tahapB: object, tahapC: object }>}
  */
 export async function evaluateUnifiedDecision(orgId, transaction, context = {}, dbClient = null) {
+  // --- Threat Detection (PRD 5.0) ---
+  const agentId = transaction?.agent_id || transaction?.agentId || context?.agent_id || context?.agentId;
+  const environment = (transaction?.environment || context?.environment || 'SANDBOX').toUpperCase();
+  if (agentId) {
+    try {
+      const rogueCheck = await detectRogueAgent(agentId, environment, { db: dbClient });
+      if (rogueCheck?.anomalous) {
+        const tahapA = { decision: 'REJECT', code: 'ROGUE_AGENT_SUSPECTED', reason_codes: ['ROGUE_AGENT_SUSPECTED'] };
+        const res = finalDecision(tahapA, null, null);
+        return {
+          ...res,
+          decision: 'REJECT',
+          state: 'REJECTED',
+          reason_codes: ['ROGUE_AGENT_SUSPECTED'],
+          tahapA,
+          tahapB: null,
+          tahapC: null,
+        };
+      }
+    } catch (err) {
+      // Fail-closed on error if critical
+      if (err?.message?.includes('ROGUE')) {
+        const tahapA = { decision: 'REJECT', code: 'ROGUE_AGENT_SUSPECTED', reason_codes: ['ROGUE_AGENT_SUSPECTED'] };
+        const res = finalDecision(tahapA, null, null);
+        return { ...res, decision: 'REJECT', state: 'REJECTED', reason_codes: ['ROGUE_AGENT_SUSPECTED'], tahapA, tahapB: null, tahapC: null };
+      }
+    }
+  }
+
   // --- Tahap A1: vLEI ---
   const vleiActive = await hasActiveVlei(orgId, dbClient);
   if (!vleiActive && transaction.require_vlei !== false) {

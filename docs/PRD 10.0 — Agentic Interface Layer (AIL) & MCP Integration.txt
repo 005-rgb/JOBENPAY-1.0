@@ -1,0 +1,283 @@
+VBaik bos, saya mengerti. Sebelumnya saya terlalu banyak memberikan instruksi tingkat tinggi tanpa memberikan detail implementasi yang *granular*. 
+
+Kali ini, kita akan bedah **PRD 10.0 (Agentic Interface Layer)** ini sampai ke level *query* SQL, struktur JSON-RPC, dan *routing* backend. Tujuannya agar AI Builder Anda tidak punya ruang untuk menebak, dan **isolasi Sandbox/Live benar-benar bekerja sampai ke level protokol MCP**.
+
+Berikut adalah **PRD 10.0 (Super Detail) & Super Prompt** yang sudah disempurnakan.
+
+---
+
+# PRD 10.0 — Agentic Interface Layer (AIL) & MCP Integration
+**Fokus:** Implementasi MCP Server (JSON-RPC 2.0) dan WebMCP Bridge dengan Isolasi Environment Ketat.
+
+## 1. SKEMA DATABASE (EKSPLISIT)
+
+**File:** `server/migrations/060_agentic_interface.sql`
+
+```sql
+BEGIN;
+
+-- 1.1 Tambahkan environment ke Agent API Keys (Isolasi Token)
+ALTER TABLE agent_api_keys 
+ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX',
+ADD COLUMN IF NOT EXISTS allowed_tools TEXT[] DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+
+-- 1.2 Tabel MCP Tool Registry (Daftar tool yang bisa dipanggil Agen)
+CREATE TABLE IF NOT EXISTS mcp_tool_registry (
+  tool_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tool_name TEXT NOT NULL UNIQUE, 
+  description TEXT NOT NULL,
+  input_schema JSONB NOT NULL,
+  required_scope TEXT NOT NULL, 
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Seed Tools Standar
+INSERT INTO mcp_tool_registry (tool_name, description, input_schema, required_scope) VALUES 
+('propose_payout', 'Propose a payout request.', '{"type":"object","properties":{"payeeId":{"type":"string"},"amountMinor":{"type":"string"},"currency":{"type":"string"}},"required":["payeeId","amountMinor","currency"]}', 'payout:propose'),
+('get_budget_status', 'Get remaining budget.', '{"type":"object","properties":{"mandateId":{"type":"string"}},"required":["mandateId"]}', 'budget:read')
+ON CONFLICT (tool_name) DO NOTHING;
+
+-- 1.3 Tabel Audit WebMCP (Mencatat panggilan dari browser)
+CREATE TABLE IF NOT EXISTS webmcp_tool_calls (
+  call_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES organizations(org_id),
+  environment environment_type NOT NULL,
+  session_id UUID,
+  tool_name TEXT NOT NULL,
+  input_args JSONB,
+  output_result JSONB,
+  status TEXT CHECK (status IN ('SUCCESS', 'ERROR', 'PENDING_APPROVAL')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMIT;
+```
+
+---
+
+## 2. BACKEND IMPLEMENTATION (MCP SERVER)
+
+**File:** `server/src/routes/mcp.js`
+
+MCP Server harus menangani request `POST` dengan protokol JSON-RPC 2.0.
+
+```javascript
+import express from 'express';
+import { validateAgentToken } from '../services/agent_auth_service.js';
+import { proposeTransaction } from '../services/decision_engine.js';
+
+const router = express.Router();
+
+// Middleware Auth Khusus Agen
+async function authenticateAgent(req, res, next) {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    const env = req.headers['x-jobenpay-environment'];
+
+    if (!token || !env) throw new Error('MISSING_CREDENTIALS');
+
+    // Verifikasi Token + Environment
+    const agent = await validateAgentToken(token, env);
+    req.agent = agent;
+    req.environment = env;
+    next();
+  } catch (err) {
+    res.status(401).json({ jsonrpc: '2.0', error: { code: -32000, message: err.message }, id: null });
+  }
+}
+
+router.post('/mcp', authenticateAgent, async (req, res) => {
+  const { jsonrpc, id, method, params } = req.body;
+
+  if (jsonrpc !== '2.0') {
+    return res.status(400).json({ jsonrpc: '2.0', error: { code: -32600, message: 'Invalid Request' }, id });
+  }
+
+  try {
+    if (method === 'initialize') {
+      return res.json({ 
+        jsonrpc: '2.0', id, 
+        result: { protocolVersion: '2026-07-28', capabilities: { tools: {} } } 
+      });
+    }
+
+    if (method === 'tools/list') {
+      // Hanya kembalikan tool yang diizinkan untuk agen ini
+      const allowedTools = await getToolsForAgent(req.agent.allowed_tools);
+      return res.json({ jsonrpc: '2.0', id, result: { tools: allowedTools } });
+    }
+
+    if (method === 'tools/call') {
+      const { name, arguments: args } = params;
+
+      // Cek Otorisasi Tool
+      if (!req.agent.allowed_tools.includes(name)) {
+        return res.status(403).json({ jsonrpc: '2.0', error: { code: -32601, message: 'Tool not allowed' }, id });
+      }
+
+      if (name === 'propose_payout') {
+        // Panggil Decision Engine (PRD 1.2) dengan Environment yang benar
+        const result = await proposeTransaction({
+          orgId: req.agent.org_id,
+          agentId: req.agent.agent_id,
+          environment: req.environment, // WAJIB
+          payeeId: args.payeeId,
+          amountMinor: args.amountMinor,
+          currency: args.currency
+        });
+
+        return res.json({ 
+          jsonrpc: '2.0', id, 
+          result: { status: result.status, decision: result.decision, reasonCodes: result.reason_codes } 
+        });
+      }
+    }
+
+    res.status(404).json({ jsonrpc: '2.0', error: { code: -32601, message: 'Method not found' }, id });
+
+  } catch (err) {
+    res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal error' }, id });
+  }
+});
+
+export default router;
+```
+
+---
+
+## 3. FRONTEND IMPLEMENTATION (WEBMCP BRIDGE)
+
+**File:** `web/src/lib/webmcp_bridge.js`
+
+Ini berjalan di browser. Agen AI (seperti Gemini di Chrome) akan mendeteksi tool ini melalui `navigator.modelContext`.
+
+```javascript
+export function initWebMCP() {
+  if (!('modelContext' in navigator)) {
+    console.warn('WebMCP not supported in this browser.');
+    return;
+  }
+
+  // Tool 1: Mencari Vendor
+  navigator.modelContext.registerTool({
+    name: 'search_vendors',
+    description: 'Search for approved payees in JOBENPAY.',
+    inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+    execute: async (args) => {
+      const env = localStorage.getItem('currentEnvironment') || 'SANDBOX';
+      const res = await fetch(`/api/v1/payees?search=${args.query}`, {
+        headers: { 'X-Jobenpay-Environment': env }
+      });
+      return await res.json();
+    }
+  });
+
+  // Tool 2: Inisiasi Payout (Hanya usulan)
+  navigator.modelContext.registerTool({
+    name: 'initiate_payout',
+    description: 'Propose a payout to a vendor. Requires human approval.',
+    inputSchema: { 
+      type: 'object', 
+      properties: { 
+        payeeId: { type: 'string' }, 
+        amountMinor: { type: 'string' }, 
+        currency: { type: 'string' } 
+      } 
+    },
+    execute: async (args) => {
+      const env = localStorage.getItem('currentEnvironment') || 'SANDBOX';
+      const res = await fetch('/api/v1/requests', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Jobenpay-Environment': env // WAJIB: Menyuntikkan environment aktif
+        },
+        body: JSON.stringify(args)
+      });
+      return await res.json();
+    }
+  });
+}
+```
+
+---
+
+## 4. SUPER PROMPT UNTUK AI BUILDER (ZERO-HALLUCINATION)
+
+Copy-paste teks di bawah ini ke AI Builder Anda (Gemini 3.8 Flash) di lokal.
+
+```markdown
+# PROMPT PRD 10.0 — AGENTIC INTERFACE LAYER (MCP & WEBMCP)
+
+Kamu bertindak sebagai Principal Full-Stack Engineer. Tugasmu adalah mengimplementasikan **Agentic Interface Layer (PRD 10.0)**. 
+
+**ATURAN MUTLAK:**
+1. **Zero-Leak Environment:** Token `jp_sbx_` tidak boleh mengakses Live, dan sebaliknya. Setiap request ke MCP wajib menyertakan header `X-Jobenpay-Environment`.
+2. **Zero-Hallucination:** Baca file `server/src/services/decision_engine.js` dan `server/src/middleware/auth.js` terlebih dahulu untuk memahami fungsi asli yang ada. Jangan mengarang fungsi baru jika sudah ada.
+3. **MCP Server Wajib JSON-RPC 2.0:** Endpoint `/mcp` harus merespons format JSON-RPC (`jsonrpc: "2.0", id, result/error`).
+
+Lakukan langkah-langkah berikut secara berurutan:
+
+### FASE 1: DATABASE MIGRATION
+Buat file `server/migrations/060_agentic_interface.sql`:
+1. `ALTER TABLE agent_api_keys ADD COLUMN IF NOT EXISTS environment environment_type NOT NULL DEFAULT 'SANDBOX';`
+2. `ALTER TABLE agent_api_keys ADD COLUMN IF NOT EXISTS allowed_tools TEXT[] DEFAULT ARRAY[]::TEXT[];`
+3. Buat tabel `mcp_tool_registry` (id, tool_name, description, input_schema, required_scope).
+4. Buat tabel `webmcp_tool_calls` (id, org_id, environment, tool_name, input_args, output_result, status).
+5. Lakukan seed data untuk `mcp_tool_registry` (tools: `propose_payout`, `get_budget_status`).
+6. Jalankan `npm run migrate`.
+
+### FASE 2: AGENT AUTH SERVICE
+Buat/modifikasi `server/src/services/agent_auth_service.js`:
+- Fungsi `validateAgentToken(token, requestedEnvironment)`:
+  - Cek prefix: Jika `jp_sbx_` tapi `requestedEnvironment === 'LIVE'`, lempar error `CROSS_ENVIRONMENT_CONTAMINATION`.
+  - Query tabel `agent_api_keys` dengan filter `key_hash` DAN `environment = requestedEnvironment`.
+  - Return `agent_id`, `org_id`, `allowed_tools`.
+
+### FASE 3: MCP SERVER (BACKEND)
+Buat file `server/src/routes/mcp.js`:
+- Gunakan `express.Router()`.
+- Buat middleware `authenticateAgent` yang memanggil `validateAgentToken` dengan header `X-Jobenpay-Environment`.
+- Implementasikan handler `POST /mcp`:
+  - Jika method `initialize`: return capabilities.
+  - Jika method `tools/list`: return daftar tool dari `mcp_tool_registry` yang ada di `allowed_tools` agen.
+  - Jika method `tools/call`:
+    - Validasi `params.name` ada di `allowed_tools`.
+    - Jika `propose_payout`, panggil fungsi `DecisionEngine.propose()` (pastikan meneruskan parameter `environment: req.environment`).
+    - Return JSON-RPC response.
+- Daftarkan route `/mcp` di `server/src/app.js` (sebelum SPA fallback).
+
+### FASE 4: WEBMCP BRIDGE (FRONTEND)
+Buat file `web/src/lib/webmcp_bridge.js`:
+- Buat fungsi `initWebMCP()`.
+- Cek `if (!('modelContext' in navigator)) return;`.
+- Daftarkan 2 tool (`search_vendors`, `initiate_payout`).
+- **PENTING:** Di dalam fungsi `execute`, baca `localStorage.getItem('currentEnvironment')` dan sertakan header `X-Jobenpay-Environment` pada request `fetch`.
+- Panggil `initWebMCP()` di `App.jsx` atau `main.jsx` (di dalam `useEffect`).
+
+### FASE 5: TESTING (ADVERSARIAL & INTEGRATION)
+Buat test suite di `server/test/integration/mcp_isolation.test.js`:
+1. `test_mcp_invalid_token`: Request tanpa token → JSON-RPC 401.
+2. `test_mcp_cross_env_blocked`: Request dengan token `jp_sbx_` dan header `LIVE` → JSON-RPC 403.
+3. `test_mcp_tools_list_filtered`: Agen hanya bisa melihat tool di `allowed_tools`-nya.
+4. `test_mcp_propose_creates_request`: Panggil `propose_payout` via MCP → cek apakah data masuk ke tabel `transaction_intents` di environment yang sesuai.
+
+### FASE 6: VERIFIKASI
+1. Jalankan `npm test`. Pastikan 100% hijau.
+2. Jalankan `npm --prefix web run build`. Pastikan tidak ada error.
+3. Berikan laporan singkat, sebutkan nama file yang dibuat/diubah.
+
+**MULAI FASE 1 SEKARANG. JANGAN MENEBAK FUNGSI YANG SUDAH ADA DI CODEBASE.**
+```
+
+---
+
+### 💡 Mengapa Prompt Ini Sangat Kuat & Detail?
+
+1.  **Tingkat Detail Kode:** Saya memberikan struktur *payload* JSON-RPC secara eksplisit. Ini memaksa AI untuk tidak sekadar membuat API REST biasa, tetapi benar-benar mengimplementasikan standar MCP.
+2.  **Pencegahan *Cross-Environment* di Auth:** Di Fase 2, AI dipaksa memeriksa *prefix* token (`jp_sbx_` vs `jp_live_`) dan mencocokkannya dengan *header*. Ini menutup celah kebocoran data paling kritis.
+3.  **Integrasi ke Decision Engine:** Di Fase 3, AI diperintahkan meneruskan `req.environment` ke `DecisionEngine.propose()`. Ini memastikan jika Agen Live melakukan request, maka *budget* dan *mandate* yang dicek adalah milik Live, bukan Sandbox.
+4.  **WebMCP Context:** Di Fase 4, AI dipaksa membaca `localStorage` saat tool dieksekusi. Ini memastikan Agen Browser (seperti Gemini) selalu menembak ke environment yang sedang aktif dilihat oleh user di layar.
+
+Dengan prompt ini, PRD 10.0 Anda akan dibangun dengan fondasi keamanan yang sama kuatnya dengan PRD 3.0 (Multi-Environment) yang sudah Anda selesaikan sebelumnya.

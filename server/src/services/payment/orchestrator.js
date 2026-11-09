@@ -4,14 +4,20 @@ import { AppError } from '../../errors.js';
 import { defaultRouter } from './payment_router.js';
 import { VaultService } from './vault_service.js';
 import { logger } from '../../lib/logger.js';
+import { getCircuitBreaker } from '../../lib/circuit-breaker.js';
 
 export class PaymentOrchestrator {
   /**
    * @param {object} [options]
    * @param {import('./payment_router.js').PaymentRouter} [options.router]
+   * @param {import('../../lib/circuit-breaker.js').CircuitBreaker} [options.breaker]
    */
-  constructor({ router = defaultRouter } = {}) {
+  constructor({
+    router = defaultRouter,
+    breaker = getCircuitBreaker('paypal-orchestrator', { failureThreshold: 3, timeout: 10000 }),
+  } = {}) {
     this.router = router;
+    this.breaker = breaker;
   }
 
   /**
@@ -96,16 +102,30 @@ export class PaymentOrchestrator {
     );
     const txId = initRes.rows[0].tx_id;
 
-    // 4. Kirim ke PaymentRouter untuk otorisasi & smart failover
+    // 4. Kirim ke PaymentRouter untuk otorisasi & smart failover (dibungkus Circuit Breaker PRD 1.9)
     try {
-      const routeResult = await this.router.routePayment(
-        amountVal,
-        cur,
-        paymentToken,
-        idempotencyKey,
-        metadata,
-        { priority },
-      );
+      const routeResult = await this.breaker.execute(async () => {
+        try {
+          return await this.router.routePayment(
+            amountVal,
+            cur,
+            paymentToken,
+            idempotencyKey,
+            metadata,
+            { priority },
+          );
+        } catch (err) {
+          if (
+            (err.httpStatus && err.httpStatus < 500) ||
+            (err.statusCode && err.statusCode < 500) ||
+            err.code === 'HARD_DECLINE' ||
+            err.code === 'VALIDATION_FAILED'
+          ) {
+            err.isCircuitBreakerIgnored = true;
+          }
+          throw err;
+        }
+      });
 
       // 5. Update Transaksi ke AUTHORIZED
       const authRes = await dbClient.query(
@@ -123,6 +143,10 @@ export class PaymentOrchestrator {
         routeResult,
       };
     } catch (err) {
+      if (err.message && err.message.includes('is OPEN')) {
+        err.code = 'CIRCUIT_OPEN';
+        err.httpStatus = 503;
+      }
       // 6. Jika gagal / hard decline / all gateways failed -> update ke FAILED
       const failedRes = await dbClient.query(
         `UPDATE payment_transactions
@@ -189,8 +213,18 @@ export class PaymentOrchestrator {
 
     const captureAmount = amountMinor ? BigInt(amountMinor) : BigInt(tx.amount_minor);
 
-    // 2. Panggil Gateway Capture
-    const capRes = await adapter.capture(tx.gateway_tx_id, captureAmount, idempotencyKey);
+    // 2. Panggil Gateway Capture (dibungkus Circuit Breaker PRD 1.9)
+    let capRes;
+    try {
+      capRes = await this.breaker.execute(async () => {
+        return adapter.capture(tx.gateway_tx_id, captureAmount, idempotencyKey);
+      });
+    } catch (err) {
+      if (err.message && err.message.includes('is OPEN')) {
+        throw new AppError('CIRCUIT_OPEN', 503, `CIRCUIT_OPEN: ${err.message}`);
+      }
+      throw err;
+    }
     if (!capRes || !capRes.success) {
       throw new AppError('CAPTURE_FAILED', 400, `CAPTURE_FAILED: ${capRes?.errorMessage || 'Capture failed at gateway'}`);
     }
@@ -262,8 +296,18 @@ export class PaymentOrchestrator {
 
     const refundAmount = amountMinor ? BigInt(amountMinor) : BigInt(tx.amount_minor);
 
-    // 2. Panggil Gateway Refund
-    const refRes = await adapter.refund(tx.gateway_tx_id, refundAmount, idempotencyKey);
+    // 2. Panggil Gateway Refund (dibungkus Circuit Breaker PRD 1.9)
+    let refRes;
+    try {
+      refRes = await this.breaker.execute(async () => {
+        return adapter.refund(tx.gateway_tx_id, refundAmount, idempotencyKey);
+      });
+    } catch (err) {
+      if (err.message && err.message.includes('is OPEN')) {
+        throw new AppError('CIRCUIT_OPEN', 503, `CIRCUIT_OPEN: ${err.message}`);
+      }
+      throw err;
+    }
     if (!refRes || !refRes.success) {
       throw new AppError('REFUND_FAILED', 400, `REFUND_FAILED: ${refRes?.errorMessage || 'Refund failed at gateway'}`);
     }
