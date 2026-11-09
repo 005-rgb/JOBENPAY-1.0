@@ -889,8 +889,25 @@ export function PaypalSettingsPage() {
     }
   };
   const owner = auth.role === 'OWNER';
-  const query = usePageQuery(['paypal-credentials', environment], () => apiClient.get('/paypal/credentials'));
-  const connection = query.data;
+  const query = usePageQuery(['paypal-credentials', environment], async () => {
+    try {
+      return await apiClient.get('/paypal/credentials');
+    } catch (err) {
+      if (err?.status === 404) {
+        return await apiClient.get('/paypal/connection');
+      }
+      throw err;
+    }
+  });
+  const connection = query.data || {
+    client_id_masked: null,
+    status: 'UNTESTED',
+    environment,
+    webhookUrl: null,
+    webhookId: null,
+    lastTestedAt: null,
+    lastErrorCode: null,
+  };
 
   const save = async (event, grantId) => {
     event?.preventDefault();
@@ -912,7 +929,15 @@ export function PaypalSettingsPage() {
       setStepUp(true);
       return;
     }
-    await apiClient.put('/paypal/credentials', body, { stepUpGrant: grantId });
+    try {
+      await apiClient.put('/paypal/credentials', body, { stepUpGrant: grantId });
+    } catch (err) {
+      if (err?.status === 404) {
+        await apiClient.put('/paypal/connection', body, { stepUpGrant: grantId });
+      } else {
+        throw err;
+      }
+    }
     setPendingCredentials(null);
     formRef.current?.reset();
     setFeedback(t('app.connectionSaved'));
@@ -922,7 +947,15 @@ export function PaypalSettingsPage() {
   const testConnection = async () => {
     setFeedback('');
     try {
-      await apiClient.post('/paypal/credentials/test');
+      try {
+        await apiClient.post('/paypal/credentials/test');
+      } catch (err) {
+        if (err?.status === 404) {
+          await apiClient.post('/paypal/connection/test');
+        } else {
+          throw err;
+        }
+      }
       await queryClient.invalidateQueries({ queryKey: ['paypal-credentials', environment] });
       await queryClient.invalidateQueries({ queryKey: ['paypal', 'connection'] });
       setFeedback(t('app.connectionTested'));
@@ -932,7 +965,7 @@ export function PaypalSettingsPage() {
   };
 
   if (query.isPending) return <LoadingState />;
-  if (query.error || !connection) return <PageError error={query.error} onRetry={query.refetch} />;
+  if (query.error) return <PageError error={query.error} onRetry={query.refetch} />;
 
   return (
     <div className={styles.pageStack}>
