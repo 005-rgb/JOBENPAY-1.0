@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { RotateCcw, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Copy, Cpu, Eye, Layers, RefreshCw } from 'lucide-react';
+import { RotateCcw, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Copy, Cpu, Eye, Layers, RefreshCw, HelpCircle } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { useEnvironment } from '../context/EnvironmentContext.jsx';
-import { Button, EmptyState, Skeleton, useToast } from '../components/primitives.jsx';
+import { Button, EmptyState, Modal, Skeleton, useToast } from '../components/primitives.jsx';
 import styles from './TransactionPages.module.css';
 
 /**
@@ -387,6 +387,7 @@ export function CplDisplayCard({ requestId }) {
  */
 export function CplPage({ initialTab = 'snapshots' }) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const { environment } = useEnvironment();
   const [filterScore, setFilterScore] = useState('ALL');
   const [selectedSnapshot, setSelectedSnapshot] = useState(null);
@@ -427,14 +428,23 @@ export function CplPage({ initialTab = 'snapshots' }) {
               Cognitive Provenance Layer (CPL)
             </h1>
             <span className={styles.providerBadge} style={{ background: '#0a2b9e', color: '#fff' }}>
-              PRD 1.7
+              REPLAY ENGINE
             </span>
           </div>
           <p className={styles.pageSubtitle} style={{ margin: 0 }}>
             Proving that AI agent decisions are cryptographically reproducible from the same ground-truth data, model, and parameters.
           </p>
         </div>
-        <div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsHelpOpen(true)}
+            title="Module Guide & Help"
+          >
+            <HelpCircle size={14} />
+            <span>Help</span>
+          </Button>
           <button
             type="button"
             className={styles.primaryLink}
@@ -702,6 +712,40 @@ export function CplPage({ initialTab = 'snapshots' }) {
           </div>
         </div>
       )}
+
+      {/* Contextual Help Modal */}
+      <Modal
+        open={isHelpOpen}
+        onOpenChange={setIsHelpOpen}
+        title="Cognitive Provenance Layer (CPL) Guide"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <Button variant="secondary" onClick={() => setIsHelpOpen(false)}>Close</Button>
+            <a
+              href="/help#ai-cpl"
+              className={styles.primaryLink}
+              style={{ textDecoration: 'none' }}
+              onClick={() => setIsHelpOpen(false)}
+            >
+              Read Full Manual &rarr;
+            </a>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px', lineHeight: '1.5' }}>
+          <p>
+            <strong>Cognitive Provenance Layer (CPL)</strong> captures immutable snapshots of AI memory, prompt context, and execution parameters for regulatory audit.
+          </p>
+          <ul style={{ margin: '0 0 0 20px', padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <li><strong>Cognitive Snapshots:</strong> Captures model metadata, temperature, prompt hashes, and retrieved grounding documents.</li>
+            <li><strong>Deterministic Replay Engine:</strong> Re-executes past decisions through the evaluation pipeline in an isolated sandbox.</li>
+            <li><strong>Reproducibility Score (RS: 0–100):</strong> Flags non-deterministic model drift if the replay score falls below 95%.</li>
+          </ul>
+          <p style={{ color: 'var(--jp-text-muted)', fontSize: '13px', margin: 0 }}>
+            Read the complete guide in the Help Center to learn how CPL connects with DIP and Signed Authorization Receipts.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }

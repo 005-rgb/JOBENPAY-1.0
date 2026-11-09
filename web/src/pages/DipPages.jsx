@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ShieldCheck, AlertTriangle, FileCheck, CheckCircle2, XCircle, ArrowLeft, Eye, Award, RefreshCw, Trash2 } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, FileCheck, CheckCircle2, XCircle, ArrowLeft, Eye, Award, RefreshCw, Trash2, HelpCircle } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { useEnvironment } from '../context/EnvironmentContext.jsx';
-import { Button, EmptyState, Skeleton, useToast } from '../components/primitives.jsx';
+import { Button, EmptyState, Modal, Skeleton, useToast } from '../components/primitives.jsx';
 import styles from './TransactionPages.module.css';
 
 /**
@@ -567,6 +567,7 @@ export function IntentAnchorBuilderPage() {
  */
 export function IntentAnchorsPage({ initialTab = 'anchors' }) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const { environment } = useEnvironment();
   const { notify } = useToast();
   const queryClient = useQueryClient();
@@ -643,7 +644,7 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
               Decision Integrity Proof (DIP)
             </h1>
             <span className={styles.providerBadge} style={{ background: '#0a2b9e', color: '#fff' }}>
-              PRD 1.6
+              AI TRUST
             </span>
           </div>
           <p className={styles.pageSubtitle} style={{ margin: 0 }}>
@@ -651,6 +652,15 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsHelpOpen(true)}
+            title="Module Guide & Help"
+          >
+            <HelpCircle size={14} />
+            <span>Help</span>
+          </Button>
           <Button
             variant="secondary"
             size="sm"
@@ -1000,6 +1010,40 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
           </div>
         </div>
       )}
+
+      {/* Contextual Help Modal */}
+      <Modal
+        open={isHelpOpen}
+        onOpenChange={setIsHelpOpen}
+        title="Decision Integrity Proof (DIP) Guide"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <Button variant="secondary" onClick={() => setIsHelpOpen(false)}>Close</Button>
+            <a
+              href="/help#ai-dip"
+              className={styles.primaryLink}
+              style={{ textDecoration: 'none' }}
+              onClick={() => setIsHelpOpen(false)}
+            >
+              Read Full Manual &rarr;
+            </a>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px', lineHeight: '1.5' }}>
+          <p>
+            <strong>Decision Integrity Proof (DIP)</strong> ensures autonomous AI agents remain mathematically aligned with human objectives before any money moves.
+          </p>
+          <ul style={{ margin: '0 0 0 20px', padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <li><strong>Intent Anchoring:</strong> Cryptographically binds the human principal's objective hash to incoming agent proposals.</li>
+            <li><strong>DIS Score (0–100):</strong> Evaluates vendor alignment, purpose coherence, amount justification, evidence validity, and temporal plausibility.</li>
+            <li><strong>Fail-Closed Hard Rules:</strong> Brand mismatches and invalid evidence instantly reject the transaction regardless of agent reasoning.</li>
+          </ul>
+          <p style={{ color: 'var(--jp-text-muted)', fontSize: '13px', margin: 0 }}>
+            Navigate to the Help Center to review the complete scoring formula and governance chain.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }

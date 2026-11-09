@@ -38,6 +38,7 @@ const english = {
     partials: 'Partial Captures',
     requests: 'Requests',
     approvals: 'Approvals',
+    helpTutorials: 'Help & Tutorials',
     ledger: 'Ledger',
     audit: 'Audit',
     payees: 'Payees',

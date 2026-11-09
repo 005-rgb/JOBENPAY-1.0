@@ -10,6 +10,7 @@ import {
   Copy,
   Cpu,
   FileCheck2,
+  HelpCircle,
   KeyRound,
   Layers,
   Lock,
@@ -56,6 +57,9 @@ export default function SecurityPage({ tab = 'pqc' }) {
   const queryClient = useQueryClient();
 
   const canRotate = ['OWNER', 'ADMIN'].includes(role || '');
+
+  // Help modal state
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   // Rotation modal state
   const [isRotateModalOpen, setIsRotateModalOpen] = useState(false);
@@ -246,7 +250,7 @@ export default function SecurityPage({ tab = 'pqc' }) {
         <div className={styles.titleArea}>
           <div className={styles.titleRow}>
             <ShieldAlert size={28} color="var(--jp-brand-teal, #0d9488)" />
-            <h1 className={styles.title}>Security Hardening (PRD 5.0)</h1>
+            <h1 className={styles.title}>Security Hardening & PQC</h1>
             <span className={`${styles.envBadge} ${isLive ? styles.envLive : styles.envSandbox}`}>
               {environment} MODE
             </span>
@@ -258,6 +262,11 @@ export default function SecurityPage({ tab = 'pqc' }) {
         </div>
 
         <div className={styles.headerActions}>
+          <Button variant="secondary" size="sm" onClick={() => setIsHelpModalOpen(true)} title="Module Guide & Help">
+            <HelpCircle size={14} />
+            <span>Help</span>
+          </Button>
+
           <Button variant="secondary" size="sm" onClick={handleRefreshCurrentTab}>
             <RefreshCw size={14} />
             <span>Refresh</span>
@@ -1038,6 +1047,44 @@ export default function SecurityPage({ tab = 'pqc' }) {
             <strong>Zero-Downtime Guarantee:</strong> Existing signatures verified using the rotated key remain valid. The new key immediately takes over new signing and encryption operations for tenant.
           </div>
         </form>
+      </Modal>
+
+      {/* Contextual Help Modal */}
+      <Modal
+        open={isHelpModalOpen}
+        onOpenChange={setIsHelpModalOpen}
+        title="Security Hardening & Post-Quantum Cryptography Guide"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <Button variant="secondary" onClick={() => setIsHelpModalOpen(false)}>Close</Button>
+            <a
+              href="/help#ops-security"
+              style={{
+                textDecoration: 'none',
+                color: 'var(--jp-link)',
+                fontWeight: 600,
+                fontSize: '14px',
+              }}
+              onClick={() => setIsHelpModalOpen(false)}
+            >
+              Read Full Manual &rarr;
+            </a>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px', lineHeight: '1.5' }}>
+          <p>
+            <strong>Security Hardening</strong> provides multi-layered defenses against quantum decryption, rogue autonomous agents, and supply chain tampering.
+          </p>
+          <ul style={{ margin: '0 0 0 20px', padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <li><strong>Post-Quantum Cryptography (PQC):</strong> Implements NIST FIPS 204 (ML-DSA-65) and hybrid encapsulation to future-proof financial records.</li>
+            <li><strong>Threat Detection:</strong> Continuously calculates velocity spikes (&gt;5x) and amount anomalies (&gt;3 sigma) to quarantine compromised agents.</li>
+            <li><strong>Supply Chain (SLSA & SBOM):</strong> Enforces SLSA Level 3 compliance and Cosign signature verification on all platform dependencies.</li>
+          </ul>
+          <p style={{ color: 'var(--jp-text-muted)', fontSize: '13px', margin: 0 }}>
+            Read the complete guide in the Help Center to learn more about key rotation schedules and runbook procedures.
+          </p>
+        </div>
       </Modal>
     </div>
   );

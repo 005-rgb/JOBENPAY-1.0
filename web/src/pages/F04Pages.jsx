@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowDownToLine, FileText, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, FileText, HelpCircle, Plus, Search, Trash2 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { safePolicy } from '@shared/policy.schema.js';
 
@@ -284,6 +284,7 @@ function PolicyEditor({ policy, onChange, payees, issues }) {
 
 export function MandatesPage() {
   const auth = useAuth();
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const query = usePageQuery(['mandates'], async () => (await apiClient.get('/mandates')).mandates);
   const agentsQuery = usePageQuery(['agents'], async () => (await apiClient.get('/agents')).agents);
   const mandates = query.data || [];
@@ -293,7 +294,13 @@ export function MandatesPage() {
     <div className={styles.pageStack}>
       <div className={styles.pageToolbar}>
         <h2>Mandates</h2>
-        {canCreate ? <Link className={styles.primaryLink} to="/mandates/new"><Plus aria-hidden="true" />New mandate</Link> : null}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <Button variant="secondary" size="sm" onClick={() => setIsHelpOpen(true)} title="Module Guide & Help">
+            <HelpCircle size={14} />
+            <span>Help</span>
+          </Button>
+          {canCreate ? <Link className={styles.primaryLink} to="/mandates/new"><Plus aria-hidden="true" />New mandate</Link> : null}
+        </div>
       </div>
       {query.isPending ? <LoadingRows /> : query.error ? <PageError error={query.error} retry={query.refetch} /> : mandates.length === 0 ? (
         <EmptyState title="No mandates yet" description="Create a mandate to define guarded payment limits for an agent." action={<Link className={styles.primaryLink} to="/mandates/new">Create mandate</Link>} />
@@ -315,6 +322,45 @@ export function MandatesPage() {
           </div>
         </Card>
       )}
+
+      {/* Contextual Help Modal */}
+      <Modal
+        open={isHelpOpen}
+        onOpenChange={setIsHelpOpen}
+        title="Deterministic Mandates Guide"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <Button variant="secondary" onClick={() => setIsHelpOpen(false)}>Close</Button>
+            <a
+              href="/help#agents-mandates"
+              style={{
+                textDecoration: 'none',
+                color: 'var(--jp-link)',
+                fontWeight: 600,
+                fontSize: '14px',
+              }}
+              onClick={() => setIsHelpOpen(false)}
+            >
+              Read Full Manual &rarr;
+            </a>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px', lineHeight: '1.5' }}>
+          <p>
+            <strong>Deterministic Mandates</strong> are immutable spending contracts that bind autonomous AI agents to strict corporate policies.
+          </p>
+          <ul style={{ margin: '0 0 0 20px', padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <li><strong>Per-Transaction Caps:</strong> Rejects any single payment proposal exceeding authorized thresholds.</li>
+            <li><strong>Monthly Budgets:</strong> Cumulative caps enforced with database concurrency guards (\`SELECT ... FOR UPDATE\`).</li>
+            <li><strong>Payee Allowlists:</strong> Limits agent proposals strictly to approved supplier IDs.</li>
+            <li><strong>Operating Schedule:</strong> Restricts payments to specific days and working hours.</li>
+          </ul>
+          <p style={{ color: 'var(--jp-text-muted)', fontSize: '13px', margin: 0 }}>
+            Read the complete guide in the Help Center to learn how mandates trigger the Approvals Queue and interact with DIP.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }

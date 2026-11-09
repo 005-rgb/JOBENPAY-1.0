@@ -12,6 +12,7 @@ import {
   Cpu,
   FileCheck,
   Grid,
+  HelpCircle,
   Home,
   Landmark,
   LockKeyhole,
@@ -137,6 +138,7 @@ const navigation = [
       { title: 'security', path: '/settings/security' },
     ],
   },
+  { key: 'help', title: 'helpTutorials', icon: HelpCircle, path: '/help' },
 ];
 
 const creationActions = [
