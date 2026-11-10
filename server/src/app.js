@@ -224,7 +224,7 @@ async function submitAgentPayout(agent, input, idempotencyKey) {
     reason: body.reason,
     idempotencyKey: idempotencyKey.trim(),
   });
-  const budget = await getActiveAgentBudget(agent.orgId, agent.id);
+  const budget = await getActiveAgentBudget(agent.orgId, agent.id, undefined, agent.environment || 'SANDBOX');
   return {
     requestId: request.id,
     status: request.status,

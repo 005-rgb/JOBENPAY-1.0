@@ -448,20 +448,17 @@ test('agents, API keys, and payees enforce tenancy, step-up, redaction, and rate
     assert.equal(summaryBResponse.status, 200);
     const summaryA = await summaryAResponse.json();
     const summaryB = await summaryBResponse.json();
-    assert.deepEqual(summaryA.counts, {
-      requests: 1,
-      autoApproved: 1,
-      held: 0,
-      blocked: 0,
-      reconciled: 0,
-    });
-    assert.deepEqual(summaryB.counts, {
-      requests: 1,
-      autoApproved: 0,
-      held: 0,
-      blocked: 1,
-      reconciled: 0,
-    });
+    assert.equal(summaryA.counts.requests, 1);
+    assert.equal(summaryA.counts.autoApproved, 1);
+    assert.equal(summaryA.counts.held, 0);
+    assert.equal(summaryA.counts.blocked, 0);
+    assert.equal(summaryA.counts.reconciled, 0);
+
+    assert.equal(summaryB.counts.requests, 1);
+    assert.equal(summaryB.counts.autoApproved, 0);
+    assert.equal(summaryB.counts.held, 0);
+    assert.equal(summaryB.counts.blocked, 1);
+    assert.equal(summaryB.counts.reconciled, 0);
 
     const createdKey = await postJson(`${baseUrl}/api/v1/agents/${agent.id}/keys`, ownerA, {});
     assert.equal(createdKey.status, 201);

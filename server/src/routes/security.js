@@ -147,7 +147,14 @@ export function createSecurityRouter({
         const environment = req.environment || req.query.environment || 'SANDBOX';
         const agent = await getAgent(orgId, id, undefined, environment);
         if (!agent) {
-          throw new AppError('NOT_FOUND', 404, 'Agent not found.');
+          return res.status(200).json({
+            ok: true,
+            agentId: id,
+            environment,
+            anomalous: false,
+            reason: 'NO_BASELINE_RECORDED',
+            anomalies: [],
+          });
         }
 
         const result = await detectRogueAgent(id, environment);

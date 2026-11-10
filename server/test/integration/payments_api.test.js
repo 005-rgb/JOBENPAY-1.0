@@ -36,6 +36,8 @@ async function createOrgUserAndSession(slugPrefix) {
       'content-type': 'application/json',
       'Cookie': `jp_sid=${sessionToken}`,
       'x-csrf-token': csrfToken,
+      'x-jobenpay-environment': 'SANDBOX',
+      'x-environment': 'SANDBOX',
     },
   };
 }
@@ -62,7 +64,9 @@ test('PRD 4.1: Payment Orchestration Layer (POL) HTTP API Integration Suite', as
   });
 
   await t.test('1. GET /api/v1/payments/gateways: returns registry & routing config', async () => {
-    const res = await fetch(`${baseUrl}/api/v1/payments/gateways`);
+    const res = await fetch(`${baseUrl}/api/v1/payments/gateways`, {
+      headers: authContext.headers,
+    });
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.ok(Array.isArray(body.gateways));

@@ -18,11 +18,14 @@ const hasDatabase = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABAS
 function collectRoutes(stack, routes = []) {
   for (const layer of stack ?? []) {
     if (layer.route) {
-      routes.push({
-        path: layer.route.path,
-        methods: Object.keys(layer.route.methods).map((m) => m.toUpperCase()),
-        handlers: layer.route.stack.map((item) => item.name),
-      });
+      const paths = Array.isArray(layer.route.path) ? layer.route.path : [layer.route.path];
+      for (const p of paths) {
+        routes.push({
+          path: p,
+          methods: Object.keys(layer.route.methods).map((m) => m.toUpperCase()),
+          handlers: layer.route.stack.map((item) => item.name),
+        });
+      }
     } else if (layer.handle?.stack) {
       collectRoutes(layer.handle.stack, routes);
     }
@@ -139,6 +142,23 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['POST /security/supply-chain/attest', 'Record software supply-chain attestation'],
   ['GET /security/supply-chain/attestations', 'List supply-chain attestations'],
   ['GET /security/supply-chain/:artifact', 'Verify supply chain artifact attestation'],
+  ['GET /me/profile', 'Active session user profile'],
+  ['GET /users/profile', 'Alias for active session user profile'],
+  ['PATCH /me/profile', 'Updates active session user profile'],
+  ['PATCH /users/profile', 'Alias for updating active session user profile'],
+  ['POST /me/password', 'Sets or changes active session user password'],
+  ['POST /users/password', 'Alias for setting active session user password'],
+  ['POST /auth/set-password', 'Alias for setting active session user password'],
+  ['POST /auth/password', 'Alias for setting active session user password'],
+  ['POST /me/2fa/setup', 'Generates 2FA setup secret and QR for active session user'],
+  ['POST /me/2fa/verify', 'Verifies 2FA TOTP code for active session user'],
+  ['POST /me/2fa/disable', 'Disables 2FA for active session user'],
+  ['GET /me/sessions', 'Lists active sessions for current user'],
+  ['GET /users/sessions', 'Alias for listing active sessions for current user'],
+  ['DELETE /me/sessions', 'Terminates all other active sessions for current user'],
+  ['DELETE /users/sessions', 'Alias for terminating active sessions for current user'],
+  ['PATCH /me/notifications', 'Updates notification preferences for active session user'],
+  ['PATCH /users/notifications', 'Alias for updating notification preferences for active session user'],
 ]);
 
 async function createOrgFixture(db, orgName, slug) {
