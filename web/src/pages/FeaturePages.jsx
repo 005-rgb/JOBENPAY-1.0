@@ -971,6 +971,7 @@ export function PaypalSettingsPage() {
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [preflightResult, setPreflightResult] = useState(null);
   const [preflightError, setPreflightError] = useState('');
+  const [autoSetupLoading, setAutoSetupLoading] = useState(false);
 
   const owner = auth.role === 'OWNER';
   const envQueryString = `?environment=${environment}&env=${environment}`;
@@ -989,6 +990,20 @@ export function PaypalSettingsPage() {
       setPreflightError(err.message);
     } finally {
       setPreflightLoading(false);
+    }
+  };
+
+  const autoSetupSandbox = async () => {
+    setAutoSetupLoading(true);
+    setPreflightError('');
+    try {
+      const data = await apiClient.post(`/admin/real-preflight/setup${envQueryString}`, {}, { headers: envHeaders });
+      setPreflightResult(data);
+      setFeedback('Sandbox prerequisites auto-configured successfully!');
+    } catch (err) {
+      setPreflightError(err.message);
+    } finally {
+      setAutoSetupLoading(false);
     }
   };
   const query = usePageQuery(['paypal-credentials', environment], async () => {
@@ -1059,10 +1074,10 @@ export function PaypalSettingsPage() {
     setFeedback('');
     try {
       try {
-        await apiClient.post(`/paypal/credentials/test${envQueryString}`, null, { headers: envHeaders });
+        await apiClient.post(`/paypal/credentials/test${envQueryString}`, {}, { headers: envHeaders });
       } catch (err) {
         if (err?.status === 404) {
-          await apiClient.post(`/paypal/connection/test${envQueryString}`, null, { headers: envHeaders });
+          await apiClient.post(`/paypal/connection/test${envQueryString}`, {}, { headers: envHeaders });
         } else {
           throw err;
         }
@@ -1193,9 +1208,14 @@ export function PaypalSettingsPage() {
             : (t('app.preflightDesc') || 'Verify all 12 operational readiness checks (PF-01 to PF-12) before executing payouts against PayPal Sandbox.')}
         </p>
         <div className={styles.inlineActions}>
-          <Button disabled={preflightLoading} onClick={runPreflight} type="button">
+          <Button disabled={preflightLoading || autoSetupLoading} onClick={runPreflight} type="button">
             {preflightLoading ? (t('app.runningPreflight') || 'Running checks...') : (t('app.runPreflight') || 'Run real-payout preflight')}
           </Button>
+          {!isLive && preflightResult && !preflightResult.ready ? (
+            <Button disabled={preflightLoading || autoSetupLoading} onClick={autoSetupSandbox} type="button" variant="secondary">
+              {autoSetupLoading ? 'Configuring Sandbox...' : 'Auto-Setup Sandbox Prerequisites (Fix PF-04/07/08)'}
+            </Button>
+          ) : null}
         </div>
         {preflightError ? <p className={styles.formFeedback} role="alert">{preflightError}</p> : null}
         {preflightResult?.checks ? (

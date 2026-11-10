@@ -132,6 +132,13 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['POST /live/paypal/:webhookToken', 'PayPal Live webhook receiver with token'],
   ['POST /sandbox/seed', 'Clones sanitized template transactions to sandbox for session tenant'],
   ['POST /debug/time-travel/:live_tx_id', 'Simulates time travel debug on live transaction within session tenant'],
+  ['GET /security/keys', 'List cryptographic keys for current tenant'],
+  ['POST /security/keys/rotate', 'Rotate cryptographic keys for current tenant'],
+  ['GET /security/pqc/status', 'Global post-quantum readiness status'],
+  ['GET /security/events', 'Security audit event feed for current tenant'],
+  ['POST /security/supply-chain/attest', 'Record software supply-chain attestation'],
+  ['GET /security/supply-chain/attestations', 'List supply-chain attestations'],
+  ['GET /security/supply-chain/:artifact', 'Verify supply chain artifact attestation'],
 ]);
 
 async function createOrgFixture(db, orgName, slug) {
@@ -506,7 +513,8 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         !r.path.includes('/webhooks/') &&
         !r.path.startsWith('/v1/') &&
         !r.path.startsWith('/proof/') &&
-        !r.path.startsWith('/ops/')
+        !r.path.startsWith('/ops/') &&
+        !r.path.startsWith('/security/supply-chain/')
       ));
 
       assert.ok(parameterizedRoutes.length >= 20, `Expected >= 20 parameterized routes, found ${parameterizedRoutes.length}`);
@@ -555,7 +563,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
             else if (targetPath.startsWith('/mandates/')) targetPath = targetPath.replace(':id', orgB.mandate.id);
             else if (targetPath.startsWith('/notifications/')) targetPath = targetPath.replace(':id', orgB.notification.id);
             else if (targetPath.startsWith('/documents/')) targetPath = targetPath.replace(':id', orgB.document.id);
-            else if (targetPath.startsWith('/agents/')) targetPath = targetPath.replace(':id', orgB.agent.id);
+            else if (targetPath.startsWith('/agents/') || targetPath.startsWith('/security/agents/')) targetPath = targetPath.replace(':id', orgB.agent.id);
             else if (targetPath.startsWith('/payees/')) targetPath = targetPath.replace(':id', orgB.payee.id);
             else if (targetPath.startsWith('/agent/v1/requests/')) targetPath = targetPath.replace(':id', orgB.requestPending.id);
             else if (targetPath.startsWith('/pact/contracts/')) targetPath = targetPath.replace(':id', crypto.randomUUID());
@@ -821,6 +829,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'POST /agents/:id/keys/:keyId/revoke',
         'POST /agents/:id/keys/rotate',
         'POST /agents/:agent_id/keys/rotate',
+        'POST /security/agents/:id/behavior-check',
         'GET /payees/:id',
         'PATCH /payees/:id',
         'POST /payees/:id/trust',
@@ -851,6 +860,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'GET /dashboard/summary',
         'GET /admin/queue',
         'GET /admin/real-preflight',
+        'POST /admin/real-preflight/setup',
         'GET /paypal/connection',
         'GET /developer/info',
         'GET /org',

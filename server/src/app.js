@@ -512,7 +512,7 @@ export function createApp() {
   app.use(cookieParser());
   app.use('/webhooks/paypal', express.raw({ type: 'application/json', limit: '1mb' }));
   app.use('/webhooks/payments', express.raw({ type: 'application/json', limit: '1mb' }));
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '1mb', strict: false }));
   app.use(environmentMiddleware);
   if (!existsSync(WEB_INDEX_FILE)) {
     app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
@@ -1016,6 +1016,138 @@ export function createApp() {
           },
         ],
       });
+    }
+  });
+
+  api.post('/admin/real-preflight/setup', requireSession, requireCsrf, requireRole('OWNER', 'JUDGE'), async (req, res, next) => {
+    try {
+      const orgId = req.membership?.org_id || req.session?.current_org_id || GLOBAL_ORG_ID;
+      const targetEnv = (req.environment || req.query?.environment || req.body?.environment || 'SANDBOX').toUpperCase();
+      if (targetEnv !== 'SANDBOX') {
+        throw buildError('VALIDATION_FAILED', 'Auto-setup is only supported in SANDBOX environment.', 400);
+      }
+
+      // 1. Reset / retry dead jobs in the queue
+      await query(
+        "UPDATE jobs SET status = 'PENDING', attempts = 0, run_at = now(), locked_until = NULL WHERE status = 'DEAD'",
+      );
+
+      // 2. Ensure an active agent with an active key exists in this org & SANDBOX
+      let agentRow = (await query(
+        "SELECT id, name FROM agents WHERE org_id = $1 AND environment = $2 AND status = 'ACTIVE' ORDER BY created_at ASC LIMIT 1",
+        [orgId, targetEnv],
+      )).rows[0];
+
+      if (!agentRow) {
+        const agentRes = await query(
+          "INSERT INTO agents (org_id, name, description, status, environment) VALUES ($1, 'Sandbox Agent', 'Automated Sandbox Payout Agent', 'ACTIVE', $2) RETURNING id, name",
+          [orgId, targetEnv],
+        );
+        agentRow = agentRes.rows[0];
+      }
+
+      // Ensure active API key exists
+      const keyCount = (await query(
+        'SELECT count(*)::integer AS count FROM agent_api_keys WHERE org_id = $1 AND agent_id = $2 AND revoked_at IS NULL',
+        [orgId, agentRow.id],
+      )).rows[0].count;
+
+      if (keyCount === 0) {
+        const rawKey = `jp_${crypto.randomBytes(24).toString('hex')}`;
+        const prefix = rawKey.slice(0, 10);
+        const hmac = crypto.createHmac('sha256', env.JOBENPAY_HMAC_PEPPER).update(rawKey).digest('hex');
+        await query(
+          'INSERT INTO agent_api_keys (org_id, agent_id, key_prefix, key_hmac, name) VALUES ($1, $2, $3, $4, $5)',
+          [orgId, agentRow.id, prefix, hmac, 'Sandbox Setup Key'],
+        );
+      }
+
+      // 3. Ensure a TRUSTED EMAIL payee exists
+      let trustedPayee = (await query(
+        "SELECT id, display_name, identifier_masked FROM payees WHERE org_id = $1 AND kind = 'EMAIL' AND trust = 'TRUSTED' LIMIT 1",
+        [orgId],
+      )).rows[0];
+
+      if (!trustedPayee) {
+        const payeeEmail = 'sb-receiver@jobenpay.test';
+        const protectedId = preparePayeeIdentifier(orgId, payeeEmail, 'EMAIL', {
+          encryptionKey: env.JOBENPAY_ENC_KEY,
+          pepper: env.JOBENPAY_HMAC_PEPPER,
+        });
+        trustedPayee = await createPayee(orgId, {
+          displayName: 'Sandbox Test Recipient',
+          kind: 'EMAIL',
+          identifierEnc: protectedId.identifierEnc,
+          identifierHmac: protectedId.identifierHmac,
+          identifierMasked: protectedId.identifierMasked,
+          trust: 'TRUSTED',
+        });
+      }
+
+      // 4. Ensure an ACTIVE 24/7 USD mandate exists for agentRow
+      const activeMandate = (await query(
+        "SELECT id, name FROM mandates WHERE org_id = $1 AND agent_id = $2 AND environment = $3 AND status = 'ACTIVE' LIMIT 1",
+        [orgId, agentRow.id, targetEnv],
+      )).rows[0];
+
+      if (!activeMandate) {
+        await withTx(async (tx) => {
+          const now = new Date();
+          const validFrom = new Date(now.getTime() - 60_000).toISOString();
+          const validTo = new Date(now.getTime() + 365 * 86400 * 1000).toISOString();
+
+          const policy = {
+            currency: 'USD',
+            validFrom,
+            validTo,
+            purpose: 'Sandbox real-payout validation policy',
+            requireInvoice: false,
+            invoiceAmountToleranceMinor: '0',
+            allowNewPayees: true,
+            perTransactionLimitMinor: '2500',
+            budget: {
+              limitMinor: '10000',
+              period: 'MONTH',
+            },
+            schedule: {
+              timezone: 'UTC',
+              days: [0, 1, 2, 3, 4, 5, 6],
+              startHour: 0,
+              endHour: 24,
+            },
+            velocity: {
+              maxRequestsPerHour: 50,
+              maxPayoutPerPayeePerDay: 5000,
+            },
+            payees: {
+              mode: 'ALLOWLIST',
+              ids: [trustedPayee.id],
+            },
+          };
+
+          const created = await createMandate(tx, {
+            orgId,
+            agentId: agentRow.id,
+            name: 'Sandbox 24/7 USD Mandate',
+            policy,
+            purposeText: policy.purpose,
+            environment: targetEnv,
+          });
+
+          await activateMandate(tx, {
+            orgId,
+            mandateId: created.mandate.id,
+            versionId: created.version.id,
+            actorId: null,
+            systemActor: 'real-setup',
+          });
+        });
+      }
+
+      const result = await runRealPreflight(orgId, { environment: targetEnv });
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
     }
   });
 

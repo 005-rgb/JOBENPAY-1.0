@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { AppError } from '../lib/errors.js';
+import { getAgent } from '../repositories/agents.js';
 import {
   listKeys,
   rotateKey,
@@ -141,7 +142,14 @@ export function createSecurityRouter({
           throw new AppError('INVALID_AGENT_ID', 400, 'Agent ID must be a valid UUID.');
         }
 
+        const orgId = req.session?.current_org_id || req.membership?.org_id;
+        if (!orgId) throw new AppError('ORG_ID_REQUIRED', 400, 'Organization ID is required.');
         const environment = req.environment || req.query.environment || 'SANDBOX';
+        const agent = await getAgent(orgId, id, undefined, environment);
+        if (!agent) {
+          throw new AppError('NOT_FOUND', 404, 'Agent not found.');
+        }
+
         const result = await detectRogueAgent(id, environment);
         return res.status(200).json({ ok: true, agentId: id, environment, ...result });
       } catch (err) {

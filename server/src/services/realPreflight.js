@@ -175,14 +175,17 @@ export async function runRealPreflight(orgId, options = {}) {
     checks.push({ id: 'PF-05', status: 'PASS', detail: 'Organization is active (not frozen and not archived).' });
   }
 
-  // PF-06: Active agent with at least one unrevoked API key
+  // PF-06: Active agent with at least one unrevoked API key (prioritizing agents with active mandates)
   const agentResult = await db.query(`
-    SELECT a.id, a.name, count(k.id)::integer AS active_key_count
+    SELECT a.id, a.name,
+           count(DISTINCT k.id)::integer AS active_key_count,
+           count(DISTINCT m.id)::integer AS active_mandate_count
     FROM agents a
-    JOIN agent_api_keys k ON k.agent_id = a.id AND k.org_id = a.org_id
-    WHERE a.org_id = $1 AND a.environment = $2 AND a.status = 'ACTIVE' AND k.revoked_at IS NULL
+    JOIN agent_api_keys k ON k.agent_id = a.id AND k.org_id = a.org_id AND k.revoked_at IS NULL
+    LEFT JOIN mandates m ON m.agent_id = a.id AND m.org_id = a.org_id AND m.environment = a.environment AND m.status = 'ACTIVE'
+    WHERE a.org_id = $1 AND a.environment = $2 AND a.status = 'ACTIVE'
     GROUP BY a.id, a.name
-    ORDER BY a.created_at ASC
+    ORDER BY active_mandate_count DESC, a.created_at ASC
     LIMIT 1
   `, [orgId, targetEnvironment]);
   const activeAgent = agentResult.rows[0] ?? null;
@@ -223,24 +226,42 @@ export async function runRealPreflight(orgId, options = {}) {
     activeMandate = mandateResult.rows[0] ?? null;
 
     if (!activeMandate) {
+      // Check if another active agent in this organization has an active mandate
+      const fallbackRes = await db.query(`
+        SELECT m.id, m.name, m.status, m.current_version_id, m.agent_id,
+               v.id AS version_id, v.policy, v.valid_from, v.valid_to,
+               a.name AS agent_name
+        FROM mandates m
+        JOIN mandate_versions v ON v.id = m.current_version_id
+        JOIN agents a ON a.id = m.agent_id AND a.org_id = m.org_id AND a.environment = m.environment
+        WHERE m.org_id = $1 AND m.environment = $2 AND m.status = 'ACTIVE' AND a.status = 'ACTIVE'
+        ORDER BY m.created_at DESC
+        LIMIT 1
+      `, [orgId, targetEnvironment]);
+      if (fallbackRes.rows[0]) {
+        activeMandate = fallbackRes.rows[0];
+      }
+    }
+
+    if (!activeMandate) {
       let draftDetail = '';
       try {
         const anyMandateRes = await db.query(
-          'SELECT id, name, status FROM mandates WHERE org_id = $1 AND environment = $2 AND agent_id = $3 ORDER BY created_at DESC LIMIT 1',
-          [orgId, targetEnvironment, activeAgent.id],
+          'SELECT id, name, status FROM mandates WHERE org_id = $1 AND environment = $2 ORDER BY created_at DESC LIMIT 1',
+          [orgId, targetEnvironment],
         );
         if (anyMandateRes.rows[0]) {
           const m = anyMandateRes.rows[0];
-          draftDetail = ` Mandat '${m.name}' ditemukan berstatus '${m.status}' — aktifkan mandat dengan tanda tangan Ed25519 agar berstatus ACTIVE.`;
+          draftDetail = ` Mandat '${m.name}' ditemukan berstatus '${m.status}' — aktifkan mandat dengan tanda tangan Ed25519 agar berstatus ACTIVE. Buka /mandates atau gunakan tombol 'Auto-Setup Sandbox Prerequisites'.`;
         } else {
-          draftDetail = ` Belum ada mandat untuk agen ini di ${targetEnvironment}. Buat mandat di /mandates/new atau jalankan real:setup.`;
+          draftDetail = ` Belum ada mandat di ${targetEnvironment}. Buat mandat di /mandates/new atau gunakan tombol 'Auto-Setup Sandbox Prerequisites'.`;
         }
       } catch {}
 
       checks.push({
         id: 'PF-07',
         status: 'FAIL',
-        detail: `No ACTIVE mandate found for agent '${activeAgent.name}' in ${targetEnvironment}.${draftDetail}`,
+        detail: `No ACTIVE mandate found in ${targetEnvironment}.${draftDetail}`,
       });
     } else {
       activePolicy = activeMandate.policy;

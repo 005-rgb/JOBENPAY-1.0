@@ -34,7 +34,8 @@ export class ApiError extends Error {
 async function request(path, { method = 'GET', body, headers = {}, stepUpGrant } = {}) {
   const requestHeaders = new Headers(headers);
   const upperMethod = method.toUpperCase();
-  if (body !== undefined) requestHeaders.set('content-type', 'application/json');
+  const hasBody = body !== undefined && body !== null;
+  if (hasBody) requestHeaders.set('content-type', 'application/json');
   if (!['GET', 'HEAD', 'OPTIONS'].includes(upperMethod) && csrfToken) {
     requestHeaders.set('x-csrf-token', csrfToken);
   }
@@ -64,7 +65,7 @@ async function request(path, { method = 'GET', body, headers = {}, stepUpGrant }
       method: upperMethod,
       credentials: 'same-origin',
       headers: requestHeaders,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: hasBody ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new ApiError({});
