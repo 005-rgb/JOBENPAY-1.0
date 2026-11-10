@@ -26,7 +26,8 @@
   text-align: center;
 }
 
-.pulseMark {
+.pulseMark,
+.heartbeatLogo {
   width: auto;
   max-width: 200px;
   height: 48px;

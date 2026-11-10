@@ -18,8 +18,8 @@ export function BrandLoadingScreen({
       <div className={styles.loadingContainer}>
         <img
           alt="JOBENPAY"
-          className={styles.pulseMark}
-          src={logoUrl}
+          className={styles.heartbeatLogo}
+          src={logoUrl || '/jobenpay-logo.svg'}
         />
         <p className={styles.loadingText}>{text}</p>
       </div>
