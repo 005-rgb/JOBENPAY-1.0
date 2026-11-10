@@ -132,6 +132,7 @@ function useSearchFilters() {
 
 export function LedgerPage() {
   const location = useLocation();
+  const { environment } = useEnvironment();
   const [type, setType] = useState('');
   const [subject, setSubject] = useState('');
   const [seqFrom, setSeqFrom] = useState('');
@@ -186,7 +187,12 @@ export function LedgerPage() {
     : entries;
   const download = async (format = 'json') => {
     try {
-      const response = await fetch(`/api/v1/ledger/export?format=${format}`, { credentials: 'same-origin' });
+      const response = await fetch(`/api/v1/ledger/export?format=${format}&environment=${environment || 'SANDBOX'}`, {
+        credentials: 'same-origin',
+        headers: {
+          'x-jobenpay-environment': environment || 'SANDBOX',
+        },
+      });
       if (!response.ok) throw new Error(`Ledger ${format.toUpperCase()} export could not be downloaded.`);
       const url = URL.createObjectURL(await response.blob());
       const anchor = document.createElement('a');
@@ -342,8 +348,8 @@ export function SimulatorPage() {
       <Banner title="Synthetic data. Sandbox only.">Scenarios submit requests using seeded synthetic documents and do not directly execute payouts.</Banner>
       <Card className={styles.simulatorCard}>
         <div className={styles.actions}>
-          <Button disabled={run.isPending} loading={run.isPending} onClick={() => run.mutate('legit')}>Run legit invoice</Button>
-          <Button disabled={run.isPending} loading={run.isPending} onClick={() => run.mutate('attack-pack')} variant="secondary">Run attack pack</Button>
+          <Button disabled={run.isPending} loading={run.isPending} onClick={() => run.mutate('legit')}>Run Happy Path (Legit Invoice)</Button>
+          <Button disabled={run.isPending} loading={run.isPending} onClick={() => run.mutate('attack-pack')} variant="secondary">Run Attack Pack</Button>
           <Button disabled={run.isPending} loading={run.isPending} onClick={() => run.mutate('all')} variant="secondary">Run all</Button>
           {['OWNER', 'JUDGE'].includes(auth.role) ? (
             <Button disabled={reset.isPending} onClick={() => setResetOpen(true)} variant="secondary">Reset demo data</Button>

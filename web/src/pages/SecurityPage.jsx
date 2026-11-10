@@ -51,6 +51,12 @@ export default function SecurityPage({ tab = 'pqc' }) {
     tab === 'threats' ? 'threats' : tab === 'supply-chain' ? 'supply-chain' : 'pqc',
   );
 
+  useEffect(() => {
+    if (tab) {
+      setActiveTab(tab === 'threats' ? 'threats' : tab === 'supply-chain' ? 'supply-chain' : 'pqc');
+    }
+  }, [tab]);
+
   const { environment, isLive } = useEnvironment();
   const { role } = useAuth();
   const { notify } = useToast();

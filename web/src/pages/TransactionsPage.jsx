@@ -13,6 +13,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Download,
   Filter,
   Layers,
   Loader2,
@@ -177,6 +178,29 @@ export function TransactionsPage() {
 
   const rows = data?.transactions || [];
 
+  const exportCsv = () => {
+    if (!transactions.length) return;
+    const headers = ['ID', 'Date', 'Category', 'Counterparty', 'Amount', 'Currency', 'Status', 'Reconciliation'];
+    const rows = transactions.map((tx) => [
+      `"${tx.id}"`,
+      `"${tx.created_at || ''}"`,
+      `"${tx.category || ''}"`,
+      `"${(tx.counterparty || tx.target_ref || '').replace(/"/g, '""')}"`,
+      `"${(Number(BigInt(tx.amount_minor || 0)) / 100).toFixed(2)}"`,
+      `"${tx.currency || 'USD'}"`,
+      `"${tx.status || ''}"`,
+      `"${tx.reconciliation_status || 'RECONCILED'}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `transactions-${(environment || 'sandbox').toLowerCase()}-${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className={styles.pageStack} data-testid="transactions-page">
       {/* Header Toolbar */}
@@ -188,6 +212,17 @@ export function TransactionsPage() {
           </p>
         </div>
         <div className={styles.headerActions}>
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={!transactions.length}
+            className={styles.secondaryLink}
+            title="Export transactions to CSV"
+            data-testid="export-csv-btn"
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
           <button
             type="button"
             onClick={() => refetch()}

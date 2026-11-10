@@ -46,6 +46,9 @@ const CheckEmailPage = lazy(() => import('./pages/CheckEmailPage.jsx'));
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage.jsx'));
 const TermsPage = lazy(() => import('./pages/LegalPages.jsx').then((m) => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import('./pages/LegalPages.jsx').then((m) => ({ default: m.PrivacyPage })));
+const AboutPage = lazy(() => import('./pages/LegalPages.jsx').then((m) => ({ default: m.AboutPage })));
+const StatusPage = lazy(() => import('./pages/LegalPages.jsx').then((m) => ({ default: m.StatusPage })));
+const PartnersPage = lazy(() => import('./pages/LegalPages.jsx').then((m) => ({ default: m.PartnersPage })));
 const MandateBuilderPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.MandateBuilderPage })));
 const MandateDetailPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.MandateDetailPage })));
 const MandatesPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.MandatesPage })));
@@ -170,6 +173,11 @@ function AuthenticatedApp() {
           <Route element={<PaymentsPage tab="simulator" />} path="/payments/simulator" />
           <Route element={<PaymentsPage tab="webhooks" />} path="/payments/webhooks" />
           <Route element={<HelpCenterPage />} path="/help" />
+          <Route element={<AboutPage />} path="/about" />
+          <Route element={<StatusPage />} path="/status" />
+          <Route element={<PartnersPage />} path="/partners" />
+          <Route element={<TermsPage />} path="/terms" />
+          <Route element={<PrivacyPage />} path="/privacy" />
           <Route element={<ComingSoonPage />} path="*" />
         </Routes>
       </Suspense>
@@ -229,6 +237,9 @@ function AppRoutes() {
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><VerifyEmailPage /></Suspense>} path="/verify-email" />
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><TermsPage /></Suspense>} path="/terms" />
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><PrivacyPage /></Suspense>} path="/privacy" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><AboutPage /></Suspense>} path="/about" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><StatusPage /></Suspense>} path="/status" />
+      <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><PartnersPage /></Suspense>} path="/partners" />
       <Route element={<Suspense fallback={<BrandLoadingScreen fullScreen />}><ProtocolConformancePage /></Suspense>} path="/protocol/conformance" />
       <Route
         element={(

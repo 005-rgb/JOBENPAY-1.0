@@ -454,18 +454,32 @@ export function Footer({ t, className = '' }) {
     isLive = false;
   }
   const firstRowLinks = ['help', 'contact', 'sitemap', 'fees', 'security', 'about', 'developers', 'partners'];
+  const footerRouteMap = {
+    help: '/help',
+    security: '/security',
+    about: '/about',
+    developers: '/developer',
+    partners: '/partners',
+    status: '/status',
+  };
   return (
     <footer className={`${styles.footer} ${className}`.trim()}>
       <div className={styles.footerLinks} data-testid="footer-links">
         <nav aria-label={t('app.footerNavigation')}>
-          {firstRowLinks.map((key) => <a href={`#${key}`} key={key}>{t(`app.${key}`)}</a>)}
+          {firstRowLinks.map((key) => {
+            const route = footerRouteMap[key];
+            if (route) {
+              return <RouterLink key={key} to={route}>{t(`app.${key}`)}</RouterLink>;
+            }
+            return <a href={`#${key}`} key={key}>{t(`app.${key}`)}</a>;
+          })}
         </nav>
         <div className={styles.localePickers}><span>{t('app.indonesia')}</span><span>{t('app.english')}</span></div>
       </div>
       <div className={styles.footerDivider} data-testid="footer-divider" />
       <div className={styles.footerCopyright} data-testid="footer-copyright">
         <span>{t('app.copyright')}</span><span aria-hidden="true" className={styles.footerVerticalDivider} /><nav aria-label={t('app.legalNavigation')}>
-          <RouterLink to="/privacy">{t('app.privacy')}</RouterLink><RouterLink to="/terms">{t('app.legal')}</RouterLink><a href="#policy">{t('app.policyUpdates')}</a>
+          <RouterLink to="/privacy">{t('app.privacy')}</RouterLink><RouterLink to="/terms">{t('app.legal')}</RouterLink><RouterLink to="/status">Status</RouterLink><a href="#policy">{t('app.policyUpdates')}</a>
         </nav>
       </div>
       <p className={styles.footerLegal} data-testid="footer-legal">
@@ -658,8 +672,8 @@ export function FixtureMain({ type, t }) {
           <p>{t('app.pageUnavailable')}</p>
           <div className={styles.fixtureFormFields}>
             <label><span>{t('app.newPayee')}</span><input aria-label={t('app.newPayee')} data-testid="floating-input" placeholder=" " /></label>
-            <Button data-testid="button-md">{t('app.create')}</Button>
-            <Button data-testid="button-lg" size="lg" variant="secondary">{t('app.submit')}</Button>
+            <Button data-testid="button-md" onClick={() => {}}>{t('app.create')}</Button>
+            <Button data-testid="button-lg" onClick={() => {}} size="lg" variant="secondary">{t('app.submit')}</Button>
           </div>
         </section>
       </div>
@@ -669,7 +683,7 @@ export function FixtureMain({ type, t }) {
     <div className={styles.fixtureS1}>
       <section className={styles.budgetHeader}>
         <div><p>{t('app.remainingBudget')}</p><strong>USD 50.00</strong></div>
-        <Button size="md" variant="secondary">{t('app.manageMandates')} <ChevronDown aria-hidden="true" /></Button>
+        <Button onClick={() => {}} size="md" variant="secondary">{t('app.manageMandates')} <ChevronDown aria-hidden="true" /></Button>
       </section>
       <section aria-label={t('app.setupCards')} className={styles.setupCards}>
         <article className={styles.setupCard} data-testid="setup-card">
@@ -706,8 +720,8 @@ export function FixtureMain({ type, t }) {
       <div className={styles.fixtureControls}>
         <label className={styles.fixtureInputLabel} htmlFor="parity-input">{t('app.newPayee')}</label>
         <input aria-label={t('app.newPayee')} data-testid="floating-input" id="parity-input" placeholder=" " />
-        <Button data-testid="button-md">{t('app.create')}</Button>
-        <Button data-testid="button-lg" size="lg" variant="secondary">{t('app.submit')}</Button>
+        <Button data-testid="button-md" onClick={() => {}}>{t('app.create')}</Button>
+        <Button data-testid="button-lg" onClick={() => {}} size="lg" variant="secondary">{t('app.submit')}</Button>
       </div>
     </div>
   );

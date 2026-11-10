@@ -577,8 +577,8 @@ export function DocumentsPage() {
   const [progress, setProgress] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [uploadError, setUploadError] = useState('');
-  const canDelete = auth.role === 'OWNER';
-  const canUpload = ['OWNER', 'ADMIN', 'OPERATOR'].includes(auth.role);
+  const canDelete = ['OWNER', 'JUDGE'].includes(auth.role);
+  const canUpload = ['OWNER', 'ADMIN', 'OPERATOR', 'JUDGE'].includes(auth.role);
   const query = usePageQuery(['documents'], async () => (await apiClient.get('/documents')).documents, { active: true });
   const upload = useMutation({
     mutationFn: () => apiClient.upload('/documents', file, setProgress),
@@ -886,12 +886,38 @@ export function ApprovalsPage() {
   const [status, setStatus] = useState('PENDING');
   const [cursor, setCursor] = useState('');
   const [previousCursors, setPreviousCursors] = useState([]);
+  const [approvingId, setApprovingId] = useState(null);
+  const auth = useAuth();
+  const { notify } = useToast();
+  const queryClient = useQueryClient();
+
   const query = usePageQuery(['approvals', status, cursor], async () => {
     const params = new URLSearchParams({ limit: '25', status });
     if (cursor) params.set('cursor', cursor);
     return apiClient.get(`/approvals?${params}`);
   }, { active: status === 'PENDING' });
   const rows = query.data?.approvals || [];
+
+  const handleQuickApprove = async (approval) => {
+    setApprovingId(approval.id);
+    try {
+      const res = await apiClient.post(`/approvals/${approval.id}/decision`, {
+        requestHash: approval.request_hash,
+        decision: 'APPROVE',
+        comment: 'Approved via quick action by Judge',
+      });
+      notify({ message: `Approval ${res?.result?.status?.toLowerCase() || 'approved'}.`, kind: 'success' });
+      await queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      await queryClient.invalidateQueries({ queryKey: ['requests'] });
+    } catch (err) {
+      notify({ message: err.message || 'Failed to approve request.', kind: 'error' });
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const canApprove = ['OWNER', 'ADMIN', 'APPROVER', 'JUDGE'].includes(auth.role);
+
   return (
     <div className={styles.pageStack}>
       <FilterSelect aria-label="Status" onChange={(event) => { setStatus(event.target.value); setCursor(''); setPreviousCursors([]); }} value={status}>
@@ -903,13 +929,31 @@ export function ApprovalsPage() {
         <Card className={styles.tableCard} padding="none">
           <div className={styles.tableScroll}>
             <table className={styles.dataTable}>
-              <thead><tr><th>Request</th><th>Agent</th><th>Payee</th><th className={styles.amountCell}>Amount</th><th>Status</th><th>Expires</th></tr></thead>
+              <thead><tr><th>Request</th><th>Agent</th><th>Payee</th><th className={styles.amountCell}>Amount</th><th>Status</th><th>Expires</th><th style={{ textAlign: 'right' }}>Action</th></tr></thead>
               <tbody>{rows.map((approval) => (
                 <tr key={approval.id}>
                   <td><Link to={`/approvals/${approval.id}`}>{approval.action} · {approval.request_id}</Link></td>
                   <td>{approval.agent_name}</td><td>{approval.payee_name || approval.payee_id || '—'}</td>
                   <td className={styles.amountCell}>{formatMoney(approval.amount_minor, approval.currency)}</td>
                   <td><StatusPill status={approval.status} /></td><td>{dateLabel(approval.expires_at)}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    {approval.status === 'PENDING' && canApprove ? (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        loading={approvingId === approval.id}
+                        disabled={Boolean(approvingId)}
+                        onClick={() => handleQuickApprove(approval)}
+                        data-testid={`quick-approve-${approval.id}`}
+                      >
+                        Approve
+                      </Button>
+                    ) : (
+                      <Link className={styles.secondaryLink} to={`/approvals/${approval.id}`} style={{ fontSize: '12px' }}>
+                        Review
+                      </Link>
+                    )}
+                  </td>
                 </tr>
               ))}</tbody>
             </table>
@@ -960,7 +1004,7 @@ export function ApprovalDetailPage() {
   if (query.isPending) return <LoadingRows />;
   if (query.error || !query.data?.approval) return <PageError error={query.error} retry={query.refetch} />;
   const { approval, request, document, evaluations, payeeHistory, decisions, executions, ledger, budget } = query.data;
-  const canDecide = ['OWNER', 'ADMIN', 'APPROVER'].includes(auth.role) && approval.status === 'PENDING';
+  const canDecide = ['OWNER', 'ADMIN', 'APPROVER', 'JUDGE'].includes(auth.role) && approval.status === 'PENDING';
   const startDecision = (choice) => {
     setDecision(choice);
     if (approval.stepUpRequired && choice === 'APPROVE') setStepUp(true);

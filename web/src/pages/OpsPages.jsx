@@ -302,6 +302,22 @@ export default function OpsPages({ tab = 'overview' }) {
       : 'overview',
   );
 
+  useEffect(() => {
+    if (tab) {
+      setActiveTab(
+        tab === 'slo'
+          ? 'slo'
+          : tab === 'circuit-breakers'
+          ? 'circuit-breakers'
+          : tab === 'runbooks'
+          ? 'runbooks'
+          : tab === 'secrets'
+          ? 'secrets'
+          : 'overview',
+      );
+    }
+  }, [tab]);
+
   const [slos, setSlos] = useState(DEFAULT_SLOS);
   const [circuitBreakers, setCircuitBreakers] = useState(DEFAULT_CIRCUIT_BREAKERS);
   const [healthStatus, setHealthStatus] = useState({ ok: true, status: 'healthy', latency: 4 });

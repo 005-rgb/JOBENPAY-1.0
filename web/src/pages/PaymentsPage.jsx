@@ -36,6 +36,10 @@ export default function PaymentsPage({ tab = 'overview' }) {
   const isLive = String(environment || '').toUpperCase() === 'LIVE';
   const { notify } = useToast();
   const [activeTab, setActiveTab] = useState(tab);
+
+  useEffect(() => {
+    if (tab) setActiveTab(tab);
+  }, [tab]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
