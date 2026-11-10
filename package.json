@@ -13,6 +13,7 @@
     "build": "npm --prefix web run build",
     "migrate": "node --env-file-if-exists=.env server/scripts/migrate.js",
     "seed": "node --env-file-if-exists=.env server/scripts/seed.js",
+    "seed:judge": "node --env-file-if-exists=.env server/scripts/seed_judge.js",
     "setup": "npm --prefix web ci && npm --prefix web run build && npm run migrate && npm run seed",
     "propose": "node --env-file-if-exists=.env server/scripts/propose.js",
     "verify-ledger": "node --env-file-if-exists=.env server/scripts/verify-ledger.js",

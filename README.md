@@ -38,11 +38,11 @@ Every transaction proposal originating from an AI agent is subjected to a batter
 
 ## 2. Demo: hosted URL + judge credentials
 
-- Hosted demo: {{HOSTED_URL}}
-- Judge account: `judge@jobenpay.test`
-- Judge password: {{JUDGE_PASSWORD}}
+- Hosted demo: https://nh.jobenapp.cloud
+- Judge account: `judge@jobenpay.io`
+- Judge password: `Password123!`
 
-The project owner must replace these placeholders before publishing a release. Demo data is synthetic, and payment operations are restricted to PayPal Sandbox.
+Demo data is synthetic, and payment operations are restricted to PayPal Sandbox. Seed script is available via `npm run seed:judge`.
 
 ### Interactive Judge Tour
 
@@ -219,11 +219,12 @@ npm test
 ```
 
 For manual verification on the web UI:
-1. Log in with the Judge account (`judge@jobenpay.test`).
-2. Navigate to **Transactions** (`/transactions`) to inspect transactions across all 15 categories.
-3. Review Double-Entry legs and Suspicious Activity Reports (SAR v1.1) in Transaction Detail.
-4. Open **Simulator** (`/simulator`) to run legitimate and adversarial payment flows.
-5. Open **Ledger** (`/ledger`) and click **Verify** to execute real-time hash-chain integrity verification.
+1. Log in with the Judge account (`judge@jobenpay.io` / `Password123!`).
+2. **Approvals (`/approvals`):** Buka menu Approvals, lihat transaksi yang menunggu persetujuan manusia ($150.00 Northwind Studio) lengkap dengan Decision Integrity Proof (DIP) dan Intent Anchor.
+3. **Security (`/security`):** Buka menu Security untuk melihat Post-Quantum Cryptography (PQC ML-DSA-65) keys, SLSA Level 3 attestations, dan verifikasi integritas hash chain.
+4. **Transactions (`/transactions`):** Inspect transactions across all 15 categories with balanced double-entry ledger legs (`SUM(DEBIT) = SUM(CREDIT)`).
+5. **Simulator (`/simulator`):** Run legitimate and adversarial payment flows.
+6. **Ledger (`/ledger`):** Click **Verify** to execute real-time hash-chain integrity verification.
 
 ---
 
