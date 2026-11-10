@@ -35,7 +35,7 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
   }
 
   // 1. GET /api/v1/me/profile
-  router.get('/me/profile', requireSession, async (req, res, next) => {
+  router.get(['/me/profile', '/users/profile'], requireSession, async (req, res, next) => {
     try {
       const user = await getFullUser(req.session.user_id, req.session.current_org_id);
       if (!user) {
@@ -75,7 +75,7 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
     avatar_url: z.string().trim().max(500).nullable().optional(),
   });
 
-  router.patch('/me/profile', requireSession, requireCsrf, async (req, res, next) => {
+  router.patch(['/me/profile', '/users/profile'], requireSession, requireCsrf, async (req, res, next) => {
     try {
       const parsed = updateProfileSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -152,17 +152,19 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
   });
 
   // 3. POST /api/v1/me/password
-  const setPasswordSchema = z.object({
-    current_password: z.string().optional(),
-    new_password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-      .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-      .regex(/[0-9]/, 'Password must contain at least one number'),
-  });
+  const setPasswordSchema = z
+    .object({
+      current_password: z.string().optional(),
+      currentPassword: z.string().optional(),
+      new_password: z.string().optional(),
+      newPassword: z.string().optional(),
+    })
+    .refine((data) => Boolean(data.new_password || data.newPassword), {
+      message: 'New password is required',
+      path: ['new_password'],
+    });
 
-  router.post('/me/password', requireSession, requireCsrf, async (req, res, next) => {
+  router.post(['/me/password', '/users/password', '/auth/set-password', '/auth/password'], requireSession, requireCsrf, async (req, res, next) => {
     try {
       const parsed = setPasswordSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -174,7 +176,37 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
         });
       }
 
-      const { current_password, new_password } = parsed.data;
+      const current_password = parsed.data.current_password || parsed.data.currentPassword;
+      const new_password = parsed.data.new_password || parsed.data.newPassword;
+
+      if (!new_password || new_password.length < 8) {
+        return res.status(400).json({
+          ok: false,
+          code: 'VALIDATION_FAILED',
+          message: 'Password must be at least 8 characters',
+        });
+      }
+      if (!/[A-Z]/.test(new_password)) {
+        return res.status(400).json({
+          ok: false,
+          code: 'VALIDATION_FAILED',
+          message: 'Password must contain at least one uppercase letter',
+        });
+      }
+      if (!/[a-z]/.test(new_password)) {
+        return res.status(400).json({
+          ok: false,
+          code: 'VALIDATION_FAILED',
+          message: 'Password must contain at least one lowercase letter',
+        });
+      }
+      if (!/[0-9]/.test(new_password)) {
+        return res.status(400).json({
+          ok: false,
+          code: 'VALIDATION_FAILED',
+          message: 'Password must contain at least one number',
+        });
+      }
       const user = await getFullUser(req.session.user_id, req.session.current_org_id);
       if (!user) {
         return res.status(404).json({ ok: false, code: 'USER_NOT_FOUND', message: 'User not found.' });
@@ -355,7 +387,7 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
   });
 
   // 7. GET /api/v1/me/sessions
-  router.get('/me/sessions', requireSession, async (req, res, next) => {
+  router.get(['/me/sessions', '/users/sessions'], requireSession, async (req, res, next) => {
     try {
       const rows = await findUserSessions(GLOBAL_ORG_ID, req.session.user_id);
       const sessions = rows.map((s) => {
@@ -379,7 +411,7 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
   });
 
   // 8. DELETE /api/v1/me/sessions
-  router.delete('/me/sessions', requireSession, requireCsrf, async (req, res, next) => {
+  router.delete(['/me/sessions', '/users/sessions'], requireSession, requireCsrf, async (req, res, next) => {
     try {
       const count = await deleteUserOtherSessions(GLOBAL_ORG_ID, req.session.user_id, req.session.id);
 
@@ -408,7 +440,7 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
     inapp_security: z.boolean().optional(),
   });
 
-  router.patch('/me/notifications', requireSession, requireCsrf, async (req, res, next) => {
+  router.patch(['/me/notifications', '/users/notifications'], requireSession, requireCsrf, async (req, res, next) => {
     try {
       const parsed = notificationSchema.safeParse(req.body);
       if (!parsed.success) {

@@ -39,6 +39,8 @@ async function createOrgUserAndSession(slugPrefix) {
       'content-type': 'application/json',
       'Cookie': `jp_sid=${sessionToken}`,
       'x-csrf-token': csrfToken,
+      'x-jobenpay-environment': 'SANDBOX',
+      'x-environment': 'SANDBOX',
     },
   };
 }

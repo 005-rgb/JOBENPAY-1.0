@@ -44,7 +44,7 @@ async function request(path, { method = 'GET', body, headers = {}, stepUpGrant }
   let cleanPath = path.startsWith('/api/v1') ? path : `/api/v1${path.startsWith('/') ? path : `/${path}`}`;
 
   // Attach environment header and query parameter for operational routes (skip global routes)
-  const GLOBAL_PREFIXES = ['/api/v1/org', '/api/v1/members', '/api/v1/billing', '/api/v1/auth'];
+  const GLOBAL_PREFIXES = ['/api/v1/org', '/api/v1/members', '/api/v1/billing', '/api/v1/auth', '/api/v1/me', '/api/v1/users'];
   const isGlobal = GLOBAL_PREFIXES.some((prefix) => cleanPath.startsWith(prefix));
   if (!isGlobal) {
     if (!requestHeaders.has('x-jobenpay-environment')) {
@@ -105,7 +105,7 @@ export const apiClient = {
     xhr.open('POST', cleanPath);
     xhr.withCredentials = true;
     if (csrfToken) xhr.setRequestHeader('x-csrf-token', csrfToken);
-    const GLOBAL_PREFIXES = ['/api/v1/org', '/api/v1/members', '/api/v1/billing', '/api/v1/auth'];
+    const GLOBAL_PREFIXES = ['/api/v1/org', '/api/v1/members', '/api/v1/billing', '/api/v1/auth', '/api/v1/me', '/api/v1/users'];
     const isGlobal = GLOBAL_PREFIXES.some((prefix) => cleanPath.startsWith(prefix));
     if (!isGlobal) {
       xhr.setRequestHeader('x-jobenpay-environment', currentEnvironment);
