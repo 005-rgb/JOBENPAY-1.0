@@ -9,16 +9,19 @@ import styles from './TransactionPages.module.css';
 /**
  * Circular score gauge for DIS (0 - 100)
  */
-export function DisGauge({ score = 0, size = 100 }) {
+export function DisGauge({ score = 0, size = 100, hard_rule_triggered = null, hardRule = null }) {
+  const hardRuleVal = hard_rule_triggered || hardRule;
+  const hasHardRule = Boolean(hardRuleVal && hardRuleVal !== 'NONE' && hardRuleVal !== 'DIP_LOW_SCORE');
+  const effectiveScore = hasHardRule ? 0 : score;
   const radius = size * 0.4;
   const strokeWidth = size * 0.08;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const strokeDashoffset = circumference - (effectiveScore / 100) * circumference;
 
-  let strokeColor = '#10b981'; // green >= 80
-  if (score < 50) {
-    strokeColor = '#ef4444'; // red < 50
-  } else if (score < 80) {
+  let strokeColor = '#10b981'; // green >= 80 and hard_rule_triggered === null
+  if (hasHardRule || effectiveScore < 50) {
+    strokeColor = '#ef4444'; // red < 50 or hard rule violation
+  } else if (effectiveScore < 80) {
     strokeColor = '#f59e0b'; // yellow 50-79
   }
 
@@ -48,10 +51,10 @@ export function DisGauge({ score = 0, size = 100 }) {
       </svg>
       <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <span style={{ fontSize: `${size * 0.28}px`, fontWeight: 'bold', color: strokeColor }}>
-          {score}
+          {effectiveScore}
         </span>
-        <span style={{ fontSize: `${size * 0.12}px`, color: 'var(--jp-text-muted)', textTransform: 'uppercase' }}>
-          / 100
+        <span style={{ fontSize: hasHardRule ? `${size * 0.09}px` : `${size * 0.12}px`, color: hasHardRule ? '#ef4444' : 'var(--jp-text-muted)', textTransform: 'uppercase', fontWeight: hasHardRule ? 'bold' : 'normal', textAlign: 'center', lineHeight: 1.1 }}>
+          {hasHardRule ? 'VIOLATION' : '/ 100'}
         </span>
       </div>
     </div>
@@ -112,6 +115,7 @@ export function DipDisplayCard({ requestId }) {
   ];
 
   const hardRule = dip.hard_rule_triggered;
+  const hasHardRuleViolation = Boolean(hardRule && hardRule !== 'DIP_LOW_SCORE');
   const isDanger = hardRule === 'DIP_EVIDENCE_INVALID' || hardRule === 'DIP_CRITICAL';
 
   return (
@@ -161,11 +165,11 @@ export function DipDisplayCard({ requestId }) {
       {/* Score and Component Breakdown Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: '24px', alignItems: 'center', margin: '20px 0' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <DisGauge score={dip.score} size={120} />
-          <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--jp-text)' }}>
-            DIS Score
+          <DisGauge score={dip.score} size={120} hard_rule_triggered={dip.hard_rule_triggered} />
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: hasHardRuleViolation ? '#ef4444' : 'var(--jp-text)' }}>
+            {hasHardRuleViolation ? 'VIOLATION DETECTED' : 'DIS Score'}
           </span>
-          <span className={`${styles.providerBadge} ${dip.score >= 80 ? styles.badgeSandbox : styles.badgeSimulated}`}>
+          <span className={`${styles.providerBadge} ${dip.score >= 80 && !hasHardRuleViolation ? styles.badgeSandbox : styles.badgeSimulated}`}>
             {dip.decision}
           </span>
         </div>
@@ -614,7 +618,7 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
   };
 
   // Compute simulated DIS score
-  const computedDisScore = Math.round(
+  const rawDisScore = Math.round(
     (0.15 * inspectPurpose +
      0.15 * inspectAmount +
      0.20 * inspectVendor +
@@ -623,8 +627,11 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
      0.20 * inspectEvidence) * 100
   );
 
-  let simulatedDecision = computedDisScore >= 80 ? 'AUTO_APPROVE' : computedDisScore >= 50 ? 'REQUIRE_APPROVAL' : 'REJECTED';
-  if (hardRuleTrigger !== 'NONE') {
+  const hasInspectorHardRule = hardRuleTrigger !== 'NONE';
+  const computedDisScore = hasInspectorHardRule ? 0 : rawDisScore;
+
+  let simulatedDecision = rawDisScore >= 80 ? 'AUTO_APPROVE' : rawDisScore >= 50 ? 'REQUIRE_APPROVAL' : 'REJECTED';
+  if (hasInspectorHardRule) {
     simulatedDecision = hardRuleTrigger === 'DIP_EVIDENCE_INVALID' ? 'REJECTED' : 'REQUIRE_APPROVAL';
   }
 
@@ -836,9 +843,9 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
           {/* Left: Gauge and Decision Summary */}
           <div className={styles.formCard} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>Decision Integrity Score (DIS)</h2>
-            <DisGauge score={computedDisScore} size={150} />
-            <div style={{ marginTop: '16px', fontSize: '18px', fontWeight: 'bold' }}>
-              {computedDisScore} / 100
+            <DisGauge score={computedDisScore} size={150} hard_rule_triggered={hardRuleTrigger !== 'NONE' ? hardRuleTrigger : null} />
+            <div style={{ marginTop: '16px', fontSize: '18px', fontWeight: 'bold', color: hasInspectorHardRule ? '#ef4444' : 'inherit' }}>
+              {hasInspectorHardRule ? 'VIOLATION DETECTED' : `${computedDisScore} / 100`}
             </div>
             <div style={{ marginTop: '8px' }}>
               <span className={`${styles.providerBadge} ${simulatedDecision === 'AUTO_APPROVE' ? styles.badgeSandbox : simulatedDecision === 'REQUIRE_APPROVAL' ? styles.badgeSimulated : styles.badgeFailed}`} style={{ fontSize: '13px', padding: '6px 14px' }}>

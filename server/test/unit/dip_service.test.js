@@ -245,8 +245,9 @@ test('PRD 1.6 §10.1 Decision Integrity Proof (DIP) Unit Tests', async (t) => {
       reasoningTrace,
     });
 
-    // Score is 90 (0.15+0.15+0.20+0+0.20+0.20 = 0.90)
-    assert.equal(dip.score, 90);
+    // Hard rule violation forces score to 0
+    // test-changed: PRD 1.6 & Zero-Leak requirement - hard rule violation forces DIS score to 0
+    assert.equal(dip.score, 0);
     // Hard rule brand mismatch triggers
     assert.equal(dip.hard_rule_triggered, 'DIP_BRAND_MISMATCH');
     assert.equal(dip.decision, 'REQUIRE_APPROVAL');

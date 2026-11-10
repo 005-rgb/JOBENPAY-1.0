@@ -495,8 +495,12 @@ export async function computeDecisionIntegrityScore({
     }
   }
 
+  // Force score to 0 if a deterministic hard rule is violated per PRD 1.6
+  const isHardRule = hardRuleTriggered && hardRuleTriggered !== 'DIP_LOW_SCORE';
+  const finalScore = isHardRule ? 0 : score;
+
   return {
-    score,
+    score: finalScore,
     components: {
       purpose: C_purpose,
       amount: C_amount,

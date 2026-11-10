@@ -89,7 +89,7 @@ export async function computeDIP(orgId, transaction, dbClient = null) {
       if (transaction.hard_rule_triggered === 'DIP_INDETERMINATE') {
         return { score: 0, decision: 'REQUIRE_APPROVAL', code: 'DIP_INDETERMINATE' };
       }
-      return { score, hard_rule_triggered: transaction.hard_rule_triggered, decision: 'REJECT', code: transaction.hard_rule_triggered };
+      return { score: 0, hard_rule_triggered: transaction.hard_rule_triggered, decision: 'REJECT', code: transaction.hard_rule_triggered };
     }
     if (score < 50) {
       return { score, decision: 'REJECT', code: 'DIP_CRITICAL' };
