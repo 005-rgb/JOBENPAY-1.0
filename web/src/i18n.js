@@ -65,6 +65,7 @@ const english = {
     organization: 'Organization',
     members: 'Members',
     paypalSandbox: 'PayPal Sandbox',
+    personalSettings: 'Personal Settings',
     security: 'Security',
     comingSoon: 'Coming soon',
     sandbox: 'SANDBOX',
@@ -403,6 +404,7 @@ const indonesian = {
     ...english.app,
     paymentOrchestration: 'Orkestrasi Pembayaran (POL)',
     securityHardening: 'Penguatan Keamanan (PRD 5.0)',
+    personalSettings: 'Pengaturan Pribadi',
   },
   transactions: {
     ...english.transactions,

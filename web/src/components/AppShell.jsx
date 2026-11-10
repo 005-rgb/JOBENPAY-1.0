@@ -24,6 +24,7 @@ import {
   Server,
   ShieldAlert,
   ShieldCheck,
+  User,
   Users,
   Wallet,
   X,
@@ -132,6 +133,7 @@ const navigation = [
     title: 'businessTools',
     icon: Grid,
     children: [
+      { title: 'personalSettings', path: '/settings/personal' },
       { title: 'organization', path: '/organization' },
       { title: 'members', path: '/members' },
       { title: 'paypalSandbox', path: '/settings/paypal' },
@@ -170,6 +172,7 @@ const routeTitles = [
   ['/mandates', 'mandates'],
   ['/payees', 'payees'],
   ['/settings/paypal', 'paypalSandbox'],
+  ['/settings/personal', 'personalSettings'],
   ['/settings/security', 'security'],
   ['/organization', 'organization'],
   ['/members', 'members'],
@@ -383,6 +386,7 @@ function AccountMenu({ t, user, org, csrfToken, onLogout }) {
             <Building2 aria-hidden="true" />{org?.name || 'JOBENPAY'}<Check aria-hidden="true" className={styles.menuCheck} />
           </DropdownMenu.Item>
           <DropdownMenu.Separator className={styles.menuSeparator} />
+          <DropdownMenu.Item asChild><RouterLink className={styles.menuItem} to="/settings/personal"><User aria-hidden="true" />{t('app.personalSettings')}</RouterLink></DropdownMenu.Item>
           <DropdownMenu.Item asChild><RouterLink className={styles.menuItem} to="/settings/security"><LockKeyhole aria-hidden="true" />{t('app.security')}</RouterLink></DropdownMenu.Item>
           <DropdownMenu.Label className={styles.menuLabel}>{t('app.language')}</DropdownMenu.Label>
           <DropdownMenu.Item className={styles.menuItem} disabled><Check aria-hidden="true" />{t('app.english')}</DropdownMenu.Item>

@@ -55,6 +55,7 @@ const MandatesPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => (
 const PayeeDetailPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.PayeeDetailPage })));
 const PayeesPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.PayeesPage })));
 const PaypalSettingsPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.PaypalSettingsPage })));
+const PersonalSettingsPage = lazy(() => import('./pages/PersonalSettingsPage.jsx'));
 const RequestDetailPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.RequestDetailPage })));
 const RequestsPage = lazy(() => import('./pages/F04Pages.jsx').then((pages) => ({ default: pages.RequestsPage })));
 const SecurityPage = lazy(() => import('./pages/FeaturePages.jsx').then((pages) => ({ default: pages.SecurityPage })));
@@ -149,6 +150,7 @@ function AuthenticatedApp() {
           <Route element={<PayeesPage initialCreate />} path="/payees/new" />
           <Route element={<PayeeDetailPage />} path="/payees/:id" />
           <Route element={<PaypalSettingsPage />} path="/settings/paypal" />
+          <Route element={<PersonalSettingsPage />} path="/settings/personal" />
           <Route element={<SecurityPage />} path="/settings/security" />
           <Route element={<RequireRole roles={['OWNER', 'ADMIN']}><OrganizationPage /></RequireRole>} path="/organization" />
           <Route element={<RequireRole roles={['OWNER', 'ADMIN']}><MembersPage /></RequireRole>} path="/members" />

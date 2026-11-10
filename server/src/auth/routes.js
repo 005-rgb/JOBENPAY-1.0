@@ -502,9 +502,9 @@ export function registerAuthRoutes(api) {
 
       await withTx(async (client) => {
         const userInsert = await client.query(
-          `INSERT INTO users (email, password_hash, display_name, email_verified_at, terms_accepted_at, terms_version)
-           VALUES ($1, $2, $3, now(), now(), '1.0')
-           RETURNING id, email, display_name`,
+          `INSERT INTO users (email, password_hash, display_name, email_verified_at, terms_accepted_at, terms_version, has_password)
+           VALUES ($1, $2, $3, now(), now(), '1.0', false)
+           RETURNING id, email, display_name, has_password`,
           [email, passwordHash, displayName],
         );
         createdUser = userInsert.rows[0];

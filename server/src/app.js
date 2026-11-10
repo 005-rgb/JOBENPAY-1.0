@@ -37,6 +37,7 @@ import { createIntentsRouter } from './routes/intents.js';
 import { createPactRouter } from './routes/pact.js';
 import { createOrganizationRouter } from './routes/organization.js';
 import { createMembersRouter } from './routes/members.js';
+import { createPersonalSettingsRouter } from './routes/personal_settings.js';
 import {
   createPublicProtocolRouter,
   createTenantProofsRouter,
@@ -113,7 +114,7 @@ import {
   markDocumentDeleted,
 } from './repositories/documents.js';
 import { consumeGrant, createGrant, useGrant } from './repositories/stepUp.js';
-import { createSession, deleteSession, findSessionByCookie } from './repositories/sessions.js';
+import { createSession, deleteSession, findSessionByCookie, touchSession } from './repositories/sessions.js';
 import { createUser, findUserByEmail, findUserById, recordLoginFailure, resetLoginFailure } from './repositories/users.js';
 import { enqueue, queueStats } from './jobs/queue.js';
 import { agentAuth } from './auth/agentAuth.js';
@@ -349,6 +350,11 @@ function requireSession(req, _res, next) {
 
       await enforceRateLimit(`session:${session.id}`, 300, 60);
       req.session = session;
+      const ua = req.get('user-agent') || null;
+      const ip = req.ip || req.socket?.remoteAddress || null;
+      if (ua && (!session.user_agent || !session.ip_address)) {
+        touchSession(GLOBAL_ORG_ID, session.id, { userAgent: ua, ipAddress: ip }).catch(() => {});
+      }
       next();
     })
     .catch((err) => next(err));
@@ -663,6 +669,7 @@ export function createApp() {
   api.use('/webhooks', webhooksRouter);
   api.use(createDxRouter({ requireSession, requireCsrf }));
   api.use(createSecurityRouter({ requireSession, requireRole, requireCsrf }));
+  api.use(createPersonalSettingsRouter({ requireSession, requireCsrf }));
 
   api.get('/developer/info', requireSession, (_req, res) => res.status(200).json({
     mcpUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/mcp`,
@@ -2025,6 +2032,10 @@ export function createApp() {
           id: user.id,
           email: user.email,
           display_name: user.display_name,
+          job_title: user.job_title || null,
+          avatar_url: user.avatar_url || null,
+          has_password: Boolean(user.has_password),
+          totp_enabled: Boolean(user.totp_enabled),
         },
         org: org ? { id: org.id, name: org.name, frozen: Boolean(org.frozen_at) } : null,
         role: effectiveRole(membership, org?.slug) || 'VIEWER',
