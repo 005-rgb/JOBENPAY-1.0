@@ -1,3 +1,4 @@
+import logoUrl from '../assets/jobenpay-logo.svg';
 import styles from './BrandLoadingScreen.module.css';
 
 export function BrandLoadingScreen({
@@ -18,7 +19,7 @@ export function BrandLoadingScreen({
         <img
           alt="JOBENPAY"
           className={styles.pulseMark}
-          src="/jp-pulse.svg"
+          src={logoUrl}
         />
         <p className={styles.loadingText}>{text}</p>
       </div>
