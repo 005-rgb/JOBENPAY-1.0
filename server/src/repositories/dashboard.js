@@ -126,6 +126,7 @@ export async function getDashboardSummary(orgId, dbOrEnv = pool, maybeEnv = 'SAN
     },
     budgetUsedPct: row.budget_used_pct,
     paypalConnected,
+    isPaypalConnected: paypalConnected,
     hasAgent,
     totalAgents: row.total_agents,
     hasActiveMandate,
@@ -134,6 +135,7 @@ export async function getDashboardSummary(orgId, dbOrEnv = pool, maybeEnv = 'SAN
     recentTransactions: row.recent_transactions || [],
     setupReadiness: {
       paypalConnected,
+      isPaypalConnected: paypalConnected,
       hasAgent,
       hasActiveMandate,
       completedCount: completedSetupCount,

@@ -46,10 +46,21 @@ export function validatePolicy(policy) {
 }
 
 export async function createMandate(tx, { orgId, agentId, name, policy, purposeText, promptVersion, environment }) {
+  const targetEnv = (environment || 'SANDBOX').toUpperCase();
+  const agentCheck = await tx.query(
+    'SELECT environment FROM agents WHERE org_id = $1 AND (id = $2 OR agent_id = $2) LIMIT 1',
+    [orgId, agentId],
+  );
+  if (agentCheck.rows[0] && agentCheck.rows[0].environment !== targetEnv) {
+    const err = new AppError('CROSS_ENVIRONMENT_MANDATE_BLOCKED', 422, 'Cannot assign an agent from a different environment.');
+    err.code = 'CROSS_ENVIRONMENT_MANDATE_BLOCKED';
+    err.statusCode = 422;
+    throw err;
+  }
   const parsed = validatePolicy(policy);
   const mandate = await tx.query(
     `INSERT INTO mandates (org_id, agent_id, name, status, environment) VALUES ($1, $2, $3, 'DRAFT', $4) RETURNING *`,
-    [orgId, agentId, name, environment || 'SANDBOX'],
+    [orgId, agentId, name, targetEnv],
   );
   const version = await tx.query(
     `INSERT INTO mandate_versions (org_id, mandate_id, version, purpose_text, policy, prompt_version, valid_from, valid_to)

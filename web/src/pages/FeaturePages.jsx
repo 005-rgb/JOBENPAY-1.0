@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Circle,
   CircleDollarSign,
   Database,
   Ellipsis,
@@ -376,7 +377,7 @@ export function DashboardPage() {
 
   const summaryQuery = usePageQuery(
     ['dashboard', 'summary', environment],
-    () => apiClient.get('/dashboard/summary', {
+    () => apiClient.get(`/dashboard/summary?environment=${encodeURIComponent(environment)}`, {
       headers: {
         'x-jobenpay-environment': environment,
         'x-environment': environment,
@@ -413,30 +414,30 @@ export function DashboardPage() {
   const setupCards = [
     {
       key: 'paypal',
-      title: `Connect PayPal ${isLive ? 'Live' : 'Sandbox'}`,
+      title: isLive ? 'Connect PayPal Live' : 'Connect PayPal Sandbox',
       description: isLive
         ? 'Connect a live PayPal production account to execute real transactions.'
         : t('app.connectSandboxDescription'),
       to: '/settings/paypal',
-      done: Boolean(data.paypalConnected),
+      done: Boolean(data?.isPaypalConnected ?? data?.paypalConnected),
     },
     {
       key: 'agent',
-      title: t('app.createAgent'),
+      title: isLive ? 'Create an agent in Live' : t('app.createAgent'),
       description: isLive
         ? 'Create an agent for live operation before assigning a mandate.'
         : t('app.createAgentDescription'),
       to: '/agents',
-      done: Boolean(data.hasAgent),
+      done: Boolean(data?.hasAgent),
     },
     {
       key: 'mandate',
-      title: t('app.activateMandate'),
+      title: isLive ? 'Activate a mandate in Live' : t('app.activateMandate'),
       description: isLive
         ? 'Set guarded limits before a live agent can propose a transaction.'
         : t('app.activateMandateDescription'),
       to: '/mandates',
-      done: Boolean(data.hasActiveMandate),
+      done: Boolean(data?.hasActiveMandate),
     },
   ];
   const quickLinks = [
@@ -484,27 +485,28 @@ export function DashboardPage() {
       ) : null}
 
       <section aria-label={t('app.setupCards')} className={styles.setupCards}>
-        {setupCards.filter((card) => !card.done).map((card) => (
-          <Card className={styles.setupCard} key={card.key} padding="tile">
-            <div className={styles.setupCardTop}>
-              <span aria-hidden="true" className={styles.setupIcon}><Plus /></span>
-              <button
-                aria-label={`${card.title} ${t('app.actions')}`}
-                className={styles.iconAction}
-                type="button"
-                onClick={() => navigate(card.to)}
-              >
-                <ChevronRight />
-              </button>
-            </div>
-            <Link to={card.to}>{card.title}</Link>
-            <p>{card.description}</p>
-          </Card>
-        ))}
-        {setupCards.filter((card) => card.done).map((card) => (
-          <Card className={`${styles.setupCard} ${styles.setupComplete}`} key={card.key} padding="tile">
-            <span className={styles.completedText}><Check aria-hidden="true" />{card.title}</span>
-          </Card>
+        {setupCards.map((card) => (
+          card.done ? (
+            <Card className={`${styles.setupCard} ${styles.setupComplete}`} key={card.key} padding="tile">
+              <span className={styles.completedText}><Check aria-hidden="true" />{card.title}</span>
+            </Card>
+          ) : (
+            <Card className={styles.setupCard} key={card.key} padding="tile">
+              <div className={styles.setupCardTop}>
+                <span aria-hidden="true" className={styles.setupIcon}><Circle size={14} className={styles.emptyDot} /></span>
+                <button
+                  aria-label={`${card.title} ${t('app.actions')}`}
+                  className={styles.iconAction}
+                  type="button"
+                  onClick={() => navigate(card.to)}
+                >
+                  <ChevronRight />
+                </button>
+              </div>
+              <Link to={card.to}>{card.title}</Link>
+              <p>{card.description}</p>
+            </Card>
+          )
         ))}
       </section>
 

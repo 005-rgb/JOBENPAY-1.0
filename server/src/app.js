@@ -959,7 +959,8 @@ export function createApp() {
   api.get('/dashboard/summary', requireSession, async (req, res, next) => {
     try {
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const summary = await getDashboardSummary(orgId, undefined, req.environment || 'SANDBOX');
+      const environment = (req.headers['x-jobenpay-environment'] || req.query?.environment || req.environment || 'SANDBOX').toUpperCase();
+      const summary = await getDashboardSummary(orgId, undefined, environment);
       const sessionUser = await loadSessionUser(req);
       const role = effectiveRole(sessionUser?.membership, sessionUser?.org?.slug);
       if (['OWNER', 'ADMIN', 'JUDGE'].includes(role)) {

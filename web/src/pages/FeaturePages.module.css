@@ -713,6 +713,10 @@
   justify-content: center;
 }
 
+.emptyDot {
+  color: var(--jp-text-muted);
+}
+
 .completedText {
   align-items: center;
   color: var(--jp-success);

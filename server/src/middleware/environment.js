@@ -12,6 +12,9 @@ export const GLOBAL_ROUTES = [
 
 export const OPERATIONAL_ROUTES = [
   '/api/v1/agents',
+  '/api/v1/dashboard',
+  '/api/v1/mandates',
+  '/api/v1/transactions',
 ];
 
 /**
@@ -31,7 +34,13 @@ export function environmentMiddleware(req, res, next) {
 
   if (isOperationalRoute) {
     if (!envUpper || !VALID_ENVIRONMENTS.has(envUpper)) {
-      return next(new AppError('ENVIRONMENT_HEADER_MISSING', 400, 'X-Jobenpay-Environment header is missing or invalid.'));
+      if (req.path.startsWith('/api/v1/agents')) {
+        return next(new AppError('ENVIRONMENT_HEADER_MISSING', 400, 'X-Jobenpay-Environment header is missing or invalid.'));
+      }
+      req.environment = 'SANDBOX';
+      res.setHeader('X-Jobenpay-Environment', req.environment);
+      res.setHeader('X-Environment', req.environment);
+      return next();
     }
     req.environment = envUpper;
     res.setHeader('X-Jobenpay-Environment', req.environment);

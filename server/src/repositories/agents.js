@@ -1,4 +1,5 @@
 import pool from '../db/pool.js';
+import { AppError } from '../lib/errors.js';
 
 function assertOrgId(orgId) {
   if (!orgId) {
@@ -6,18 +7,30 @@ function assertOrgId(orgId) {
   }
 }
 
-export async function listAgents(orgId, db = pool, environment = null) {
+export async function listAgents(orgId, dbOrEnv = pool, maybeEnv = null) {
   assertOrgId(orgId);
-  let query = `SELECT COALESCE(agent_id, id) AS agent_id, id, org_id, name, description, status, environment, created_at
-     FROM agents
-     WHERE org_id = $1`;
-  const params = [orgId];
-  if (environment) {
-    query += ` AND environment = $2`;
-    params.push(environment);
+  let db = pool;
+  let environment = null;
+  if (typeof dbOrEnv === 'string') {
+    environment = dbOrEnv;
+    db = maybeEnv || pool;
+  } else {
+    db = dbOrEnv || pool;
+    environment = maybeEnv;
   }
-  query += ` ORDER BY created_at DESC, id`;
-  const result = await db.query(query, params);
+
+  if (!environment || typeof environment !== 'string' || !environment.trim()) {
+    const err = new AppError('ENVIRONMENT_REQUIRED', 400, 'Environment parameter is required for listAgents.');
+    err.code = 'ENVIRONMENT_REQUIRED';
+    throw err;
+  }
+
+  const env = environment.trim().toUpperCase();
+  const query = `SELECT COALESCE(agent_id, id) AS agent_id, id, org_id, name, description, status, environment, created_at
+     FROM agents
+     WHERE org_id = $1 AND environment = $2
+     ORDER BY created_at DESC, id`;
+  const result = await db.query(query, [orgId, env]);
   return result.rows;
 }
 
