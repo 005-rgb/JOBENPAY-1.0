@@ -279,12 +279,17 @@ export async function appendEntry(tx, optionsOrOrgId, maybePayload) {
     .digest('hex');
   const signature = signEd25519(privateKey, entryHash);
   const finalEntryId = entryId || crypto.randomUUID();
+  const entryEnv = (
+    (typeof optionsOrOrgId === 'object' && optionsOrOrgId?.environment) ||
+    (typeof maybePayload === 'object' && maybePayload?.environment) ||
+    'SANDBOX'
+  ).toUpperCase();
 
   await tx.query(
     `INSERT INTO ledger_entries (
-      org_id, seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, signing_key_id, created_at, entry_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-    [orgId, seq, type, subjectType ?? null, subjectId ?? null, payload ?? {}, prevHash, entryHash, signature, kid, signingKeyId, createdAtIso, finalEntryId],
+      org_id, seq, type, subject_type, subject_id, payload, prev_hash, entry_hash, signature, kid, signing_key_id, created_at, entry_id, environment
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+    [orgId, seq, type, subjectType ?? null, subjectId ?? null, payload ?? {}, prevHash, entryHash, signature, kid, signingKeyId, createdAtIso, finalEntryId, entryEnv],
   );
 
   await tx.query(

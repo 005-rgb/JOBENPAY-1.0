@@ -1,7 +1,21 @@
 import pool from '../db/pool.js';
+import { AppError } from '../lib/errors.js';
 
 function assertOrgId(orgId) {
   if (!orgId) throw new Error('orgId is required for document repository methods.');
+}
+
+function resolveDbAndEnv(dbOrEnv, maybeEnv) {
+  let db = pool;
+  let environment = null;
+  if (typeof dbOrEnv === 'string') {
+    environment = dbOrEnv;
+    db = maybeEnv || pool;
+  } else {
+    db = dbOrEnv || pool;
+    environment = maybeEnv;
+  }
+  return { db, environment };
 }
 
 export async function createDocument(orgId, {
@@ -26,44 +40,59 @@ export async function createDocument(orgId, {
   return result.rows[0];
 }
 
-export async function listDocuments(orgId, db = pool, environment = null) {
+export async function listDocuments(orgId, dbOrEnv = pool, maybeEnv = null) {
   assertOrgId(orgId);
-  const conditions = ['org_id = $1'];
-  const params = [orgId];
-  if (environment) {
-    conditions.push('environment = $2');
-    params.push(String(environment).toUpperCase());
+  const { db, environment } = resolveDbAndEnv(dbOrEnv, maybeEnv);
+  if (!environment || typeof environment !== 'string' || !environment.trim()) {
+    const err = new AppError('ENVIRONMENT_REQUIRED', 400, 'Environment parameter is required for listDocuments.');
+    err.code = 'ENVIRONMENT_REQUIRED';
+    throw err;
   }
+  const env = environment.trim().toUpperCase();
   const result = await db.query(`
-    SELECT id, created_at, uploader_kind, filename, mime, size, sha256, status, injection_flags
+    SELECT id, created_at, uploader_kind, filename, mime, size, sha256, status, injection_flags, environment
     FROM documents
-    WHERE ${conditions.join(' AND ')}
+    WHERE org_id = $1 AND environment = $2
     ORDER BY created_at DESC, id
     LIMIT 100
-  `, params);
+  `, [orgId, env]);
   return result.rows;
 }
 
-export async function getDocument(orgId, documentId, db = pool) {
+export async function getDocument(orgId, documentId, dbOrEnv = pool, maybeEnv = null) {
   assertOrgId(orgId);
+  const { db, environment } = resolveDbAndEnv(dbOrEnv, maybeEnv);
+  const conditions = ['org_id = $1', 'id = $2'];
+  const params = [orgId, documentId];
+  if (environment) {
+    conditions.push('environment = $3');
+    params.push(String(environment).toUpperCase());
+  }
   const result = await db.query(`
     SELECT id, created_at, org_id, uploader_kind, uploader_id, filename, mime, size,
-           sha256, storage_key, status, injection_flags
+           sha256, storage_key, status, injection_flags, environment
     FROM documents
-    WHERE org_id = $1 AND id = $2
+    WHERE ${conditions.join(' AND ')}
     LIMIT 1
-  `, [orgId, documentId]);
+  `, params);
   return result.rows[0] ?? null;
 }
 
-export async function findDocumentByHash(orgId, sha256, db = pool) {
+export async function findDocumentByHash(orgId, sha256, dbOrEnv = pool, maybeEnv = null) {
   assertOrgId(orgId);
+  const { db, environment } = resolveDbAndEnv(dbOrEnv, maybeEnv);
+  const params = [orgId, sha256];
+  let envFilter = '';
+  if (environment) {
+    params.push(String(environment).toUpperCase());
+    envFilter = ` AND environment = $${params.length}`;
+  }
   const result = await db.query(`
-    SELECT id
+    SELECT id, environment
     FROM documents
-    WHERE org_id = $1 AND sha256 = $2 AND status <> 'DELETED'
+    WHERE org_id = $1 AND sha256 = $2 AND status <> 'DELETED'${envFilter}
     LIMIT 1
-  `, [orgId, sha256]);
+  `, params);
   return result.rows[0] ?? null;
 }
 
@@ -128,13 +157,20 @@ export async function updateDocumentAnalysis(orgId, documentId, {
   return true;
 }
 
-export async function markDocumentDeleted(orgId, documentId, db = pool) {
+export async function markDocumentDeleted(orgId, documentId, dbOrEnv = pool, maybeEnv = null) {
   assertOrgId(orgId);
+  const { db, environment } = resolveDbAndEnv(dbOrEnv, maybeEnv);
+  const params = [orgId, documentId];
+  let envFilter = '';
+  if (environment) {
+    params.push(String(environment).toUpperCase());
+    envFilter = ` AND environment = $${params.length}`;
+  }
   const result = await db.query(`
     UPDATE documents
     SET status = 'DELETED'
-    WHERE org_id = $1 AND id = $2 AND status <> 'DELETED'
+    WHERE org_id = $1 AND id = $2 AND status <> 'DELETED'${envFilter}
     RETURNING id, sha256, storage_key
-  `, [orgId, documentId]);
+  `, params);
   return result.rows[0] ?? null;
 }

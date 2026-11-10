@@ -86,6 +86,7 @@ export async function decideApproval({
   decision,
   comment = '',
   stepUpGrantId,
+  environment = null,
 }, { db } = {}) {
   requireId(orgId, 'orgId');
   requireId(userId, 'userId');
@@ -106,11 +107,17 @@ export async function decideApproval({
 
   const result = await withTx(async (tx) => {
     const approvalResult = await tx.query(
-      'SELECT * FROM approvals WHERE org_id = $1 AND id = $2 FOR UPDATE',
+      `SELECT a.*, ti.environment
+       FROM approvals a
+       JOIN transaction_intents ti ON ti.org_id = a.org_id AND ti.intent_id = a.request_id
+       WHERE a.org_id = $1 AND a.id = $2 FOR UPDATE`,
       [orgId, approvalId],
     );
     const approval = approvalResult.rows[0];
     if (!approval) throw approvalError('NOT_FOUND', 'Approval not found.', 404);
+    if (environment && approval.environment !== String(environment).toUpperCase()) {
+      throw approvalError('NOT_FOUND', 'Approval not found.', 404);
+    }
     if (approval.status !== 'PENDING') {
       throw approvalError('ALREADY_DECIDED', 'This approval has already been decided.', 409);
     }
@@ -242,7 +249,7 @@ export async function decideApproval({
   return result;
 }
 
-export async function cancelRequest(orgId, requestId, userId, { db } = {}) {
+export async function cancelRequest(orgId, requestId, userId, { db, environment = null } = {}) {
   const result = await withTx(async (tx) => {
     await tx.query(
       `SELECT id FROM approvals
@@ -251,11 +258,16 @@ export async function cancelRequest(orgId, requestId, userId, { db } = {}) {
       [orgId, requestId],
     );
     const locked = await tx.query(
-      'SELECT * FROM payment_requests WHERE org_id = $1 AND id = $2 FOR UPDATE',
+      `SELECT r.*, ti.environment FROM payment_requests r
+       JOIN transaction_intents ti ON ti.org_id = r.org_id AND ti.intent_id = r.id
+       WHERE r.org_id = $1 AND r.id = $2 FOR UPDATE`,
       [orgId, requestId],
     );
     const request = locked.rows[0];
     if (!request) throw approvalError('NOT_FOUND', 'Request not found.', 404);
+    if (environment && request.environment !== String(environment).toUpperCase()) {
+      throw approvalError('NOT_FOUND', 'Request not found.', 404);
+    }
     if (!['PENDING_APPROVAL', 'APPROVED'].includes(request.status)) {
       throw approvalError('ALREADY_DECIDED', 'This request cannot be cancelled in its current state.', 409);
     }

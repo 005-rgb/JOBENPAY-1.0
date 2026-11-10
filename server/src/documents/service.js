@@ -9,6 +9,7 @@ export async function persistStoredDocument(stored, {
   orgId,
   uploaderKind = 'USER',
   uploaderId,
+  environment = 'SANDBOX',
   db = pool,
 }) {
   if (!orgId || !uploaderId) {
@@ -25,6 +26,7 @@ export async function persistStoredDocument(stored, {
         size: stored.size,
         sha256: stored.sha256,
         storageKey: stored.storageKey,
+        environment: (environment || 'SANDBOX').toUpperCase(),
       }, tx);
       await appendEntry(tx, {
         orgId,

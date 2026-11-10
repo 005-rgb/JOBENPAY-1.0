@@ -96,14 +96,26 @@ export async function addMandateVersion(tx, { orgId, mandateId, policy, purposeT
   return publicPolicyRow(version.rows[0]);
 }
 
-export async function getMandate(orgId, mandateId, db = query, environment = null) {
-  const conditions = ['m.org_id = $1', 'm.id = $2'];
-  const params = [orgId, mandateId];
-  if (environment) {
-    conditions.push('m.environment = $3');
-    params.push(String(environment).toUpperCase());
+export async function getMandate(orgId, mandateId, dbOrEnv = query, maybeEnv = null) {
+  let db = query;
+  let environment = null;
+  if (typeof dbOrEnv === 'string') {
+    environment = dbOrEnv;
+    db = maybeEnv || query;
+  } else {
+    db = dbOrEnv || query;
+    environment = maybeEnv;
   }
-  const result = await db(
+  if (!environment || typeof environment !== 'string' || !environment.trim()) {
+    const err = new AppError('ENVIRONMENT_REQUIRED', 400, 'Environment parameter is required for getMandate.');
+    err.code = 'ENVIRONMENT_REQUIRED';
+    throw err;
+  }
+  const env = environment.trim().toUpperCase();
+  const conditions = ['m.org_id = $1', 'm.id = $2', 'm.environment = $3'];
+  const params = [orgId, mandateId, env];
+  const queryFn = typeof db === 'function' ? db : (sql, p) => db.query(sql, p);
+  const result = await queryFn(
     `SELECT m.*, v.id AS version_id, v.version, v.purpose_text, v.policy, v.policy_canonical,
             v.policy_hash, v.signature, v.signing_kid, v.activated_by, v.activated_at,
             v.valid_from, v.valid_to, v.prompt_version, v.created_at AS version_created_at
@@ -113,7 +125,7 @@ export async function getMandate(orgId, mandateId, db = query, environment = nul
   );
   if (!result.rows[0]) return null;
   const row = result.rows[0];
-  const versions = await db(
+  const versions = await queryFn(
     `SELECT * FROM mandate_versions
      WHERE org_id = $1 AND mandate_id = $2
      ORDER BY version DESC`,
@@ -126,18 +138,28 @@ export async function getMandate(orgId, mandateId, db = query, environment = nul
   };
 }
 
-export async function listMandates(orgId, db = { query }, environment = null) {
-  const conditions = ['m.org_id = $1'];
-  const params = [orgId];
-  if (environment) {
-    conditions.push('m.environment = $2');
-    params.push(String(environment).toUpperCase());
+export async function listMandates(orgId, dbOrEnv = { query }, maybeEnv = null) {
+  let db = { query };
+  let environment = null;
+  if (typeof dbOrEnv === 'string') {
+    environment = dbOrEnv;
+    db = maybeEnv || { query };
+  } else {
+    db = dbOrEnv || { query };
+    environment = maybeEnv;
   }
-  const result = await db.query(
+  if (!environment || typeof environment !== 'string' || !environment.trim()) {
+    const err = new AppError('ENVIRONMENT_REQUIRED', 400, 'Environment parameter is required for listMandates.');
+    err.code = 'ENVIRONMENT_REQUIRED';
+    throw err;
+  }
+  const env = environment.trim().toUpperCase();
+  const queryFn = typeof db === 'function' ? db : (sql, p) => db.query(sql, p);
+  const result = await queryFn(
     `SELECT m.*, v.version, v.policy, v.activated_at
      FROM mandates m LEFT JOIN mandate_versions v ON v.id = m.current_version_id
-     WHERE ${conditions.join(' AND ')} ORDER BY m.created_at DESC, m.id`,
-    params,
+     WHERE m.org_id = $1 AND m.environment = $2 ORDER BY m.created_at DESC, m.id`,
+    [orgId, env],
   );
   return result.rows;
 }
@@ -159,8 +181,8 @@ export async function activateMandate(tx, {
   if (!version || version.id !== versionId) throw mandateError('VALIDATION_FAILED', 'Only the latest mandate version can be activated.', 409);
   if (version.activated_at) throw mandateError('VALIDATION_FAILED', 'An activated mandate version is immutable; create a new version.', 409);
   const other = await tx.query(
-    `SELECT id FROM mandates WHERE org_id = $1 AND agent_id = $2 AND status = 'ACTIVE' AND id <> $3 FOR UPDATE`,
-    [orgId, mandate.agent_id, mandateId],
+    `SELECT id FROM mandates WHERE org_id = $1 AND agent_id = $2 AND environment = $4 AND status = 'ACTIVE' AND id <> $3 FOR UPDATE`,
+    [orgId, mandate.agent_id, mandateId, mandate.environment],
   );
   if (other.rowCount) throw mandateError('MANDATE_ALREADY_ACTIVE', 'The agent already has an active mandate.', 409);
   if (!systemActor) {

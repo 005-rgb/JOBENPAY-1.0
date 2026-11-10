@@ -1,12 +1,32 @@
 import pool from '../db/pool.js';
 import { parsePage, pageResult } from '../lib/cursor.js';
+import { AppError } from '../lib/errors.js';
 
 function assertOrgId(orgId) {
   if (!orgId) throw new Error('orgId is required for approval repository methods.');
 }
 
-export async function listApprovals(orgId, { limit, cursor, status = 'PENDING' } = {}, db = pool) {
+function resolveDbAndEnv(dbOrEnv, maybeEnv) {
+  let db = pool;
+  let environment = null;
+  if (typeof dbOrEnv === 'string') {
+    environment = dbOrEnv;
+    db = maybeEnv || pool;
+  } else {
+    db = dbOrEnv || pool;
+    environment = maybeEnv;
+  }
+  return { db, environment };
+}
+
+export async function listApprovals(orgId, { limit, cursor, status = 'PENDING', environment = null } = {}, db = pool) {
   assertOrgId(orgId);
+  if (!environment || typeof environment !== 'string' || !environment.trim()) {
+    const err = new AppError('ENVIRONMENT_REQUIRED', 400, 'Environment parameter is required for listApprovals.');
+    err.code = 'ENVIRONMENT_REQUIRED';
+    throw err;
+  }
+  const env = environment.trim().toUpperCase();
   const page = parsePage({ limit, cursor });
   const result = await db.query(
     `SELECT a.id, a.request_id, a.status, a.step_up_required, a.request_hash, a.expires_at,
@@ -15,13 +35,14 @@ export async function listApprovals(orgId, { limit, cursor, status = 'PENDING' }
             payee.display_name AS payee_name, r.decision, r.reason_codes
      FROM approvals a
      JOIN payment_requests r ON r.org_id = a.org_id AND r.id = a.request_id
-     JOIN agents agent ON agent.org_id = r.org_id AND agent.id = r.agent_id
-     LEFT JOIN payees payee ON payee.org_id = r.org_id AND payee.id = r.payee_id
-     WHERE a.org_id = $1 AND ($2::text IS NULL OR a.status = $2)
+     JOIN transaction_intents ti ON ti.org_id = a.org_id AND ti.intent_id = a.request_id
+     JOIN agents agent ON agent.org_id = r.org_id AND agent.id = r.agent_id AND agent.environment = $6
+     LEFT JOIN payees payee ON payee.org_id = r.org_id AND payee.id = r.payee_id AND payee.environment = $6
+     WHERE a.org_id = $1 AND ti.environment = $6 AND ($2::text IS NULL OR a.status = $2)
        AND ($3::timestamptz IS NULL OR (a.created_at, a.id) < ($3, $4::uuid))
      ORDER BY a.created_at DESC, a.id DESC
      LIMIT $5`,
-    [orgId, status || null, page.cursor?.createdAt ?? null, page.cursor?.id ?? null, page.limit + 1],
+    [orgId, status || null, page.cursor?.createdAt ?? null, page.cursor?.id ?? null, page.limit + 1, env],
   );
   const resultPage = pageResult(result.rows, page.limit);
   return {
@@ -30,8 +51,15 @@ export async function listApprovals(orgId, { limit, cursor, status = 'PENDING' }
   };
 }
 
-export async function getApprovalDetail(orgId, approvalId, db = pool) {
+export async function getApprovalDetail(orgId, approvalId, dbOrEnv = pool, maybeEnv = null) {
   assertOrgId(orgId);
+  const { db, environment } = resolveDbAndEnv(dbOrEnv, maybeEnv);
+  if (!environment || typeof environment !== 'string' || !environment.trim()) {
+    const err = new AppError('ENVIRONMENT_REQUIRED', 400, 'Environment parameter is required for getApprovalDetail.');
+    err.code = 'ENVIRONMENT_REQUIRED';
+    throw err;
+  }
+  const env = environment.trim().toUpperCase();
   const result = await db.query(
     `SELECT a.id AS approval_id, a.org_id, a.request_id, a.status AS approval_status,
             a.step_up_required, a.request_hash AS approval_request_hash, a.expires_at,
@@ -51,21 +79,22 @@ export async function getApprovalDetail(orgId, approvalId, db = pool) {
             bp.limit_minor, bp.reserved_minor, bp.spent_minor, bp.period_start, bp.period_end
      FROM approvals a
      JOIN payment_requests r ON r.org_id = a.org_id AND r.id = a.request_id
-     JOIN agents agent ON agent.org_id = r.org_id AND agent.id = r.agent_id
-     LEFT JOIN payees payee ON payee.org_id = r.org_id AND payee.id = r.payee_id
-     LEFT JOIN documents d ON d.org_id = r.org_id AND d.id = r.document_id
+     JOIN transaction_intents ti ON ti.org_id = a.org_id AND ti.intent_id = a.request_id
+     JOIN agents agent ON agent.org_id = r.org_id AND agent.id = r.agent_id AND agent.environment = $3
+     LEFT JOIN payees payee ON payee.org_id = r.org_id AND payee.id = r.payee_id AND payee.environment = $3
+     LEFT JOIN documents d ON d.org_id = r.org_id AND d.id = r.document_id AND d.environment = $3
      LEFT JOIN document_extractions de ON de.org_id = d.org_id AND de.document_id = d.id
      LEFT JOIN mandate_versions mv ON mv.org_id = r.org_id AND mv.id = r.mandate_version_id
-     LEFT JOIN mandates m ON m.org_id = mv.org_id AND m.id = mv.mandate_id
+     LEFT JOIN mandates m ON m.org_id = mv.org_id AND m.id = mv.mandate_id AND m.environment = $3
      LEFT JOIN LATERAL (
        SELECT limit_minor, reserved_minor, spent_minor, period_start, period_end
        FROM mandate_budget_periods
        WHERE org_id = r.org_id AND version_id = r.mandate_version_id
        ORDER BY period_start DESC LIMIT 1
      ) bp ON true
-     WHERE a.org_id = $1 AND a.id = $2
+     WHERE a.org_id = $1 AND a.id = $2 AND ti.environment = $3
      LIMIT 1`,
-    [orgId, approvalId],
+    [orgId, approvalId, env],
   );
   const row = result.rows[0];
   if (!row) return null;

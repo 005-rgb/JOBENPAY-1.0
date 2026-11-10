@@ -7,8 +7,7 @@ function assertOrgId(orgId) {
   }
 }
 
-export async function listAgents(orgId, dbOrEnv = pool, maybeEnv = null) {
-  assertOrgId(orgId);
+function resolveDbAndEnv(dbOrEnv, maybeEnv) {
   let db = pool;
   let environment = null;
   if (typeof dbOrEnv === 'string') {
@@ -18,6 +17,12 @@ export async function listAgents(orgId, dbOrEnv = pool, maybeEnv = null) {
     db = dbOrEnv || pool;
     environment = maybeEnv;
   }
+  return { db, environment };
+}
+
+export async function listAgents(orgId, dbOrEnv = pool, maybeEnv = null) {
+  assertOrgId(orgId);
+  const { db, environment } = resolveDbAndEnv(dbOrEnv, maybeEnv);
 
   if (!environment || typeof environment !== 'string' || !environment.trim()) {
     const err = new AppError('ENVIRONMENT_REQUIRED', 400, 'Environment parameter is required for listAgents.');
@@ -34,18 +39,20 @@ export async function listAgents(orgId, dbOrEnv = pool, maybeEnv = null) {
   return result.rows;
 }
 
-export async function getAgent(orgId, agentId, db = pool, environment = null) {
+export async function getAgent(orgId, agentId, dbOrEnv = pool, maybeEnv = null) {
   assertOrgId(orgId);
-  let query = `SELECT COALESCE(agent_id, id) AS agent_id, id, org_id, name, description, status, environment, created_at
-     FROM agents
-     WHERE org_id = $1 AND (id = $2 OR agent_id = $2)`;
-  const params = [orgId, agentId];
-  if (environment) {
-    query += ` AND environment = $3`;
-    params.push(environment);
+  const { db, environment } = resolveDbAndEnv(dbOrEnv, maybeEnv);
+  if (!environment || typeof environment !== 'string' || !environment.trim()) {
+    const err = new AppError('ENVIRONMENT_REQUIRED', 400, 'Environment parameter is required for getAgent.');
+    err.code = 'ENVIRONMENT_REQUIRED';
+    throw err;
   }
-  query += ` LIMIT 1`;
-  const result = await db.query(query, params);
+  const env = environment.trim().toUpperCase();
+  const query = `SELECT COALESCE(agent_id, id) AS agent_id, id, org_id, name, description, status, environment, created_at
+     FROM agents
+     WHERE org_id = $1 AND (id = $2 OR agent_id = $2) AND environment = $3
+     LIMIT 1`;
+  const result = await db.query(query, [orgId, agentId, env]);
   return result.rows[0] ?? null;
 }
 
@@ -55,28 +62,35 @@ export async function createAgent(orgId, { name, description, status = 'ACTIVE',
     `INSERT INTO agents (org_id, name, description, status, environment)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING COALESCE(agent_id, id) AS agent_id, id, org_id, name, description, status, environment, created_at`,
-    [orgId, name, description ?? null, status, environment || 'SANDBOX'],
+    [orgId, name, description ?? null, status, (environment || 'SANDBOX').toUpperCase()],
   );
   return result.rows[0];
 }
 
-export async function updateAgent(orgId, agentId, { name, description, status }, db = pool) {
+export async function updateAgent(orgId, agentId, { name, description, status }, dbOrEnv = pool, maybeEnv = null) {
   assertOrgId(orgId);
+  const { db, environment } = resolveDbAndEnv(dbOrEnv, maybeEnv);
+  const params = [
+    orgId,
+    agentId,
+    name ?? null,
+    description !== undefined,
+    description ?? null,
+    status ?? null,
+  ];
+  let envClause = '';
+  if (environment) {
+    params.push(String(environment).toUpperCase());
+    envClause = ` AND environment = $${params.length}`;
+  }
   const result = await db.query(
     `UPDATE agents
      SET name = COALESCE($3, name),
          description = CASE WHEN $4::boolean THEN $5 ELSE description END,
          status = COALESCE($6, status)
-     WHERE org_id = $1 AND id = $2
-     RETURNING id, org_id, name, description, status, created_at`,
-    [
-      orgId,
-      agentId,
-      name ?? null,
-      description !== undefined,
-      description ?? null,
-      status ?? null,
-    ],
+     WHERE org_id = $1 AND id = $2${envClause}
+     RETURNING id, org_id, name, description, status, environment, created_at`,
+    params,
   );
   return result.rows[0] ?? null;
 }

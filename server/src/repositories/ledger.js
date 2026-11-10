@@ -1,4 +1,5 @@
 import pool from '../db/pool.js';
+import { AppError } from '../lib/errors.js';
 
 function assertOrgId(orgId) {
   if (!orgId) throw new Error('orgId is required for ledger repository methods.');
@@ -17,11 +18,18 @@ export async function listLedgerEntries(orgId, {
   seqFrom,
   seqTo,
   q,
+  environment = null,
 } = {}, db = pool) {
   assertOrgId(orgId);
+  if (!environment || typeof environment !== 'string' || !environment.trim()) {
+    const err = new AppError('ENVIRONMENT_REQUIRED', 400, 'Environment parameter is required for listLedgerEntries.');
+    err.code = 'ENVIRONMENT_REQUIRED';
+    throw err;
+  }
+  const env = environment.trim().toUpperCase();
   const pageSize = Math.min(Math.max(Number(limit) || 25, 1), 100);
-  const values = [orgId];
-  const filters = ['org_id = $1'];
+  const values = [orgId, env];
+  const filters = ['org_id = $1', 'environment = $2'];
 
   if (type) appendFilter(filters, values, 'type = ?', type);
   if (subject) {

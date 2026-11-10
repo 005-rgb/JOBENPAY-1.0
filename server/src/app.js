@@ -236,7 +236,7 @@ async function submitAgentPayout(agent, input, idempotencyKey) {
 
 async function getAgentRequestStatus(agent, requestId) {
   if (!validUuid(requestId)) throw buildError('VALIDATION_FAILED', 'requestId must be a UUID.', 400);
-  const request = await getAgentRequest(agent.orgId, agent.id, requestId);
+  const request = await getAgentRequest(agent.orgId, agent.id, requestId, undefined, agent.environment || 'SANDBOX');
   if (!request) throw buildError('NOT_FOUND', 'Request not found.', 404);
   return {
     requestId: request.id,
@@ -248,7 +248,7 @@ async function getAgentRequestStatus(agent, requestId) {
 }
 
 async function getAgentBudgetStatus(agent) {
-  const budget = await getActiveAgentBudget(agent.orgId, agent.id);
+  const budget = await getActiveAgentBudget(agent.orgId, agent.id, undefined, agent.environment || 'SANDBOX');
   return {
     decision: null,
     reasonCodes: [],
@@ -704,6 +704,7 @@ export function createApp() {
         || (seqFrom && Number(seqFrom) < 1) || (seqTo && Number(seqTo) < 1)) {
         throw buildError('VALIDATION_FAILED', 'Ledger filters are invalid.', 400);
       }
+      const environment = (req.headers['x-jobenpay-environment'] || req.query?.environment || req.environment || 'SANDBOX').toUpperCase();
       return res.status(200).json(await listLedgerEntries(orgId, {
         limit: Number(limit),
         cursor,
@@ -712,6 +713,7 @@ export function createApp() {
         seqFrom: seqFrom ? Number(seqFrom) : undefined,
         seqTo: seqTo ? Number(seqTo) : undefined,
         q,
+        environment,
       }));
     } catch (error) {
       return next(error);
@@ -1061,12 +1063,14 @@ export function createApp() {
       if (req.query.q && String(req.query.q).length > 200) {
         throw buildError('VALIDATION_FAILED', 'q must be at most 200 characters.', 400);
       }
+      const environment = (req.headers['x-jobenpay-environment'] || req.query?.environment || req.environment || 'SANDBOX').toUpperCase();
       const result = await listRequests(orgId, {
         limit: req.query.limit,
         cursor: req.query.cursor,
         status: req.query.status || null,
         agentId: req.query.agentId || null,
         q: req.query.q || null,
+        environment,
       });
       return res.status(200).json(result);
     } catch (error) {
@@ -1077,9 +1081,12 @@ export function createApp() {
   api.get('/requests/:id', requireSession, async (req, res, next) => {
     try {
       if (!validUuid(req.params.id)) throw buildError('NOT_FOUND', 'Request not found.', 404);
+      const environment = (req.headers['x-jobenpay-environment'] || req.query?.environment || req.environment || 'SANDBOX').toUpperCase();
       const result = await getRequestTimeline(
         req.session.current_org_id || GLOBAL_ORG_ID,
         req.params.id,
+        undefined,
+        environment,
       );
       if (!result.request) throw buildError('NOT_FOUND', 'Request not found.', 404);
       return res.status(200).json({ ...result, timeline: result.timeline });
@@ -1091,10 +1098,12 @@ export function createApp() {
   api.post('/requests/:id/cancel', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'APPROVER'), async (req, res, next) => {
     try {
       if (!validUuid(req.params.id)) throw buildError('NOT_FOUND', 'Request not found.', 404);
+      const environment = (req.headers['x-jobenpay-environment'] || req.query?.environment || req.environment || 'SANDBOX').toUpperCase();
       const request = await cancelRequest(
         req.session.current_org_id || GLOBAL_ORG_ID,
         req.params.id,
         req.user.id,
+        { environment },
       );
       return res.status(200).json({ request });
     } catch (error) {
@@ -1108,9 +1117,10 @@ export function createApp() {
       if (req.query.status && !approvalStatuses.has(String(req.query.status))) {
         throw buildError('VALIDATION_FAILED', 'status is not a valid approval state.', 400);
       }
+      const environment = (req.headers['x-jobenpay-environment'] || req.query?.environment || req.environment || 'SANDBOX').toUpperCase();
       const result = await listApprovals(
         req.session.current_org_id || GLOBAL_ORG_ID,
-        { limit: req.query.limit, cursor: req.query.cursor, status: req.query.status || 'PENDING' },
+        { limit: req.query.limit, cursor: req.query.cursor, status: req.query.status || 'PENDING', environment },
       );
       return res.status(200).json(result);
     } catch (error) {
@@ -1121,9 +1131,12 @@ export function createApp() {
   api.get('/approvals/:id', requireSession, async (req, res, next) => {
     try {
       if (!validUuid(req.params.id)) throw buildError('NOT_FOUND', 'Approval not found.', 404);
+      const environment = (req.headers['x-jobenpay-environment'] || req.query?.environment || req.environment || 'SANDBOX').toUpperCase();
       const detail = await getApprovalDetail(
         req.session.current_org_id || GLOBAL_ORG_ID,
         req.params.id,
+        undefined,
+        environment,
       );
       if (!detail) throw buildError('NOT_FOUND', 'Approval not found.', 404);
       return res.status(200).json(detail);
@@ -1135,6 +1148,7 @@ export function createApp() {
   api.post('/approvals/:id/decision', requireSession, requireCsrf, requireRole('OWNER', 'ADMIN', 'APPROVER'), async (req, res, next) => {
     try {
       if (!validUuid(req.params.id)) throw buildError('NOT_FOUND', 'Approval not found.', 404);
+      const environment = (req.headers['x-jobenpay-environment'] || req.query?.environment || req.environment || 'SANDBOX').toUpperCase();
       const result = await decideApproval({
         orgId: req.session.current_org_id || GLOBAL_ORG_ID,
         approvalId: req.params.id,
@@ -1144,6 +1158,7 @@ export function createApp() {
         decision: req.body?.decision,
         comment: req.body?.comment,
         stepUpGrantId: req.get('x-step-up-grant') || req.body?.stepUpGrantId,
+        environment,
       });
       return res.status(200).json({ result, reasonCodes: result.reasonCodes ?? [] });
     } catch (error) {
@@ -1186,7 +1201,7 @@ export function createApp() {
       if (!agent || typeof req.body?.purposeText !== 'string' || !req.body.purposeText.trim()) {
         throw buildError('VALIDATION_FAILED', 'agentId and purposeText are required.', 400);
       }
-      const payees = await listMandatePayees(orgId);
+      const payees = await listMandatePayees(orgId, undefined, req.environment || 'SANDBOX');
       let policy;
       try {
         policy = await generateStructured({
@@ -1207,8 +1222,8 @@ export function createApp() {
       }
       const previous = await query(
         `SELECT v.policy FROM mandates m JOIN mandate_versions v ON v.id = m.current_version_id
-         WHERE m.org_id = $1 AND m.agent_id = $2 ORDER BY v.created_at DESC LIMIT 1`,
-        [orgId, agent.id],
+         WHERE m.org_id = $1 AND m.agent_id = $2 AND m.environment = $3 ORDER BY v.created_at DESC LIMIT 1`,
+        [orgId, agent.id, req.environment || 'SANDBOX'],
       );
       const knownPayeeIds = new Set(payees.map((payee) => payee.id));
       const unknownPayees = policy.payees.ids.filter((id) => !knownPayeeIds.has(id));
@@ -1338,6 +1353,7 @@ export function createApp() {
       const document = await uploadMultipartDocument(req, {
         orgId: req.session.current_org_id || GLOBAL_ORG_ID,
         uploaderId: req.user.id,
+        environment: req.environment || 'SANDBOX',
       });
       return res.status(201).json({
         document: {
@@ -1380,7 +1396,7 @@ export function createApp() {
     try {
       if (!validUuid(req.params.id)) return next(buildError('NOT_FOUND', 'Document not found.', 404));
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const document = await getDocument(orgId, req.params.id);
+      const document = await getDocument(orgId, req.params.id, undefined, req.environment || null);
       if (!document || document.status === 'DELETED' || !document.storage_key) {
         return next(buildError('NOT_FOUND', 'Document not found.', 404));
       }
@@ -1409,7 +1425,7 @@ export function createApp() {
     try {
       if (!validUuid(req.params.id)) return next(buildError('NOT_FOUND', 'Document not found.', 404));
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const document = await getDocument(orgId, req.params.id);
+      const document = await getDocument(orgId, req.params.id, undefined, req.environment || null);
       if (!document) return next(buildError('NOT_FOUND', 'Document not found.', 404));
       const extraction = await getDocumentExtraction(orgId, document.id);
       return res.status(200).json({
@@ -1445,7 +1461,7 @@ export function createApp() {
       if (!validUuid(req.params.id)) return next(buildError('NOT_FOUND', 'Document not found.', 404));
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       const document = await withTx(async (tx) => {
-        const deleted = await markDocumentDeleted(orgId, req.params.id, tx);
+        const deleted = await markDocumentDeleted(orgId, req.params.id, tx, req.environment || null);
         if (!deleted) throw buildError('NOT_FOUND', 'Document not found.', 404);
         await appendEntry(tx, {
           orgId,
@@ -1456,7 +1472,8 @@ export function createApp() {
         });
         return deleted;
       });
-      const existing = await getDocument(orgId, req.params.id);
+      const existing = await getDocument(orgId, req.params.id, undefined, req.environment || null);
+      if (existing?.storage_key) await removeStoredDocument(existing.storage_key);
       if (existing?.storage_key) await removeStoredDocument(existing.storage_key);
       if (!document) return next(buildError('NOT_FOUND', 'Document not found.', 404));
       return res.status(200).json({ ok: true, documentId: document.id, sha256: document.sha256 });
@@ -1697,7 +1714,7 @@ export function createApp() {
       }
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       const payee = await withTx(async (tx) => {
-        const current = await getPayee(orgId, req.params.id, tx);
+        const current = await getPayee(orgId, req.params.id, tx, req.environment || null);
         if (!current) {
           throw buildError('NOT_FOUND', 'Payee not found.', 404);
         }
@@ -1715,7 +1732,7 @@ export function createApp() {
           kind,
           ...(identifierChanged ? prepared : {}),
           identifierChanged,
-        }, tx);
+        }, tx, req.environment || null);
         if (identifierChanged) {
           await recordPayeeRevision(orgId, current.id, {
             oldHmac: current.identifier_hmac,
@@ -1737,7 +1754,7 @@ export function createApp() {
         return next(buildError('NOT_FOUND', 'Payee not found.', 404));
       }
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
-      const payee = await getPayee(orgId, req.params.id);
+      const payee = await getPayee(orgId, req.params.id, undefined, req.environment || null);
       if (!payee) {
         return next(buildError('NOT_FOUND', 'Payee not found.', 404));
       }
@@ -1762,7 +1779,7 @@ export function createApp() {
       }
       const orgId = req.session.current_org_id || GLOBAL_ORG_ID;
       const payee = await withTx(async (tx) => {
-        const current = await getPayee(orgId, req.params.id, tx);
+        const current = await getPayee(orgId, req.params.id, tx, req.environment || null);
         if (!current) {
           throw buildError('NOT_FOUND', 'Payee not found.', 404);
         }
@@ -1775,7 +1792,7 @@ export function createApp() {
         if (!granted) {
           throw buildError('STEP_UP_REQUIRED', 'Step-up authentication required.', 403);
         }
-        const updated = await updatePayeeTrust(orgId, current.id, req.body.trust, req.user.id, tx);
+        const updated = await updatePayeeTrust(orgId, current.id, req.body.trust, req.user.id, tx, req.environment || null);
         await appendEntry(tx, {
           orgId,
           type: LEDGER_TYPES.PAYEE_TRUST_CHANGED,

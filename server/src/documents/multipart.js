@@ -10,7 +10,7 @@ function uploadError(code, message, statusCode) {
   return error;
 }
 
-export async function uploadMultipartDocument(req, { orgId, uploaderId, uploaderKind = 'USER' }) {
+export async function uploadMultipartDocument(req, { orgId, uploaderId, uploaderKind = 'USER', environment = null }) {
   const contentType = req.headers['content-type'] || '';
   if (!/^multipart\/form-data(?:;|$)/i.test(contentType)) {
     throw uploadError('DOCUMENT_MULTIPART_REQUIRED', 'A multipart document upload is required.', 400);
@@ -79,7 +79,12 @@ export async function uploadMultipartDocument(req, { orgId, uploaderId, uploader
       throw uploadError('DOCUMENT_MULTIPART_INVALID', 'No file was provided.', 400);
     }
     const stored = await uploadTask;
-    return await persistStoredDocument(stored, { orgId, uploaderId, uploaderKind });
+    return await persistStoredDocument(stored, {
+      orgId,
+      uploaderId,
+      uploaderKind,
+      environment: (environment || req.environment || 'SANDBOX').toUpperCase(),
+    });
   } catch (error) {
     if (uploadTask) {
       const stored = await uploadTask.catch(() => null);

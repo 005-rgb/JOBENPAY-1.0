@@ -84,8 +84,8 @@ bulkRouter.post('/', async (req, res, next) => {
 
       // Check active mandate
       const mandateRes = await tx.query(
-        `SELECT id FROM mandates WHERE org_id = $1 AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1`,
-        [orgId]
+        `SELECT id FROM mandates WHERE org_id = $1 AND environment = $2 AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1`,
+        [orgId, targetEnv]
       );
       const mandateVersionId = mandateRes.rows[0]?.id || '00000000-0000-4000-8000-000000000003';
       const agentId = req.agent?.id || '00000000-0000-4000-8000-000000000002';
