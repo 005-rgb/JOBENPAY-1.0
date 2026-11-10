@@ -218,11 +218,33 @@ export function compile(rawPolicy, options = {}) {
     }
   }
 
+  // Pre-schema normalization for developer-friendly compatibility
+  if (policy && typeof policy === 'object') {
+    policy = { ...policy };
+    if (!policy.policy_name) {
+      policy.policy_name = policy.name || policy.description || (typeof policy.policy_id === 'string' ? policy.policy_id : 'JPL Policy');
+    }
+    if (Array.isArray(policy.rules)) {
+      policy.rules = policy.rules.map((rule) => {
+        if (!rule || typeof rule !== 'object') return rule;
+        const r = { ...rule };
+        if (r.effect && !r.outcome) {
+          r.outcome = r.effect;
+        }
+        if (r.condition && (!r.conditions || !Array.isArray(r.conditions))) {
+          r.conditions = [r.condition];
+        }
+        return r;
+      });
+    }
+  }
+
   // Schema validation
   const parseResult = JplPolicySchema.safeParse(policy);
   if (!parseResult.success) {
-    const firstIssue = parseResult.error.issues[0].message;
-    throw new AppError('INVALID_POLICY_SCHEMA', 422, `INVALID_POLICY_SCHEMA: Policy schema invalid: ${firstIssue}`);
+    const firstIssue = parseResult.error.issues[0];
+    const pathStr = firstIssue.path.length > 0 ? ` (${firstIssue.path.join('.')})` : '';
+    throw new AppError('INVALID_POLICY_SCHEMA', 422, `INVALID_POLICY_SCHEMA: Policy schema invalid${pathStr}: ${firstIssue.message}`);
   }
 
   // Version support check (PRD 1.8 §4.4: 1.0, and 0.9 backward compatibility)

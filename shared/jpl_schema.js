@@ -52,7 +52,7 @@ export const JplSignatureSchema = z.object({
 
 export const JplPolicySchema = z.object({
   jpl_version: z.string().min(1),
-  policy_id: z.string().regex(/^pol_[0-9A-HJKMNP-TV-Z]{26}$/, 'Invalid policy_id format'),
+  policy_id: z.string().regex(/^pol_[a-zA-Z0-9_-]{1,64}$/, 'Invalid policy_id format'),
   policy_name: z.string().max(200),
   metadata: JplMetadataSchema,
   rules: z.array(JplRuleSchema).min(1).max(100),

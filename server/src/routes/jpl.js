@@ -16,23 +16,30 @@ export function createJplRouter({ requireSession, requireCsrf } = {}) {
     try {
       const vectorsDir = path.resolve(process.cwd(), 'public/vectors/jpl');
       if (!fs.existsSync(vectorsDir)) {
-        return res.status(200).json({ vectors: [] });
+        return res.status(200).json({ ok: true, vectors: [] });
       }
 
       const files = fs.readdirSync(vectorsDir).filter((f) => f.endsWith('.json')).sort();
       const vectors = files.map((filename) => {
         const fullPath = path.join(vectorsDir, filename);
         const content = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+        const category = content.category || 'SCHEMA';
+        let test_type = 'schema_validation';
+        if (category === 'SEMANTICS') test_type = 'evaluation';
+        else if (category === 'VERIFY') test_type = 'signature_verification';
+        else if (category === 'VERSION') test_type = 'backward_compatibility';
+
+        const expected_outcome = content.expected_result || content.expected_outcome || content.expected_validity || 'VALID';
         return {
           filename,
-          test_type: content.test_type || 'schema_validation',
-          expected_outcome: content.expected_outcome || content.expected_validity || 'UNKNOWN',
-          description: content.description || filename,
+          test_type: content.test_type || test_type,
+          expected_outcome,
+          description: content.description || content.vector_name || filename,
           content,
         };
       });
 
-      return res.status(200).json({ vectors });
+      return res.status(200).json({ ok: true, vectors });
     } catch (err) {
       next(err);
     }
@@ -43,24 +50,28 @@ export function createJplRouter({ requireSession, requireCsrf } = {}) {
     try {
       const { policy } = req.body || {};
       if (!policy) {
-        return res.status(400).json({ valid: false, error: 'Policy object is required' });
+        return res.status(400).json({ ok: false, valid: false, message: 'Policy object is required', error: 'Policy object is required' });
       }
 
       const compiled = compile(policy);
       return res.status(200).json({
+        ok: true,
         valid: true,
         policy_hash: compiled.policy_hash,
         rule_count: compiled.rules ? compiled.rules.length : 0,
         rules: (compiled.rules || []).map((r) => ({
           rule_id: r.rule_id,
           description: r.description,
-          effect: r.effect,
+          effect: r.outcome,
+          outcome: r.outcome,
           priority: r.priority,
         })),
       });
     } catch (err) {
       return res.status(400).json({
+        ok: false,
         valid: false,
+        message: err.message || 'Compilation failed',
         error: err.message || 'Compilation failed',
         code: err.code || 'COMPILATION_ERROR',
       });
@@ -72,15 +83,27 @@ export function createJplRouter({ requireSession, requireCsrf } = {}) {
     try {
       const { policy, context } = req.body || {};
       if (!policy || !context) {
-        return res.status(400).json({ outcome: 'DENY', error: 'Policy and context are required' });
+        return res.status(400).json({ ok: false, outcome: 'DENY', message: 'Policy and context are required', error: 'Policy and context are required' });
       }
 
+      const start = performance.now();
       const compiled = compile(policy);
       const evalResult = evaluate(compiled, context);
-      return res.status(200).json(evalResult);
+      const execution_time_ms = Number((performance.now() - start).toFixed(2));
+
+      return res.status(200).json({
+        ok: true,
+        ...evalResult,
+        execution_time_ms,
+        matched_rules: evalResult.rule_id
+          ? [{ rule_id: evalResult.rule_id, effect: evalResult.outcome, priority: 1 }]
+          : [],
+      });
     } catch (err) {
       return res.status(200).json({
+        ok: false,
         outcome: 'DENY',
+        message: err.message || 'Evaluation error (fail-closed)',
         error: err.message || 'Evaluation error (fail-closed)',
         code: err.code || 'EVALUATION_ERROR',
         matched_rules: [],
@@ -93,16 +116,18 @@ export function createJplRouter({ requireSession, requireCsrf } = {}) {
   // 4. POST /api/v1/jpl/verify - Cryptographically verify hash & signature
   router.post('/jpl/verify', sessionAuth, csrfMiddleware, async (req, res, next) => {
     try {
-      const { policy } = req.body || {};
+      const { policy, publicKey, expectedHash } = req.body || {};
       if (!policy) {
-        return res.status(400).json({ valid: false, error: 'Policy object is required' });
+        return res.status(400).json({ ok: false, valid: false, message: 'Policy object is required', error: 'Policy object is required' });
       }
 
-      const verification = verify(policy);
-      return res.status(200).json(verification);
+      const verification = verify(policy, { publicKey, expectedHash });
+      return res.status(200).json({ ok: true, ...verification });
     } catch (err) {
       return res.status(400).json({
+        ok: false,
         valid: false,
+        message: err.message || 'Verification failed',
         error: err.message || 'Verification failed',
       });
     }

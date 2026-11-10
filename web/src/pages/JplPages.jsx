@@ -25,20 +25,22 @@ const TEMPLATES = {
     name: '1. Minimal Valid Policy',
     policy: {
       jpl_version: '1.0',
-      policy_id: 'pol_minimal_demo',
-      organization_id: 'org_demo_123',
+      policy_id: 'pol_01HX4Z8K9M2N3P4Q5R6S7T8V01',
+      policy_name: 'Minimal Valid Policy',
       default_outcome: 'DENY',
       rules: [
         {
           rule_id: 'rule_allow_low_payout',
           description: 'Allow payouts under $1000',
-          effect: 'PERMIT',
+          outcome: 'PERMIT',
           priority: 100,
-          condition: {
-            field: 'transaction.amount_minor',
-            operator: 'lte',
-            value: 100000,
-          },
+          conditions: [
+            {
+              field: 'transaction.amount_minor',
+              operator: 'lte',
+              value: 100000,
+            },
+          ],
         },
       ],
     },
@@ -59,31 +61,35 @@ const TEMPLATES = {
     name: '2. Explicit Deny Precedence (PRD 1.8 §4.2)',
     policy: {
       jpl_version: '1.0',
-      policy_id: 'pol_deny_precedence_demo',
-      organization_id: 'org_demo_123',
+      policy_id: 'pol_01HX4Z8K9M2N3P4Q5R6S7T8V08',
+      policy_name: 'Explicit Deny Precedence Policy',
       default_outcome: 'REQUIRE_APPROVAL',
       rules: [
         {
           rule_id: 'rule_permit_standard_ops',
           description: 'Permit standard operational purchases',
-          effect: 'PERMIT',
+          outcome: 'PERMIT',
           priority: 50,
-          condition: {
-            field: 'transaction.category',
-            operator: 'in',
-            value: ['PAYOUT', 'INVOICE', 'SALE'],
-          },
+          conditions: [
+            {
+              field: 'transaction.category',
+              operator: 'in',
+              value: ['PAYOUT', 'INVOICE', 'SALE'],
+            },
+          ],
         },
         {
           rule_id: 'rule_deny_sanctioned_entity',
           description: 'Deny any high risk or blocked payee immediately',
-          effect: 'DENY',
+          outcome: 'DENY',
           priority: 10,
-          condition: {
-            field: 'transaction.risk_score',
-            operator: 'gte',
-            value: 80,
-          },
+          conditions: [
+            {
+              field: 'transaction.risk_score',
+              operator: 'gte',
+              value: 80,
+            },
+          ],
         },
       ],
     },
@@ -101,20 +107,22 @@ const TEMPLATES = {
     name: '3. Strict Vendor Allowlist & Attribute Check',
     policy: {
       jpl_version: '1.0',
-      policy_id: 'pol_vendor_allowlist',
-      organization_id: 'org_demo_123',
+      policy_id: 'pol_01HX4Z8K9M2N3P4Q5R6S7T8V12',
+      policy_name: 'Strict Vendor Allowlist Policy',
       default_outcome: 'REQUIRE_APPROVAL',
       rules: [
         {
           rule_id: 'rule_verified_vendors_only',
           description: 'Only permit hardware purchase from Dell or Apple',
-          effect: 'PERMIT',
+          outcome: 'PERMIT',
           priority: 20,
-          condition: {
-            field: 'transaction.brand',
-            operator: 'in',
-            value: ['Apple', 'Dell', 'Lenovo'],
-          },
+          conditions: [
+            {
+              field: 'transaction.brand',
+              operator: 'in',
+              value: ['Apple', 'Dell', 'Lenovo'],
+            },
+          ],
         },
       ],
     },
@@ -124,6 +132,40 @@ const TEMPLATES = {
         amount_minor: 125000,
         brand: 'Apple',
         vendor: 'Apple Authorized Reseller',
+      },
+    },
+  },
+  signed: {
+    name: '4. Cryptographically Signed Policy (Ed25519)',
+    policy: {
+      jpl_version: '1.0',
+      policy_id: 'pol_01HX4Z8K9M2N3P4Q5R6S7T8V16',
+      policy_name: 'Valid Signature Policy',
+      rules: [
+        {
+          rule_id: 'rule_1',
+          priority: 1,
+          conditions: [
+            {
+              field: 'request.category',
+              operator: 'eq',
+              value: 'PAYOUT',
+            },
+          ],
+          outcome: 'PERMIT',
+        },
+      ],
+      default_outcome: 'DENY',
+      signature: {
+        alg: 'Ed25519',
+        kid: 'kid_test_key_01',
+        sig: 'base64:gX+GXtNh50U4RGXceZs6l9VBEhiMY2624fqR9e22PjtuZ+ypkFhkdJ8biOui5dyqi4YIPQY8WpF8tcOHGo+fBg==',
+      },
+    },
+    context: {
+      request: {
+        category: 'PAYOUT',
+        amount_minor: 50000,
       },
     },
   },
@@ -258,7 +300,8 @@ export function JplPage() {
           pass = (actual === v.expected_outcome);
         } else if (v.test_type === 'evaluation') {
           try {
-            const evalData = await apiClient.post('/jpl/evaluate', { policy: c.policy, context: c.context });
+            const context = c.context || c.input || {};
+            const evalData = await apiClient.post('/jpl/evaluate', { policy: c.policy, context });
             actual = evalData?.outcome || 'ERROR';
           } catch {
             actual = 'ERROR';
@@ -266,7 +309,11 @@ export function JplPage() {
           pass = (actual === v.expected_outcome);
         } else if (v.test_type === 'signature_verification') {
           try {
-            const verData = await apiClient.post('/jpl/verify', { policy: c.policy });
+            const verData = await apiClient.post('/jpl/verify', {
+              policy: c.policy,
+              publicKey: c.public_key,
+              expectedHash: c.expected_hash,
+            });
             actual = verData?.valid ? 'VALID' : 'INVALID';
           } catch {
             actual = 'INVALID';

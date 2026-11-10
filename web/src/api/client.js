@@ -73,11 +73,19 @@ async function request(path, { method = 'GET', body, headers = {}, stepUpGrant }
 
   const payload = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok || payload?.ok === false) {
-    const source = payload?.error || payload || {};
+    const rawError = payload?.error;
+    const message = (typeof rawError === 'string' && rawError)
+      || rawError?.message
+      || payload?.message
+      || (typeof payload === 'string' && payload)
+      || 'The request could not be completed.';
+    const code = (typeof rawError === 'object' && rawError?.code)
+      || payload?.code
+      || 'REQUEST_FAILED';
     throw new ApiError({
-      code: source.code || 'REQUEST_FAILED',
-      message: source.message || 'The request could not be completed.',
-      details: source.details || null,
+      code,
+      message,
+      details: payload?.details || (typeof rawError === 'object' ? rawError?.details : null),
       status: response.status,
     });
   }
