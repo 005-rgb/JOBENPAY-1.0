@@ -1,5 +1,5 @@
 // @ts-check
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -243,11 +243,11 @@ export default function SecurityPage({ tab = 'pqc' }) {
     }
   };
 
-  const keys = keysData?.keys || [];
-  const events = eventsData?.events || [];
-  const attestations = attestationsData?.attestations || [];
+  const keys = Array.isArray(keysData?.keys) ? keysData.keys : [];
+  const events = Array.isArray(eventsData?.events) ? eventsData.events : [];
+  const attestations = Array.isArray(attestationsData?.attestations) ? attestationsData.attestations : [];
   const pqcSummary = pqcStatusData?.summary || { total: 5, completed: 2, readyPercentage: 60 };
-  const pqcComponents = pqcStatusData?.components || [];
+  const pqcComponents = Array.isArray(pqcStatusData?.components) ? pqcStatusData.components : [];
 
   return (
     <div className={styles.container}>
