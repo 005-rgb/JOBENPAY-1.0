@@ -44,7 +44,7 @@ function useCursorPage(key, path, filters = {}) {
   };
 }
 
-function VirtualTable({ columns, data, emptyTitle, emptyDescription, highlightRow }) {
+function VirtualTable({ columns, data, emptyTitle, emptyDescription, highlightRow, gridTemplate, minWidth }) {
   const parentRef = useRef(null);
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
   const rows = table.getRowModel().rows;
@@ -53,23 +53,39 @@ function VirtualTable({ columns, data, emptyTitle, emptyDescription, highlightRo
     getScrollElement: () => parentRef.current,
     estimateSize: () => {
       const value = getComputedStyle(document.documentElement).getPropertyValue('--jp-table-row-h');
-      return Number.parseFloat(value) || 0;
+      return Number.parseFloat(value) || 52;
     },
     overscan: 8,
   });
 
   if (!data.length) return <EmptyState title={emptyTitle} description={emptyDescription} />;
 
+  const template = gridTemplate || `repeat(${columns.length}, minmax(140px, 1fr))`;
+  const minTableWidth = minWidth || `${Math.max(columns.length * 140, 720)}px`;
+
   return (
     <div className={styles.virtualTable} ref={parentRef} role="table">
-      <div className={`${styles.virtualRow} ${styles.virtualHeader}`} role="row">
+      <div
+        className={`${styles.virtualRow} ${styles.virtualHeader}`}
+        role="row"
+        style={{
+          gridTemplateColumns: template,
+          minWidth: minTableWidth,
+        }}
+      >
         {table.getHeaderGroups().flatMap((group) => group.headers).map((header) => (
           <div className={styles.virtualCell} key={header.id} role="columnheader">
             {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
           </div>
         ))}
       </div>
-      <div className={styles.virtualBody} style={{ height: virtualizer.getTotalSize() }}>
+      <div
+        className={styles.virtualBody}
+        style={{
+          height: virtualizer.getTotalSize(),
+          minWidth: minTableWidth,
+        }}
+      >
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const row = rows[virtualRow.index];
           return (
@@ -77,7 +93,12 @@ function VirtualTable({ columns, data, emptyTitle, emptyDescription, highlightRo
               className={`${styles.virtualRow} ${row.original.seq === highlightRow ? styles.brokenRow : ''}`}
               key={row.id}
               role="row"
-              style={{ height: virtualRow.size, transform: `translateY(${virtualRow.start}px)` }}
+              style={{
+                gridTemplateColumns: template,
+                height: virtualRow.size,
+                minWidth: minTableWidth,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
             >
               {row.getVisibleCells().map((cell) => (
                 <div className={styles.virtualCell} key={cell.id} role="cell">
@@ -147,6 +168,7 @@ export function LedgerPage() {
   });
   const [verification, setVerification] = useState(null);
   const [brokenEntry, setBrokenEntry] = useState(null);
+  const [selectedEntry, setSelectedEntry] = useState(null);
   const { notify } = useToast();
   const verify = useMutation({
     mutationFn: () => apiClient.get('/ledger/verify'),
@@ -170,10 +192,56 @@ export function LedgerPage() {
   }, [location.pathname, verifyLedger]);
   const columns = useMemo(() => [
     { accessorKey: 'seq', header: 'Seq' },
-    { accessorKey: 'created_at', header: 'Time', cell: ({ getValue }) => new Date(getValue()).toLocaleString() },
+    {
+      accessorKey: 'created_at',
+      header: 'Time',
+      cell: ({ getValue }) => {
+        const val = getValue();
+        if (!val) return '—';
+        const d = new Date(val);
+        return <span title={d.toISOString()}>{d.toLocaleString()}</span>;
+      },
+    },
     { accessorKey: 'type', header: 'Type' },
-    { accessorFn: (row) => `${row.subject_type || '—'} ${row.subject_id || ''}`, id: 'subject', header: 'Subject' },
-    { accessorFn: (row) => JSON.stringify(row.payload ?? {}), id: 'payload', header: 'Summary' },
+    {
+      accessorFn: (row) => `${row.subject_type || '—'} ${row.subject_id || ''}`,
+      id: 'subject',
+      header: 'Subject',
+      cell: ({ getValue }) => {
+        const val = getValue() || '—';
+        return <span className={styles.subjectText} title={val}>{val}</span>;
+      },
+    },
+    {
+      accessorKey: 'payload',
+      header: 'Summary / Payload',
+      cell: ({ row }) => {
+        const payload = row.original.payload ?? {};
+        const jsonStr = JSON.stringify(payload);
+        const isEmpty = !payload || Object.keys(payload).length === 0;
+        return (
+          <div className={styles.payloadCell}>
+            <span className={styles.payloadText} title={jsonStr}>
+              {isEmpty ? '—' : jsonStr}
+            </span>
+            {!isEmpty && (
+              <button
+                type="button"
+                className={styles.viewPayloadBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedEntry(row.original);
+                }}
+                aria-label={`View full payload for sequence ${row.original.seq}`}
+                title="View full payload"
+              >
+                View
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
     {
       accessorKey: 'entry_hash',
       header: 'Entry hash',
@@ -260,11 +328,64 @@ export function LedgerPage() {
               emptyDescription="Ledger entries will appear here as activity occurs."
               emptyTitle="No ledger entries"
               highlightRow={showBroken ? verification.firstBrokenSeq : null}
+              gridTemplate="65px 165px 175px 185px minmax(260px, 1fr) 135px 85px"
+              minWidth="1070px"
             />
             <CursorPagination page={page.page} cursors={page.cursors} onNext={page.next} onPrevious={page.previous} total={page.page?.total ?? 0} />
           </>
         )}
       </Card>
+      {selectedEntry && (
+        <Modal
+          open={Boolean(selectedEntry)}
+          onOpenChange={(open) => !open && setSelectedEntry(null)}
+          title={`Ledger Entry #${selectedEntry.seq}`}
+          description={`${selectedEntry.type} • ${selectedEntry.subject_type || '—'} ${selectedEntry.subject_id || ''}`}
+          size="lg"
+        >
+          <div className={styles.modalPayloadDetails}>
+            <div className={styles.modalMetaGrid}>
+              <div className={styles.modalMetaItem}>
+                <span className={styles.modalMetaLabel}>Sequence</span>
+                <span className={styles.modalMetaValue}>#{selectedEntry.seq}</span>
+              </div>
+              <div className={styles.modalMetaItem}>
+                <span className={styles.modalMetaLabel}>Timestamp</span>
+                <span className={styles.modalMetaValue}>
+                  {selectedEntry.created_at ? new Date(selectedEntry.created_at).toLocaleString() : '—'}
+                </span>
+              </div>
+              <div className={styles.modalMetaItem}>
+                <span className={styles.modalMetaLabel}>Type</span>
+                <span className={styles.modalMetaValue}>{selectedEntry.type}</span>
+              </div>
+              <div className={styles.modalMetaItem}>
+                <span className={styles.modalMetaLabel}>Subject</span>
+                <span className={styles.modalMetaValue}>
+                  {selectedEntry.subject_type || '—'} {selectedEntry.subject_id || ''}
+                </span>
+              </div>
+              <div className={styles.modalMetaItem}>
+                <span className={styles.modalMetaLabel}>Entry Hash</span>
+                <span className={styles.modalMetaValue} title={selectedEntry.entry_hash}>
+                  <code>{selectedEntry.entry_hash || '—'}</code>
+                </span>
+              </div>
+              <div className={styles.modalMetaItem}>
+                <span className={styles.modalMetaLabel}>Key ID (kid)</span>
+                <span className={styles.modalMetaValue}>
+                  <code>{selectedEntry.kid || '—'}</code>
+                </span>
+              </div>
+            </div>
+
+            <div className={styles.modalSection}>
+              <span className={styles.modalSectionHeader}>Payload JSON</span>
+              <CodeBlock value={JSON.stringify(selectedEntry.payload ?? {}, null, 2)} />
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -298,7 +419,14 @@ export function AuditPage() {
         </FilterBar>
         {page.isPending ? <PageLoading /> : page.error ? <Banner kind="error" title="Unable to load audit events">{page.error.message}</Banner> : (
           <>
-            <VirtualTable columns={columns} data={page.page?.events ?? []} emptyDescription="Audit events will appear here." emptyTitle="No audit events" />
+            <VirtualTable
+              columns={columns}
+              data={page.page?.events ?? []}
+              emptyDescription="Audit events will appear here."
+              emptyTitle="No audit events"
+              gridTemplate="180px 220px 220px minmax(220px, 1fr)"
+              minWidth="840px"
+            />
             <CursorPagination page={page.page} cursors={page.cursors} onNext={page.next} onPrevious={page.previous} total={page.page?.total ?? 0} />
           </>
         )}
@@ -445,13 +573,17 @@ function CopyHash({ value }) {
   const { notify } = useToast();
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard.writeText(value || '');
       notify({ message: 'Ledger hash copied.' });
     } catch (error) {
       notify({ message: error.message || 'Could not copy the ledger hash.', kind: 'error' });
     }
   };
-  return <button className={styles.copyHash} onClick={copy} title="Copy hash" type="button">{value.slice(0, 14)}…</button>;
+  return (
+    <button className={styles.copyHash} onClick={copy} title="Copy hash" type="button">
+      {value ? `${value.slice(0, 14)}…` : '—'}
+    </button>
+  );
 }
 
 export default { AuditPage, DeveloperPage, LedgerPage, SimulatorPage };
