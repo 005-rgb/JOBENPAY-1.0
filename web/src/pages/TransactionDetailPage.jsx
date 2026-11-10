@@ -39,13 +39,17 @@ import { StatusPill, ProviderBadge } from './TransactionsPage.jsx';
 import styles from './TransactionPages.module.css';
 
 function formatMoney(amountMinor, currency = 'USD') {
-  if (amountMinor === null || amountMinor === undefined) return '—';
-  const minor = BigInt(amountMinor);
-  const major = Number(minor) / 100;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(major);
+  if (amountMinor === null || amountMinor === undefined || amountMinor === '') return '—';
+  try {
+    const minor = BigInt(amountMinor);
+    const major = Number(minor) / 100;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency || 'USD',
+    }).format(major);
+  } catch {
+    return '—';
+  }
 }
 
 function dateLabel(isoString) {

@@ -29,13 +29,17 @@ import { TRANSACTION_CATEGORIES, TRANSACTION_STATUSES, CATEGORY_PROVIDERS } from
 import styles from './TransactionPages.module.css';
 
 function formatMoney(amountMinor, currency = 'USD') {
-  if (amountMinor === null || amountMinor === undefined) return '—';
-  const minor = BigInt(amountMinor);
-  const major = Number(minor) / 100;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(major);
+  if (amountMinor === null || amountMinor === undefined || amountMinor === '') return '—';
+  try {
+    const minor = BigInt(amountMinor);
+    const major = Number(minor) / 100;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency || 'USD',
+    }).format(major);
+  } catch {
+    return '—';
+  }
 }
 
 function dateLabel(isoString) {
@@ -176,22 +180,31 @@ export function TransactionsPage() {
     setSearchParams(new URLSearchParams());
   };
 
-  const rows = data?.transactions || [];
+  const transactions = Array.isArray(data?.transactions) ? data.transactions : [];
+  const rows = transactions;
 
   const exportCsv = () => {
-    if (!transactions.length) return;
+    if (!transactions?.length) return;
     const headers = ['ID', 'Date', 'Category', 'Counterparty', 'Amount', 'Currency', 'Status', 'Reconciliation'];
-    const rows = transactions.map((tx) => [
-      `"${tx.id}"`,
-      `"${tx.created_at || ''}"`,
-      `"${tx.category || ''}"`,
-      `"${(tx.counterparty || tx.target_ref || '').replace(/"/g, '""')}"`,
-      `"${(Number(BigInt(tx.amount_minor || 0)) / 100).toFixed(2)}"`,
-      `"${tx.currency || 'USD'}"`,
-      `"${tx.status || ''}"`,
-      `"${tx.reconciliation_status || 'RECONCILED'}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csvRows = transactions.map((tx) => {
+      let amountFormatted = '0.00';
+      try {
+        amountFormatted = (Number(BigInt(tx.amount_minor || 0)) / 100).toFixed(2);
+      } catch {
+        amountFormatted = '0.00';
+      }
+      return [
+        `"${tx.intent_id || tx.id || ''}"`,
+        `"${tx.created_at || ''}"`,
+        `"${tx.category || ''}"`,
+        `"${(tx.counterparty || tx.target_ref || tx.counterparty_name || '').replace(/"/g, '""')}"`,
+        `"${amountFormatted}"`,
+        `"${tx.currency || 'USD'}"`,
+        `"${tx.status || ''}"`,
+        `"${tx.reconciliation_status || 'RECONCILED'}"`,
+      ];
+    });
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...csvRows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -215,7 +228,7 @@ export function TransactionsPage() {
           <button
             type="button"
             onClick={exportCsv}
-            disabled={!transactions.length}
+            disabled={!transactions?.length}
             className={styles.secondaryLink}
             title="Export transactions to CSV"
             data-testid="export-csv-btn"
@@ -393,7 +406,7 @@ export function TransactionsPage() {
                         <span style={{ fontWeight: '500' }}>{tx.counterparty_name || 'Internal Ledger'}</span>
                         {tx.counterparty_id && (
                           <span className={styles.mono} style={{ fontSize: '11px', color: 'var(--jp-text-muted)' }}>
-                            {tx.counterparty_id.slice(0, 8)}...
+                            {String(tx.counterparty_id).slice(0, 8)}...
                           </span>
                         )}
                       </div>
