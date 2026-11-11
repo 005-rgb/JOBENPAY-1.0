@@ -52,8 +52,7 @@ export class PaymentOrchestrator {
     dbClient = pool,
   }) {
     if (!orgId) throw new AppError('VALIDATION_FAILED', 400, 'orgId is required');
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const safeRequestId = (requestId && UUID_REGEX.test(requestId)) ? requestId : crypto.randomUUID();
+    if (!requestId) throw new AppError('VALIDATION_FAILED', 400, 'requestId is required');
     if (!idempotencyKey) throw new AppError('VALIDATION_FAILED', 400, 'idempotencyKey is required');
     if (!currency || currency.length !== 3) {
       throw new AppError('VALIDATION_FAILED', 400, 'currency must be a 3-letter ISO code');
@@ -100,7 +99,7 @@ export class PaymentOrchestrator {
          org_id, environment, request_id, gateway, amount_minor, currency, status, idempotency_key
        ) VALUES ($1, $2, $3, $4, $5, $6, 'INITIATED', $7)
        RETURNING tx_id`,
-      [orgId, env, safeRequestId, 'PENDING', amountVal.toString(), cur, idempotencyKey],
+      [orgId, env, requestId, 'PENDING', amountVal.toString(), cur, idempotencyKey],
     );
     const txId = initRes.rows[0].tx_id;
 

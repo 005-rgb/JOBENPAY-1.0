@@ -1,6 +1,7 @@
 // @ts-check
 import crypto from 'node:crypto';
 import pool from '../db/pool.js';
+import { toMinor } from '../db/money.js';
 import { AppError } from '../errors.js';
 import { PaymentOrchestrator } from '../services/payment/orchestrator.js';
 import {
@@ -296,8 +297,20 @@ export async function executePaymentHandler(req, res, next) {
       simulateResult,
     } = req.body;
 
-    if (!amountMinor || !currency) {
+    const cur = (currency || '').trim().toUpperCase();
+    if (!amountMinor || !cur) {
       throw new AppError('VALIDATION_FAILED', 400, 'amountMinor and currency are required');
+    }
+
+    let parsedAmountMinor;
+    try {
+      const raw = String(amountMinor).replace(',', '.').trim();
+      parsedAmountMinor = toMinor(raw, cur);
+      if (parsedAmountMinor <= 0n) {
+        throw new Error('Must be positive');
+      }
+    } catch (parseErr) {
+      throw new AppError('VALIDATION_FAILED', 400, `Invalid amountMinor: ${parseErr.message}`);
     }
 
     const isShadow = Boolean(req.body.shadow_mode || req.body.shadowMode);
@@ -320,8 +333,8 @@ export async function executePaymentHandler(req, res, next) {
       customerId,
       paymentMethodId,
       token,
-      amountMinor,
-      currency,
+      amountMinor: parsedAmountMinor.toString(),
+      currency: cur,
       idempotencyKey,
       metadata,
     });

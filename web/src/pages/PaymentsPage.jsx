@@ -191,7 +191,9 @@ export default function PaymentsPage({ tab = 'overview' }) {
     setError(null);
 
     try {
-      const minor = Math.round(parseFloat(simForm.amount) * 100).toString();
+      const rawAmount = String(simForm.amount || '').replace(',', '.').trim();
+      const parsedFloat = parseFloat(rawAmount);
+      const minor = isNaN(parsedFloat) || parsedFloat <= 0 ? '100' : Math.round(parsedFloat * 100).toString();
       const idemKey = `sim_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const reqId = typeof crypto?.randomUUID === 'function'
         ? crypto.randomUUID()
