@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ShieldCheck, AlertTriangle, FileCheck, CheckCircle2, XCircle, ArrowLeft, Eye, Award, RefreshCw, Trash2, HelpCircle } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, FileCheck, CheckCircle2, XCircle, ArrowLeft, Eye, Award, RefreshCw, Trash2, HelpCircle, X } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import { Button, EmptyState, Modal, Skeleton, useToast } from '../components/primitives.jsx';
@@ -236,34 +236,45 @@ export function DipDisplayCard({ requestId }) {
       {/* Intent Anchor Modal */}
       {showAnchorModal && dip.intent_anchor && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
+          className={styles.modalOverlay}
           onClick={() => setShowAnchorModal(false)}
         >
           <div
-            className={styles.formCard}
-            style={{ width: '100%', maxWidth: '640px', maxHeight: '80vh', overflowY: 'auto' }}
+            className={styles.modalBox}
+            style={{ maxWidth: '640px' }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--jp-border)', paddingBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>Human-Signed Intent Anchor</h3>
-              <button className={styles.secondaryButton} onClick={() => setShowAnchorModal(false)}>Close</button>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>
+                <FileCheck size={18} color="var(--jp-brand-teal, #0d9488)" />
+                <span>Human-Signed Intent Anchor</span>
+              </h3>
+              <button
+                type="button"
+                className={styles.modalCloseBtn}
+                onClick={() => setShowAnchorModal(false)}
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div style={{ marginTop: '16px' }}>
-              <p style={{ fontStyle: 'italic', color: 'var(--jp-text)' }}>
-                "{dip.intent_anchor.natural_language_input}"
-              </p>
-              <pre className={styles.mono} style={{ fontSize: '12px', background: '#0a0a0c', padding: '12px', borderRadius: '6px', overflowX: 'auto' }}>
-                {JSON.stringify(dip.intent_anchor, null, 2)}
-              </pre>
+            <p style={{ fontStyle: 'italic', color: 'var(--jp-text)', margin: '4px 0 10px', fontSize: '13px' }}>
+              "{dip.intent_anchor.natural_language_input}"
+            </p>
+            <pre className={styles.mono} style={{ fontSize: '12px', background: '#0a0a0c', padding: '12px', borderRadius: '8px', overflowX: 'auto', maxHeight: '55vh', overflowY: 'auto' }}>
+              {JSON.stringify(dip.intent_anchor, null, 2)}
+            </pre>
+            <div className={styles.modalFooter}>
+              <button
+                type="button"
+                className={styles.secondaryLink}
+                onClick={() => setShowAnchorModal(false)}
+                style={{ border: '1px solid var(--jp-border)', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer' }}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -985,35 +996,46 @@ export function IntentAnchorsPage({ initialTab = 'anchors' }) {
       {/* Selected Intent Modal */}
       {selectedIntent && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
+          className={styles.modalOverlay}
           onClick={() => setSelectedIntent(null)}
         >
           <div
-            className={styles.formCard}
-            style={{ width: '100%', maxWidth: '640px', maxHeight: '80vh', overflowY: 'auto' }}
+            className={styles.modalBox}
+            style={{ maxWidth: '640px' }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>Intent Anchor Details</h3>
-              <button className={styles.secondaryLink} onClick={() => setSelectedIntent(null)} style={{ padding: '2px 8px' }}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>
+                <Award size={18} color="var(--jp-brand-teal, #0d9488)" />
+                <span>Intent Anchor Details</span>
+              </h3>
+              <button
+                type="button"
+                className={styles.modalCloseBtn}
+                onClick={() => setSelectedIntent(null)}
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p style={{ fontStyle: 'italic', color: 'var(--jp-text)', margin: '4px 0 10px', fontSize: '13px' }}>
+              "{selectedIntent.natural_language_input}"
+            </p>
+            <pre className={styles.mono} style={{ fontSize: '11px', background: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '8px', overflowX: 'auto', maxHeight: '55vh', overflowY: 'auto' }}>
+              {JSON.stringify(selectedIntent, null, 2)}
+            </pre>
+            <div className={styles.modalFooter}>
+              <button
+                type="button"
+                className={styles.secondaryLink}
+                onClick={() => setSelectedIntent(null)}
+                style={{ border: '1px solid var(--jp-border)', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer' }}
+              >
                 Close
               </button>
             </div>
-            <p style={{ fontStyle: 'italic', color: 'var(--jp-text)' }}>
-              "{selectedIntent.natural_language_input}"
-            </p>
-            <pre className={styles.mono} style={{ fontSize: '11px', background: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '6px', overflowX: 'auto' }}>
-              {JSON.stringify(selectedIntent, null, 2)}
-            </pre>
           </div>
         </div>
       )}

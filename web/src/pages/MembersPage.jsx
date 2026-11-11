@@ -438,38 +438,41 @@ export default function MembersPage() {
       {/* Invite Member Modal */}
       {inviteModalOpen && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '16px',
-          }}
+          className={styles.modalOverlay}
+          onClick={() => setInviteModalOpen(false)}
         >
           <div
-            className={styles.formCard}
-            style={{ maxWidth: '440px', width: '100%', background: 'var(--jp-surface-card)', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }}
+            className={styles.modalBox}
+            style={{ maxWidth: '460px' }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>Invite New Team Member</h3>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>
+                <UserPlus size={18} color="var(--jp-brand-teal, #0d9488)" />
+                <span>Invite New Team Member</span>
+              </h3>
               <button
                 type="button"
+                className={styles.modalCloseBtn}
                 onClick={() => setInviteModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--jp-text-muted)', cursor: 'pointer' }}
+                aria-label="Close dialog"
               >
                 <X size={18} />
               </button>
             </div>
+
+            <p className={styles.modalDescription}>
+              Send an invitation to join your organization with role-based access control (RBAC).
+            </p>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 inviteMutation.mutate({ email: inviteEmail.trim(), role: inviteRole });
               }}
-              className={styles.pageStack}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
             >
               <div className={styles.field}>
                 <label className={styles.fieldLabel} htmlFor="inviteEmail">Email Address *</label>
@@ -499,12 +502,12 @@ export default function MembersPage() {
                 </select>
               </div>
 
-              <div className={styles.formActions} style={{ justifyContent: 'flex-end', marginTop: '12px' }}>
+              <div className={styles.modalFooter}>
                 <button
                   type="button"
                   className={styles.secondaryLink}
                   onClick={() => setInviteModalOpen(false)}
-                  style={{ border: '1px solid var(--jp-border)', cursor: 'pointer' }}
+                  style={{ border: '1px solid var(--jp-border)', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -512,7 +515,7 @@ export default function MembersPage() {
                   type="submit"
                   className={styles.primaryLink}
                   disabled={inviteMutation.isPending || !inviteEmail.trim()}
-                  style={{ border: 'none', cursor: inviteMutation.isPending ? 'not-allowed' : 'pointer' }}
+                  style={{ borderRadius: '8px', padding: '8px 20px', cursor: inviteMutation.isPending ? 'not-allowed' : 'pointer' }}
                 >
                   {inviteMutation.isPending ? <Loader2 className="animate-spin" size={16} /> : <UserPlus size={16} />}
                   <span>Send Invitation</span>
@@ -526,34 +529,33 @@ export default function MembersPage() {
       {/* Change Role Modal */}
       {roleModalOpen && selectedMember && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '16px',
-          }}
+          className={styles.modalOverlay}
+          onClick={() => setRoleModalOpen(false)}
         >
           <div
-            className={styles.formCard}
-            style={{ maxWidth: '420px', width: '100%', background: 'var(--jp-surface-card)', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }}
+            className={styles.modalBox}
+            style={{ maxWidth: '440px' }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>Change Member Role</h3>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>
+                <Shield size={18} color="var(--jp-brand-teal, #0d9488)" />
+                <span>Change Member Role</span>
+              </h3>
               <button
                 type="button"
+                className={styles.modalCloseBtn}
                 onClick={() => setRoleModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--jp-text-muted)', cursor: 'pointer' }}
+                aria-label="Close dialog"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p style={{ fontSize: '13px', color: 'var(--jp-text-muted)', marginBottom: '16px' }}>
-              Updating role for <strong>{selectedMember.display_name || selectedMember.email}</strong>.
+            <p className={styles.modalDescription}>
+              Updating role permissions for <strong>{selectedMember.display_name || selectedMember.email}</strong>.
             </p>
 
             <form
@@ -561,7 +563,7 @@ export default function MembersPage() {
                 e.preventDefault();
                 updateRoleMutation.mutate({ userId: selectedMember.user_id, role: newRole });
               }}
-              className={styles.pageStack}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
             >
               <div className={styles.field}>
                 <label className={styles.fieldLabel} htmlFor="newRoleSelect">Assign Role</label>
@@ -578,12 +580,12 @@ export default function MembersPage() {
                 </select>
               </div>
 
-              <div className={styles.formActions} style={{ justifyContent: 'flex-end', marginTop: '12px' }}>
+              <div className={styles.modalFooter}>
                 <button
                   type="button"
                   className={styles.secondaryLink}
                   onClick={() => setRoleModalOpen(false)}
-                  style={{ border: '1px solid var(--jp-border)', cursor: 'pointer' }}
+                  style={{ border: '1px solid var(--jp-border)', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -591,7 +593,7 @@ export default function MembersPage() {
                   type="submit"
                   className={styles.primaryLink}
                   disabled={updateRoleMutation.isPending || newRole === selectedMember.role}
-                  style={{ border: 'none', cursor: updateRoleMutation.isPending ? 'not-allowed' : 'pointer' }}
+                  style={{ borderRadius: '8px', padding: '8px 20px', cursor: updateRoleMutation.isPending ? 'not-allowed' : 'pointer' }}
                 >
                   {updateRoleMutation.isPending ? <Loader2 className="animate-spin" size={16} /> : <UserCheck size={16} />}
                   <span>Update Role</span>

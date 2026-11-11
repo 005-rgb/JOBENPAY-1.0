@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   XCircle,
+  X,
   Zap,
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
@@ -1140,85 +1141,81 @@ export default function OpsPages({ tab = 'overview' }) {
           {/* Runbook Modal View */}
           {selectedRunbook && (
             <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0,0,0,0.6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 999,
-                padding: '20px',
-              }}
+              className={styles.modalOverlay}
               onClick={() => setSelectedRunbook(null)}
             >
               <div
-                style={{
-                  background: 'var(--jp-surface)',
-                  border: '1px solid var(--jp-border)',
-                  borderRadius: 'var(--jp-radius-lg)',
-                  maxWidth: '680px',
-                  width: '100%',
-                  maxHeight: '85vh',
-                  overflowY: 'auto',
-                  padding: 'var(--jp-space-5)',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-                }}
+                className={styles.modalBox}
+                style={{ maxWidth: '680px', maxHeight: '85vh' }}
                 onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div className={styles.modalHeader}>
                   <div>
                     <span style={{ fontSize: '11px', color: 'var(--jp-brand-teal)', fontWeight: 'bold' }}>
                       RUNBOOK {selectedRunbook.slug}
                     </span>
-                    <h2 style={{ margin: '4px 0 0 0', fontSize: '18px' }}>{selectedRunbook.title}</h2>
+                    <h3 className={styles.modalTitle} style={{ marginTop: '4px' }}>
+                      {selectedRunbook.title}
+                    </h3>
                   </div>
                   <button
+                    type="button"
+                    className={styles.modalCloseBtn}
                     onClick={() => setSelectedRunbook(null)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--jp-text-muted)',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                    }}
+                    aria-label="Close dialog"
                   >
-                    &times;
+                    <X size={18} />
                   </button>
                 </div>
 
-                <div style={{ marginTop: 'var(--jp-space-4)', display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13px', maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)' }}>1. Symptom</h4>
-                    <p style={{ margin: 0 }}>{selectedRunbook.symptom}</p>
+                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)', fontSize: '12px' }}>1. Symptom</h4>
+                    <p style={{ margin: 0, background: 'var(--jp-surface-muted)', padding: '10px 12px', borderRadius: '8px' }}>
+                      {selectedRunbook.symptom}
+                    </p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)' }}>2. Impact</h4>
-                    <p style={{ margin: 0 }}>{selectedRunbook.impact}</p>
+                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)', fontSize: '12px' }}>2. Impact</h4>
+                    <p style={{ margin: 0, background: 'var(--jp-surface-muted)', padding: '10px 12px', borderRadius: '8px' }}>
+                      {selectedRunbook.impact}
+                    </p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)' }}>3. Diagnosis</h4>
-                    <p style={{ margin: 0 }}>{selectedRunbook.diagnosis}</p>
+                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)', fontSize: '12px' }}>3. Diagnosis</h4>
+                    <p style={{ margin: 0, background: 'var(--jp-surface-muted)', padding: '10px 12px', borderRadius: '8px' }}>
+                      {selectedRunbook.diagnosis}
+                    </p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)' }}>4. Resolution Steps</h4>
-                    <p style={{ margin: 0 }}>{selectedRunbook.resolution}</p>
+                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)', fontSize: '12px' }}>4. Resolution Steps</h4>
+                    <p style={{ margin: 0, background: 'var(--jp-surface-muted)', padding: '10px 12px', borderRadius: '8px' }}>
+                      {selectedRunbook.resolution}
+                    </p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)' }}>5. Escalation Path</h4>
-                    <p style={{ margin: 0 }}>{selectedRunbook.escalation}</p>
+                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)', fontSize: '12px' }}>5. Escalation Path</h4>
+                    <p style={{ margin: 0, background: 'var(--jp-surface-muted)', padding: '10px 12px', borderRadius: '8px' }}>
+                      {selectedRunbook.escalation}
+                    </p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)' }}>6. Post-Incident Review</h4>
-                    <p style={{ margin: 0 }}>{selectedRunbook.postIncident}</p>
+                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--jp-text-muted)', fontSize: '12px' }}>6. Post-Incident Review</h4>
+                    <p style={{ margin: 0, background: 'var(--jp-surface-muted)', padding: '10px 12px', borderRadius: '8px' }}>
+                      {selectedRunbook.postIncident}
+                    </p>
                   </div>
                 </div>
 
-                <div style={{ marginTop: 'var(--jp-space-5)', textAlign: 'right' }}>
-                  <button onClick={() => setSelectedRunbook(null)} className={styles.primaryLink}>
+                <div className={styles.modalFooter}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRunbook(null)}
+                    className={styles.primaryLink}
+                    style={{ border: 'none', borderRadius: '8px', padding: '8px 20px', cursor: 'pointer' }}
+                  >
                     Close
                   </button>
                 </div>

@@ -43,7 +43,11 @@ export class PayPalAdapter extends BaseConnector {
         };
       }
 
-      if (token?.includes('soft_decline') || metadata?.simulateSoftDecline) {
+      if (
+        token === 'tok_soft_decline' ||
+        token?.includes('paypal_soft_decline') ||
+        (metadata?.simulateSoftDecline && !token?.includes('tok_visa_soft_decline'))
+      ) {
         return {
           success: false,
           gateway: 'PAYPAL',

@@ -80,14 +80,14 @@ export function createTenantProofsRouter({ requireSession, requireRole, requireC
   );
 
   router.get(
-    '/handshakes',
+    ['/handshakes', '/handshake'],
     requireSession,
     requireRole('OWNER', 'ADMIN', 'OPERATOR', 'APPROVER', 'VIEWER', 'JUDGE'),
     listHandshakesHandler,
   );
 
   router.get(
-    '/handshakes/:handshake_id',
+    ['/handshakes/:handshake_id', '/handshake/:handshake_id'],
     requireSession,
     requireRole('OWNER', 'ADMIN', 'OPERATOR', 'APPROVER', 'VIEWER', 'JUDGE'),
     getTenantHandshakeHandler,

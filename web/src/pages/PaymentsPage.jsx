@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  X,
   Plus,
   Trash2,
   Terminal,
@@ -192,7 +193,9 @@ export default function PaymentsPage({ tab = 'overview' }) {
     try {
       const minor = Math.round(parseFloat(simForm.amount) * 100).toString();
       const idemKey = `sim_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const reqId = `req_${Date.now()}`;
+      const reqId = typeof crypto?.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : '00000000-0000-4000-8000-' + Date.now().toString(16).padStart(12, '0').slice(-12);
 
       let token = 'tok_visa_valid';
       if (simForm.scenario === 'SOFT_DECLINE') {
@@ -1266,73 +1269,61 @@ export default function PaymentsPage({ tab = 'overview' }) {
       {/* MODAL: TOKENIZE CARD & STORE IN VAULT */}
       {showAddVaultModal && (
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: 'var(--jp-space-4)',
+          className={styles.modalOverlay}
+          onClick={() => {
+            setShowAddVaultModal(false);
+            setPanWarning('');
           }}
         >
           <div
-            style={{
-              background: 'var(--jp-surface)',
-              border: '1px solid var(--jp-border)',
-              borderRadius: 'var(--jp-radius-card)',
-              width: '100%',
-              maxWidth: '480px',
-              padding: 'var(--jp-space-5)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--jp-space-4)',
-              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.15)',
-            }}
+            className={styles.modalBox}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="vaultModalTitle"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Lock size={16} color="#2563eb" /> Tokenize Card in Self-Owned Vault
+            <div className={styles.modalHeader}>
+              <h3 id="vaultModalTitle" className={styles.modalTitle}>
+                <Lock size={18} color="var(--jp-brand-teal, #0d9488)" />
+                <span>Tokenize Card in Self-Owned Vault</span>
               </h3>
               <button
+                type="button"
+                className={styles.modalCloseBtn}
                 onClick={() => {
                   setShowAddVaultModal(false);
                   setPanWarning('');
                 }}
-                style={{ background: 'transparent', border: 0, cursor: 'pointer', fontSize: '18px' }}
+                aria-label="Close dialog"
               >
-                &times;
+                <X size={18} />
               </button>
             </div>
 
-            <div style={{ fontSize: '12px', color: 'var(--jp-text-muted)', lineHeight: '1.4' }}>
-              Strict PCI DSS v4.0 Zero-PAN architecture. The token will be bound to your organization and can be routed to Stripe or PayPal.
-            </div>
+            <p className={styles.modalDescription}>
+              Strict PCI DSS v4.0 Zero-PAN architecture. The token is cryptographically isolated and never stored as raw cardholder data.
+            </p>
 
             {panWarning && (
               <div
                 style={{
                   background: '#fef2f2',
                   border: '1px solid #fecaca',
-                  borderRadius: '6px',
-                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
                   color: '#991b1b',
-                  fontSize: '12px',
+                  fontSize: '13px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '8px',
                 }}
               >
-                <AlertCircle size={15} />
+                <AlertCircle size={16} />
                 <span>{panWarning}</span>
               </div>
             )}
 
-            <form onSubmit={handleAddVaultMethod} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--jp-space-3)' }}>
+            <form onSubmit={handleAddVaultMethod} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div className={styles.field}>
                 <label className={styles.fieldLabel}>Customer ID / Reference</label>
                 <input
@@ -1345,7 +1336,7 @@ export default function PaymentsPage({ tab = 'overview' }) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--jp-space-3)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Tokenizing Gateway</label>
                   <select
@@ -1393,7 +1384,7 @@ export default function PaymentsPage({ tab = 'overview' }) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--jp-space-3)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Last 4 Digits</label>
                   <input
@@ -1432,7 +1423,7 @@ export default function PaymentsPage({ tab = 'overview' }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--jp-space-3)', marginTop: 'var(--jp-space-2)' }}>
+              <div className={styles.modalFooter}>
                 <button
                   type="button"
                   className={styles.secondaryLink}
@@ -1440,6 +1431,7 @@ export default function PaymentsPage({ tab = 'overview' }) {
                     setShowAddVaultModal(false);
                     setPanWarning('');
                   }}
+                  style={{ cursor: 'pointer', padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--jp-border)' }}
                 >
                   Cancel
                 </button>
@@ -1447,6 +1439,7 @@ export default function PaymentsPage({ tab = 'overview' }) {
                   type="submit"
                   className={styles.primaryLink}
                   disabled={loading || Boolean(panWarning)}
+                  style={{ cursor: loading || Boolean(panWarning) ? 'not-allowed' : 'pointer', padding: '8px 20px', borderRadius: '8px' }}
                 >
                   {loading ? 'Tokenizing...' : 'Save to Vault'}
                 </button>

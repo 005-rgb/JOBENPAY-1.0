@@ -1,4 +1,5 @@
 // @ts-check
+import crypto from 'node:crypto';
 import pool from '../db/pool.js';
 import { AppError } from '../errors.js';
 import { PaymentOrchestrator } from '../services/payment/orchestrator.js';
@@ -309,10 +310,13 @@ export async function executePaymentHandler(req, res, next) {
       });
     }
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const safeRequestId = (requestId && UUID_REGEX.test(requestId)) ? requestId : crypto.randomUUID();
+
     const result = await orchestrator.createPayment({
       orgId,
       environment,
-      requestId,
+      requestId: safeRequestId,
       customerId,
       paymentMethodId,
       token,

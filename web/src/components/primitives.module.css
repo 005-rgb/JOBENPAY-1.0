@@ -353,25 +353,40 @@
 
 .dialogOverlay {
   animation: overlayIn var(--jp-transition-standard);
-  background: var(--jp-overlay);
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   inset: 0;
   position: fixed;
   z-index: var(--jp-dialog-z);
 }
 
 .dialogContent {
-  background: var(--jp-surface);
-  border-radius: var(--jp-radius-modal);
-  box-shadow: var(--jp-shadow-modal);
+  background: var(--jp-surface, #ffffff);
+  border: 1px solid var(--jp-border, #e2e8f0);
+  border-radius: var(--jp-radius-modal, 16px);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
   left: 50%;
   max-height: calc(100vh - var(--jp-space-8));
   overflow: auto;
-  padding: var(--jp-space-8);
+  padding: 24px 28px;
   position: fixed;
   top: 50%;
   transform: translate(-50%, -50%);
   width: calc(100% - var(--jp-space-8));
   z-index: var(--jp-dialog-z);
+  animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .dialogMd { max-width: var(--jp-modal-md-w); }
@@ -384,25 +399,32 @@
 }
 
 .dialogHeader h2 {
-  font-size: var(--jp-font-size-page-title);
-  line-height: var(--jp-font-line-page-title);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
   margin: 0;
+  color: var(--jp-text, #0f172a);
+  letter-spacing: -0.01em;
 }
 
 .dialogDescription {
-  color: var(--jp-text-muted);
-  margin: var(--jp-space-2) 0 0;
+  color: var(--jp-text-muted, #64748b);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 6px 0 0;
 }
 
 .dialogBody {
-  margin-top: var(--jp-space-6);
+  margin-top: 20px;
 }
 
 .dialogFooter {
   display: flex;
-  gap: var(--jp-space-3);
+  gap: 12px;
   justify-content: flex-end;
-  margin-top: var(--jp-space-8);
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--jp-border-subtle, #f1f5f9);
 }
 
 .iconButton {
@@ -412,12 +434,17 @@
   border-radius: 50%;
   cursor: pointer;
   display: inline-flex;
-  height: var(--jp-control-size);
+  height: 32px;
   justify-content: center;
-  width: var(--jp-control-size);
+  width: 32px;
+  color: var(--jp-text-muted, #64748b);
+  transition: all 0.15s ease;
 }
 
-.iconButton:hover { background: var(--jp-secondary-hover); }
+.iconButton:hover {
+  background: var(--jp-surface-muted, #f1f5f9);
+  color: var(--jp-text, #0f172a);
+}
 
 .toastViewport {
   bottom: var(--jp-space-6);

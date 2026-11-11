@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { RotateCcw, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Copy, Cpu, Eye, Layers, RefreshCw, HelpCircle } from 'lucide-react';
+import { RotateCcw, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Copy, Cpu, Eye, Layers, RefreshCw, HelpCircle, X } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { useEnvironment } from '../context/EnvironmentContext.jsx';
 import { Button, EmptyState, Modal, Skeleton, useToast } from '../components/primitives.jsx';
@@ -344,37 +344,43 @@ export function CplDisplayCard({ requestId }) {
       {/* Snapshot Raw Modal */}
       {showRawModal && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
+          className={styles.modalOverlay}
           onClick={() => setShowRawModal(false)}
         >
           <div
-            className={styles.formCard}
-            style={{ width: '100%', maxWidth: '720px', maxHeight: '80vh', overflowY: 'auto' }}
+            className={styles.modalBox}
+            style={{ maxWidth: '720px' }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Cognitive Snapshot JSON</h3>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>
+                <Cpu size={18} color="var(--jp-brand-teal, #0d9488)" />
+                <span>Cognitive Snapshot JSON</span>
+              </h3>
               <button
                 type="button"
-                className={styles.secondaryButton}
+                className={styles.modalCloseBtn}
                 onClick={() => setShowRawModal(false)}
-                style={{ fontSize: '12px', padding: '4px 8px' }}
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <pre className={styles.mono} style={{ fontSize: '11px', whiteSpace: 'pre-wrap', lineHeight: '1.4', background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', maxHeight: '60vh', overflowY: 'auto' }}>
+              {JSON.stringify(snapshot, null, 2)}
+            </pre>
+            <div className={styles.modalFooter}>
+              <button
+                type="button"
+                className={styles.secondaryLink}
+                onClick={() => setShowRawModal(false)}
+                style={{ border: '1px solid var(--jp-border)', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer' }}
               >
                 Close
               </button>
             </div>
-            <pre className={styles.mono} style={{ fontSize: '11px', whiteSpace: 'pre-wrap', lineHeight: '1.4', background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '6px' }}>
-              {JSON.stringify(snapshot, null, 2)}
-            </pre>
           </div>
         </div>
       )}
@@ -683,32 +689,43 @@ export function CplPage({ initialTab = 'snapshots' }) {
       {/* Selected Snapshot JSON Modal */}
       {selectedSnapshot && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
+          className={styles.modalOverlay}
           onClick={() => setSelectedSnapshot(null)}
         >
           <div
-            className={styles.formCard}
-            style={{ width: '100%', maxWidth: '720px', maxHeight: '80vh', overflowY: 'auto' }}
+            className={styles.modalBox}
+            style={{ maxWidth: '720px' }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>Cognitive Snapshot Details</h3>
-              <button className={styles.secondaryLink} onClick={() => setSelectedSnapshot(null)} style={{ padding: '2px 8px' }}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>
+                <Layers size={18} color="var(--jp-brand-teal, #0d9488)" />
+                <span>Cognitive Snapshot Details</span>
+              </h3>
+              <button
+                type="button"
+                className={styles.modalCloseBtn}
+                onClick={() => setSelectedSnapshot(null)}
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <pre className={styles.mono} style={{ fontSize: '11px', background: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '8px', overflowX: 'auto', maxHeight: '60vh', overflowY: 'auto' }}>
+              {JSON.stringify(selectedSnapshot, null, 2)}
+            </pre>
+            <div className={styles.modalFooter}>
+              <button
+                type="button"
+                className={styles.secondaryLink}
+                onClick={() => setSelectedSnapshot(null)}
+                style={{ border: '1px solid var(--jp-border)', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer' }}
+              >
                 Close
               </button>
             </div>
-            <pre className={styles.mono} style={{ fontSize: '11px', background: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '6px', overflowX: 'auto' }}>
-              {JSON.stringify(selectedSnapshot, null, 2)}
-            </pre>
           </div>
         </div>
       )}

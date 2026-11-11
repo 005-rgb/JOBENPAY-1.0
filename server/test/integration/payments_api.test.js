@@ -163,6 +163,32 @@ test('PRD 4.1: Payment Orchestration Layer (POL) HTTP API Integration Suite', as
     executedTxId = body.transaction.tx_id;
   });
 
+  await t.test('5b. POST /api/v1/payments/execute: handles non-UUID requestId and performs soft decline failover to PayPal', async () => {
+    const idemKey = `idem_api_failover_${testRunId}`;
+
+    const res = await fetch(`${baseUrl}/api/v1/payments/execute`, {
+      method: 'POST',
+      headers: {
+        ...authContext.headers,
+        'idempotency-key': idemKey,
+      },
+      body: JSON.stringify({
+        requestId: 'req_non_uuid_simulator_test',
+        token: 'tok_visa_soft_decline',
+        amountMinor: '15000',
+        currency: 'USD',
+        metadata: { scenario: 'SOFT_DECLINE' },
+      }),
+    });
+
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.ok(body.transaction);
+    assert.equal(body.transaction.gateway, 'PAYPAL');
+    assert.equal(body.transaction.status, 'AUTHORIZED');
+  });
+
   await t.test('6. POST /api/v1/payments/execute: requires idempotency key', async () => {
     const res = await fetch(`${baseUrl}/api/v1/payments/execute`, {
       method: 'POST',
