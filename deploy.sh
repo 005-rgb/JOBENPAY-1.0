@@ -459,6 +459,14 @@ else
     log WARN "Peringatan migrasi skema: $migration_err. Melanjutkan restart Passenger agar rilis aplikasi tetap aktif."
   fi
 
+  log INFO "Menjalankan pembaruan data demo juri permanen (seed_judge.js)..."
+  if (cd "$APP_DIR" && UV_THREADPOOL_SIZE=1 NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=256 --v8-pool-size=1" "$NODE_BIN" server/scripts/seed_judge.js >"$BACKUP_DIR/seed-judge.log" 2>&1); then
+    log INFO "Data demo juri (Apex Global Technologies Inc.) berhasil diperbarui secara permanen."
+  else
+    seed_err="$(cat "$BACKUP_DIR/seed-judge.log" 2>/dev/null || true)"
+    [ -z "$seed_err" ] || log WARN "Peringatan seed demo juri: $seed_err"
+  fi
+
   mkdir -p "$APP_DIR/tmp"
   touch "$APP_DIR/tmp/restart.txt"
   log INFO "Rilis $COMMIT_AFTER ($BRANCH; sebelumnya $PREVIOUS_COMMIT) siap; restart Passenger diminta."
