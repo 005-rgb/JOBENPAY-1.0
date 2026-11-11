@@ -151,12 +151,20 @@
 }
 
 .demoHint,
-.paypalDisclaimer,
 .fieldHint {
   color: var(--jp-text-muted);
   font-size: var(--jp-font-size-caption);
   line-height: var(--jp-font-line-caption);
   margin: 0;
+}
+
+.paypalDisclaimer {
+  color: var(--jp-text-muted);
+  font-size: var(--jp-font-size-caption);
+  line-height: var(--jp-font-line-caption);
+  margin: 0;
+  text-align: center;
+  width: 100%;
 }
 
 .loginLink,

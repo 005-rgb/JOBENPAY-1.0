@@ -1981,9 +1981,37 @@ export function createApp() {
         const matches = user ? await verifyPassword(password, user.password_hash) : false;
         if (!user || !matches) {
           try {
-            const { seedJudgeDemoData } = await import('../scripts/seed_judge.js');
-            await seedJudgeDemoData();
-            user = await findUserByEmail(GLOBAL_ORG_ID, email);
+            const passwordHash = await hashPassword('Password123!');
+            const userRes = await pool.query(
+              `INSERT INTO users (email, password_hash, display_name, locale, email_verified_at, has_password)
+               VALUES ($1, $2, 'Devpost Judge (Principal Evaluator)', 'en', now(), true)
+               ON CONFLICT (email) DO UPDATE
+               SET password_hash = $2, email_verified_at = COALESCE(users.email_verified_at, now()),
+                   has_password = true, failed_login_count = 0, locked_until = NULL
+               RETURNING *`,
+              [email, passwordHash]
+            );
+            user = userRes.rows[0];
+
+            // Ensure judge organization & membership
+            const orgRes = await pool.query(
+              `INSERT INTO organizations (name, slug)
+               VALUES ('Apex Global Technologies Inc.', 'jobenpay-demo')
+               ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+               RETURNING id`
+            );
+            const judgeOrgId = orgRes.rows[0].id;
+            await pool.query(
+              `INSERT INTO memberships (org_id, user_id, role, is_judge)
+               VALUES ($1, $2, 'OWNER', true)
+               ON CONFLICT (org_id, user_id) DO UPDATE SET role = 'OWNER', is_judge = true`,
+              [judgeOrgId, user.id]
+            );
+
+            // Background trigger full demo data seed
+            import('../scripts/seed_judge.js').then(({ seedJudgeDemoData }) => {
+              seedJudgeDemoData().catch((e) => logger.warn({ err: e.message }, 'background seedJudgeDemoData'));
+            });
           } catch (e) {
             logger.error({ err: e.message }, 'Failed to auto-seed judge account');
           }

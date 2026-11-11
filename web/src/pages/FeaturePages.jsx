@@ -209,7 +209,6 @@ export function LoginPage() {
         </form>
         {import.meta.env.VITE_SHOW_DEMO_HINT === '1' ? <p className={styles.demoHint}>{t('app.demoAccountsHint')}</p> : null}
         <p className={styles.paypalDisclaimer}>{t('app.paypalDisclaimer')}</p>
-        <Link className={styles.loginLink} to="/terms">{t('app.help')}</Link>
       </Card>
     </main>
   );
