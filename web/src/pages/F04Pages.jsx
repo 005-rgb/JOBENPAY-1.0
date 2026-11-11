@@ -211,7 +211,7 @@ function PolicyEditor({ policy, onChange, payees, issues }) {
         ? ACTIONS.map((action) => [action, action])
         : path === 'schedule.days'
           ? WEEKDAYS
-          : payees.map((payee) => [payee.id, payee.display_name]);
+          : payees.map((payee) => [payee.id, payee.displayName || payee.display_name || payee.name || payee.identifierMasked || 'Payee']);
       return (
         <fieldset className={styles.editorField} key={path}>
           <legend>{label}</legend>

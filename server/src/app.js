@@ -271,9 +271,13 @@ function publicPayee(payee, { identifier } = {}) {
   const result = {
     id: payee.id,
     displayName: payee.display_name,
+    display_name: payee.display_name,
+    name: payee.display_name,
     kind: payee.kind,
     identifierMasked: payee.identifier_masked,
+    identifier_masked: payee.identifier_masked,
     trust: payee.trust,
+    trust_level: payee.trust,
     changedAt: payee.changed_at,
     createdAt: payee.created_at,
   };

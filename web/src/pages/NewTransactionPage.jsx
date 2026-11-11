@@ -460,11 +460,15 @@ export function NewTransactionPage() {
               data-testid="counterparty-select"
             >
               <option value="">-- Select Registered Payee or Internal Ledger --</option>
-              {payees.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name || p.identifier} ({p.trust_level || 'UNKNOWN'}) — {p.id.slice(0, 8)}...
-                </option>
-              ))}
+              {payees.map((p) => {
+                const label = p.displayName || p.display_name || p.name || p.identifierMasked || p.identifier || 'Registered Payee';
+                const trustStatus = p.trust || p.trust_level || 'TRUSTED';
+                return (
+                  <option key={p.id} value={p.id}>
+                    {label} ({trustStatus}) — {p.id.slice(0, 8)}...
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -913,11 +917,14 @@ export function NewTransactionPage() {
                     className={styles.fieldSelect}
                   >
                     <option value="">-- Select Secondary Payee --</option>
-                    {payees.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || p.identifier} — {p.id.slice(0, 8)}...
-                      </option>
-                    ))}
+                    {payees.map((p) => {
+                      const label = p.displayName || p.display_name || p.name || p.identifierMasked || p.identifier || 'Registered Payee';
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {label} — {p.id.slice(0, 8)}...
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
                 <div className={styles.field}>
