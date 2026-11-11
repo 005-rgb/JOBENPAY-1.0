@@ -244,20 +244,15 @@ export function HandshakesPage() {
   const { environment } = useEnvironment();
   const [filterStatus, setFilterStatus] = useState('ALL');
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['trust-handshakes', filterStatus, environment],
     queryFn: async () => {
       try {
-        return await apiClient.get(`/handshakes${filterStatus !== 'ALL' ? `?status=${filterStatus}` : ''}`);
+        const res = await apiClient.get(`/handshakes${filterStatus !== 'ALL' ? `?status=${filterStatus}` : ''}`);
+        return res || { handshakes: [] };
       } catch (err) {
-        if (err?.status === 404 || err?.message?.toLowerCase().includes('not found')) {
-          try {
-            return await apiClient.get(`/v1/handshakes${filterStatus !== 'ALL' ? `?status=${filterStatus}` : ''}`);
-          } catch {
-            return { handshakes: [] };
-          }
-        }
-        throw err;
+        console.warn('Could not load handshakes from server, rendering empty state:', err?.message);
+        return { handshakes: [] };
       }
     },
   });
