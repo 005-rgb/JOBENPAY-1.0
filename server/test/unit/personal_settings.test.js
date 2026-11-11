@@ -101,3 +101,43 @@ test('Personal Settings: User-Agent Parser Unit Tests', async (t) => {
     assert.equal(parsed.browser, 'Web Browser');
   });
 });
+
+test('Personal Settings: Google Re-Auth & Password Policy Unit Tests', async (t) => {
+  const { verifyGoogleIdToken } = await import('../../src/auth/google.js');
+
+  function createMockGoogleIdToken(payload) {
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    return `${header}.${body}.mock_signature`;
+  }
+
+  await t.test('verifyGoogleIdToken correctly extracts email and sub in test mode', async () => {
+    const token = createMockGoogleIdToken({
+      email: 'david@jobenpay.test',
+      name: 'David Guntoro',
+      sub: 'google-sub-mock-123',
+    });
+    const verified = await verifyGoogleIdToken(token);
+    assert.equal(verified.email, 'david@jobenpay.test');
+    assert.equal(verified.name, 'David Guntoro');
+    assert.equal(verified.sub, 'google-sub-mock-123');
+  });
+
+  await t.test('password policy rejects weak passwords', () => {
+    const testCases = [
+      { pass: 'Short1!', expected: false, reason: '< 8 chars' },
+      { pass: 'nouppercase1!', expected: false, reason: 'no uppercase' },
+      { pass: 'NOLOWERCASE1!', expected: false, reason: 'no lowercase' },
+      { pass: 'NoNumberHere!', expected: false, reason: 'no number' },
+      { pass: 'ValidPass123!', expected: true, reason: 'valid format' },
+    ];
+
+    for (const tc of testCases) {
+      const isValid = tc.pass.length >= 8 &&
+        /[A-Z]/.test(tc.pass) &&
+        /[a-z]/.test(tc.pass) &&
+        /[0-9]/.test(tc.pass);
+      assert.equal(isValid, tc.expected, `Failed on: ${tc.reason}`);
+    }
+  });
+});

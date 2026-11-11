@@ -409,10 +409,15 @@ export function registerAuthRoutes(api) {
           return res.status(403).json({ ok: false, code: 'FORBIDDEN', message: 'Account locked.' });
         }
 
-        // Ensure email is marked verified since verified by Google
-        if (!existing.email_verified_at) {
-          await pool.query('UPDATE users SET email_verified_at = now() WHERE id = $1', [existing.id]);
-        }
+        // Ensure email is marked verified since verified by Google and link Google account
+        await pool.query(
+          `UPDATE users
+           SET email_verified_at = COALESCE(email_verified_at, now()),
+               google_linked = true,
+               google_sub = COALESCE(google_sub, $2)
+           WHERE id = $1`,
+          [existing.id, googleUser.sub || null],
+        );
 
         let membership = await findFirstMembership(GLOBAL_ORG_ID, existing.id);
         let currentOrgId = membership?.org_id;
@@ -502,10 +507,10 @@ export function registerAuthRoutes(api) {
 
       await withTx(async (client) => {
         const userInsert = await client.query(
-          `INSERT INTO users (email, password_hash, display_name, email_verified_at, terms_accepted_at, terms_version, has_password)
-           VALUES ($1, $2, $3, now(), now(), '1.0', false)
-           RETURNING id, email, display_name, has_password`,
-          [email, passwordHash, displayName],
+          `INSERT INTO users (email, password_hash, display_name, email_verified_at, terms_accepted_at, terms_version, has_password, google_linked, google_sub)
+           VALUES ($1, $2, $3, now(), now(), '1.0', false, true, $4)
+           RETURNING id, email, display_name, has_password, google_linked`,
+          [email, passwordHash, displayName, googleUser.sub || null],
         );
         createdUser = userInsert.rows[0];
 

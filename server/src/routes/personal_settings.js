@@ -6,6 +6,7 @@ import { generateTotpSetup, verifyTotpCode } from '../lib/totp.js';
 import { parseUserAgent } from '../lib/user_agent.js';
 import { findUserSessions, deleteUserOtherSessions } from '../repositories/sessions.js';
 import { appendAudit } from '../repositories/audit.js';
+import { verifyGoogleIdToken } from '../auth/google.js';
 import { env } from '../config.js';
 
 const GLOBAL_ORG_ID = '00000000-0000-4000-8000-000000000001';
@@ -21,7 +22,7 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
   async function getFullUser(userId, currentOrgId) {
     const { rows } = await query(
       `SELECT u.id, u.email, u.display_name, u.job_title, u.avatar_url,
-              u.has_password, u.totp_enabled, u.totp_secret_enc, u.password_hash,
+              u.has_password, u.google_linked, u.google_sub, u.totp_enabled, u.totp_secret_enc, u.password_hash,
               u.notification_preferences, u.created_at,
               m.role, o.name as organization_name
        FROM users u
@@ -51,6 +52,7 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
           job_title: user.job_title || '',
           avatar_url: user.avatar_url || '',
           has_password: Boolean(user.has_password),
+          google_linked: Boolean(user.google_linked),
           totp_enabled: Boolean(user.totp_enabled),
           role: user.role || 'VIEWER',
           organization_name: user.organization_name || 'JOBENPAY',
@@ -158,6 +160,8 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
       currentPassword: z.string().optional(),
       new_password: z.string().optional(),
       newPassword: z.string().optional(),
+      google_credential: z.string().optional(),
+      googleCredential: z.string().optional(),
     })
     .refine((data) => Boolean(data.new_password || data.newPassword), {
       message: 'New password is required',
@@ -178,6 +182,7 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
 
       const current_password = parsed.data.current_password || parsed.data.currentPassword;
       const new_password = parsed.data.new_password || parsed.data.newPassword;
+      const google_credential = parsed.data.google_credential || parsed.data.googleCredential;
 
       if (!new_password || new_password.length < 8) {
         return res.status(400).json({
@@ -212,22 +217,45 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
         return res.status(404).json({ ok: false, code: 'USER_NOT_FOUND', message: 'User not found.' });
       }
 
-      // If user already has a custom password, current_password must be verified
+      // If user already has a custom password, either current_password OR google_credential must be verified
       if (user.has_password && user.password_hash) {
-        if (!current_password) {
+        let identityVerified = false;
+
+        if (current_password) {
+          const matches = await verifyPassword(current_password, user.password_hash);
+          if (!matches) {
+            return res.status(400).json({
+              ok: false,
+              code: 'INVALID_CURRENT_PASSWORD',
+              message: 'The current password you provided is incorrect.',
+            });
+          }
+          identityVerified = true;
+        } else if (google_credential) {
+          try {
+            const googleUser = await verifyGoogleIdToken(google_credential);
+            if (!googleUser || googleUser.email.toLowerCase() !== user.email.toLowerCase()) {
+              return res.status(400).json({
+                ok: false,
+                code: 'GOOGLE_EMAIL_MISMATCH',
+                message: 'The Google account email does not match your JobenPay account email.',
+              });
+            }
+            identityVerified = true;
+          } catch (gErr) {
+            return res.status(400).json({
+              ok: false,
+              code: 'GOOGLE_AUTH_FAILED',
+              message: gErr.message || 'Google account verification failed.',
+            });
+          }
+        }
+
+        if (!identityVerified) {
           return res.status(400).json({
             ok: false,
             code: 'CURRENT_PASSWORD_REQUIRED',
-            message: 'Current password is required to change your password.',
-          });
-        }
-
-        const matches = await verifyPassword(current_password, user.password_hash);
-        if (!matches) {
-          return res.status(400).json({
-            ok: false,
-            code: 'INVALID_CURRENT_PASSWORD',
-            message: 'The current password you provided is incorrect.',
+            message: 'Current password or Google account verification is required to update your password.',
           });
         }
       }
@@ -235,16 +263,20 @@ export function createPersonalSettingsRouter({ requireSession, requireCsrf }) {
       const newHash = await hashPassword(new_password);
       await query(
         `UPDATE users
-         SET password_hash = $1, has_password = true, failed_login_count = 0, locked_until = NULL
+         SET password_hash = $1, has_password = true, google_linked = CASE WHEN $3 = true THEN true ELSE google_linked END, failed_login_count = 0, locked_until = NULL
          WHERE id = $2`,
-        [newHash, req.session.user_id],
+        [newHash, req.session.user_id, Boolean(google_credential)],
       );
+
+      const action = !user.has_password
+        ? 'PASSWORD_SET'
+        : (google_credential ? 'PASSWORD_RESET_VIA_GOOGLE' : 'PASSWORD_CHANGED');
 
       await appendAudit({
         orgId: req.session.current_org_id || GLOBAL_ORG_ID,
         actorId: req.session.user_id,
-        action: user.has_password ? 'PASSWORD_CHANGED' : 'PASSWORD_SET',
-        details: { method: user.has_password ? 'change' : 'initial_setup' },
+        action,
+        details: { method: !user.has_password ? 'initial_setup' : (google_credential ? 'google_reauth' : 'change') },
       }).catch(() => {});
 
       res.status(200).json({

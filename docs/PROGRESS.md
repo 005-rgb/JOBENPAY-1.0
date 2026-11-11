@@ -1,8 +1,8 @@
 # PROGRESS
 
 ## Status ringkas
-- **Langkah terakhir dikerjakan**: PRD 1.3 / 3.0 — Transaction Module Zero-Leak Environment Isolation & Anti-IDOR Hardening.
-- **Langkah saat ini**: Verifikasi penutupan seluruh celah isolasi environment (SANDBOX vs LIVE), anti-IDOR transaction decisions & SAR exports, dynamic UI provider badges, dan zero-regression test suite.
+- **Langkah terakhir dikerjakan**: Personal Settings — Google OAuth Linked Account Password Self-Service & DB Normalization (Opsi 1 + 2).
+- **Langkah saat ini**: Verifikasi penutupan celah current password pada akun Google OAuth, migrasi 062, Google re-auth bypass di settings, dan zero-regression test suite.
 - **Validasi lokal terkini**:
   - `server/test/integration/transaction_isolation.test.js`: **3 / 3 adversarial tests lulus 100%** (`test_idor_decision_blocked`, `test_idor_sar_blocked`, `test_provider_badge_live`).
   - Frontend: `npm --prefix web run build` **Clean build (6.99s, 0 error)**.

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../api/client.js';
 import { Button, Modal, Skeleton, useToast } from '../components/primitives.jsx';
+import { GoogleAuthButton } from '../components/GoogleAuthButton.jsx';
 import styles from './SecurityPage.module.css';
 
 export function PersonalSettingsPage() {
@@ -58,6 +59,19 @@ export function PersonalSettingsPage() {
     },
   });
 
+  // 3. Query Auth Config (for Google OAuth client ID)
+  const { data: authConfig } = useQuery({
+    queryKey: ['auth', 'config'],
+    queryFn: async () => {
+      try {
+        return await apiClient.get('/auth/config');
+      } catch {
+        return { googleClientId: null };
+      }
+    },
+  });
+  const googleClientId = authConfig?.googleClientId || null;
+
   // State: Tab 1 (Profile)
   const [displayName, setDisplayName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -77,6 +91,7 @@ export function PersonalSettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showCurrentPass, setShowCurrentPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
+  const [useGoogleVerify, setUseGoogleVerify] = useState(false);
 
   // State: Tab 2 (Security - 2FA)
   const [is2faModalOpen, setIs2faModalOpen] = useState(false);
@@ -201,10 +216,25 @@ export function PersonalSettingsPage() {
       return;
     }
     const payload = { new_password: newPassword };
-    if (profileData?.has_password) {
+    if (profileData?.has_password && !useGoogleVerify) {
       payload.current_password = currentPassword;
     }
     updatePasswordMutation.mutate(payload);
+  };
+
+  const handleGooglePasswordReset = (credential) => {
+    if (!newPassword || newPassword.length < 8) {
+      notify({ message: 'Please enter a new password (minimum 8 characters) first.', kind: 'error' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      notify({ message: 'New password and confirm password do not match.', kind: 'error' });
+      return;
+    }
+    updatePasswordMutation.mutate({
+      new_password: newPassword,
+      google_credential: credential,
+    });
   };
 
   const handleCopySecret = (secret) => {
@@ -372,8 +402,13 @@ export function PersonalSettingsPage() {
                     disabled
                     style={{ background: 'rgba(255, 255, 255, 0.04)', color: 'var(--jp-text-muted)', cursor: 'not-allowed' }}
                   />
-                  <span className={styles.fieldHint}>
-                    Your primary organization login email cannot be changed directly.
+                  <span className={styles.fieldHint} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <span>Your primary organization login email cannot be changed directly.</span>
+                    {profileData?.google_linked && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '500' }}>
+                        Google Linked
+                      </span>
+                    )}
                   </span>
                 </div>
 
@@ -480,9 +515,28 @@ export function PersonalSettingsPage() {
               )}
 
               <form onSubmit={handleSavePassword} style={{ maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {profileData?.has_password && (
+                {profileData?.has_password && !useGoogleVerify && (
                   <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>Current Password</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className={styles.fieldLabel}>Current Password</label>
+                      {googleClientId && (
+                        <button
+                          type="button"
+                          onClick={() => setUseGoogleVerify(true)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--jp-brand-teal, #0d9488)',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            padding: 0,
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          Verify with Google instead
+                        </button>
+                      )}
+                    </div>
                     <div style={{ position: 'relative' }}>
                       <input
                         type={showCurrentPass ? 'text' : 'password'}
@@ -501,6 +555,42 @@ export function PersonalSettingsPage() {
                         {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {profileData?.has_password && useGoogleVerify && (
+                  <div style={{
+                    padding: '12px 14px',
+                    background: 'rgba(56, 189, 248, 0.08)',
+                    border: '1px solid rgba(56, 189, 248, 0.25)',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#38bdf8' }}>
+                        Google Re-Authentication
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setUseGoogleVerify(false)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--jp-text-muted)',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          padding: 0,
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        Use Current Password
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--jp-text-muted)', margin: 0 }}>
+                      No current password required. Enter your new password below, then click the Google button to verify your identity and save.
+                    </p>
                   </div>
                 )}
 
@@ -543,15 +633,35 @@ export function PersonalSettingsPage() {
                   </span>
                 </div>
 
-                <div>
-                  <Button
-                    type="submit"
-                    loading={updatePasswordMutation.isPending}
-                    disabled={!newPassword || !confirmPassword}
-                  >
-                    {profileData?.has_password ? 'Update Password' : 'Save Local Password'}
-                  </Button>
-                </div>
+                {profileData?.has_password && useGoogleVerify ? (
+                  <div style={{ marginTop: '8px' }}>
+                    <label className={styles.fieldLabel} style={{ marginBottom: '8px', display: 'block' }}>
+                      Verify with Google & Apply Password
+                    </label>
+                    {googleClientId ? (
+                      <GoogleAuthButton
+                        clientId={googleClientId}
+                        onSuccess={handleGooglePasswordReset}
+                        onError={(err) => notify({ message: err.message || 'Google verification failed.', kind: 'error' })}
+                        text="continue_with"
+                      />
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#ef4444' }}>
+                        Google client ID is not configured on this server.
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <Button
+                      type="submit"
+                      loading={updatePasswordMutation.isPending}
+                      disabled={!newPassword || !confirmPassword || (profileData?.has_password && !currentPassword)}
+                    >
+                      {profileData?.has_password ? 'Update Password' : 'Save Local Password'}
+                    </Button>
+                  </div>
+                )}
               </form>
             </div>
           </div>
