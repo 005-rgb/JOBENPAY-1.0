@@ -345,26 +345,30 @@ export function HandshakesPage() {
                   </td>
                 </tr>
               ) : (
-                handshakes.map((h) => (
-                  <tr key={h.handshake_id}>
-                    <td className={styles.mono} style={{ fontSize: '12px', fontWeight: 600 }}>
-                      {h.handshake_id.slice(0, 8)}...
-                    </td>
-                    <td className={styles.mono} style={{ fontSize: '12px' }}>
-                      {h.target_org_id?.slice(0, 8)}...
-                    </td>
-                    <td>{h.request_intent?.category || 'PAYOUT'}</td>
-                    <td>
-                      <StatusPill status={h.status} />
-                    </td>
-                    <td style={{ fontSize: '12px' }}>
-                      {h.issued_at ? new Date(h.issued_at).toLocaleTimeString() : '—'}
-                    </td>
-                    <td style={{ fontSize: '12px' }}>
-                      {h.expires_at && new Date(h.expires_at) > new Date() ? 'Active' : 'Expired'}
-                    </td>
-                  </tr>
-                ))
+                handshakes.map((h) => {
+                  const isExpired = !h.expires_at || new Date(h.expires_at) <= new Date() || h.status === 'EXPIRED';
+                  const expiresInText = isExpired ? 'Expired' : 'Active (< 5m)';
+                  return (
+                    <tr key={h.handshake_id}>
+                      <td className={styles.mono} style={{ fontSize: '12px', fontWeight: 600 }} title={h.handshake_id}>
+                        {h.handshake_id ? `${h.handshake_id.slice(0, 8)}...` : '—'}
+                      </td>
+                      <td className={styles.mono} style={{ fontSize: '12px' }} title={h.target_org_id}>
+                        {h.target_org_id ? `${h.target_org_id.slice(0, 8)}...` : '—'}
+                      </td>
+                      <td>{h.request_intent?.category || 'PAYOUT'}</td>
+                      <td>
+                        <StatusPill status={h.status} />
+                      </td>
+                      <td style={{ fontSize: '12px' }}>
+                        {h.issued_at ? new Date(h.issued_at).toLocaleTimeString() : '—'}
+                      </td>
+                      <td style={{ fontSize: '12px', color: isExpired ? 'var(--jp-text-muted)' : 'var(--jp-success, #16a34a)' }}>
+                        {expiresInText}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

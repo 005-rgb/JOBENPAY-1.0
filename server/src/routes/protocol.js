@@ -16,6 +16,8 @@ import {
   createProofHandler,
   listProofsHandler,
   revokeProofHandler,
+  listHandshakesHandler,
+  getTenantHandshakeHandler,
 } from '../controllers/protocol_controller.js';
 
 /**
@@ -75,6 +77,30 @@ export function createTenantProofsRouter({ requireSession, requireRole, requireC
     csrfMiddleware,
     requireRole('OWNER', 'ADMIN'),
     revokeProofHandler,
+  );
+
+  router.get(
+    '/handshakes',
+    requireSession,
+    requireRole('OWNER', 'ADMIN', 'OPERATOR', 'APPROVER', 'VIEWER', 'JUDGE'),
+    listHandshakesHandler,
+  );
+
+  router.get(
+    '/handshakes/:handshake_id',
+    requireSession,
+    requireRole('OWNER', 'ADMIN', 'OPERATOR', 'APPROVER', 'VIEWER', 'JUDGE'),
+    getTenantHandshakeHandler,
+  );
+
+  router.post(
+    '/verify/receipt',
+    postVerifyReceipt,
+  );
+
+  router.post(
+    '/verify/batch',
+    postVerifyBatch,
   );
 
   return router;

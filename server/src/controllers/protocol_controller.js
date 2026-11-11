@@ -7,6 +7,7 @@ import {
   initiateHandshake,
   respondHandshake,
   getHandshake as fetchHandshake,
+  listHandshakes,
 } from '../services/handshake_service.js';
 import {
   createPublicProof,
@@ -629,6 +630,53 @@ export async function revokeProofHandler(req, res, next) {
   }
 }
 
+/**
+ * GET /api/v1/handshakes (Tenant Authenticated)
+ */
+export async function listHandshakesHandler(req, res, next) {
+  try {
+    const orgId = req.org?.id || req.session?.current_org_id;
+    if (!orgId) {
+      throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
+    }
+
+    const status = typeof req.query.status === 'string' ? req.query.status : null;
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+    const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
+
+    const result = await listHandshakes(orgId, { status, limit, offset });
+    return res.status(200).json(result);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * GET /api/v1/handshakes/:handshake_id (Tenant Authenticated)
+ */
+export async function getTenantHandshakeHandler(req, res, next) {
+  try {
+    const orgId = req.org?.id || req.session?.current_org_id;
+    if (!orgId) {
+      throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
+    }
+
+    const handshakeId = req.params.handshake_id;
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(handshakeId)) {
+      throw new AppError('NOT_FOUND', 404, `Handshake ${handshakeId} not found`);
+    }
+
+    const result = await fetchHandshake(handshakeId);
+    if (result.requester_org_id !== orgId && result.target_org_id !== orgId) {
+      throw new AppError('NOT_FOUND', 404, `Handshake ${handshakeId} not found`);
+    }
+    return res.status(200).json(result);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export default {
   postVerifyReceipt,
   getVerifyReceipt,
@@ -645,4 +693,6 @@ export default {
   createProofHandler,
   listProofsHandler,
   revokeProofHandler,
+  listHandshakesHandler,
+  getTenantHandshakeHandler,
 };

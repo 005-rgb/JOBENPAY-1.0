@@ -80,6 +80,8 @@ const EXPLICIT_EXCEPTIONS = new Map([
   ['POST /org/logo', 'Uploads organization logo within active session tenant'],
   ['POST /members/invite', 'Invites a new member into active session tenant'],
   ['POST /proofs', 'Creates a new signed receipt proof within active session tenant'],
+  ['POST /verify/receipt', 'Public SAR verification endpoint without tenant authentication'],
+  ['POST /verify/batch', 'Public batch SAR verification endpoint'],
   ['POST /v1/verify/receipt', 'Public SAR verification endpoint without tenant authentication'],
   ['GET /v1/verify/receipt/:sar_id', 'Public SAR receipt retrieval by ID without tenant authentication'],
   ['POST /v1/verify/batch', 'Public batch SAR verification endpoint'],
@@ -556,6 +558,9 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
           if (targetPath.includes(':proof_id')) {
             targetPath = targetPath.replace(':proof_id', crypto.randomUUID());
           }
+          if (targetPath.includes(':handshake_id')) {
+            targetPath = targetPath.replace(':handshake_id', crypto.randomUUID());
+          }
           if (targetPath.includes(':agent_id')) {
             targetPath = targetPath.replace(':agent_id', orgB.agent.id);
           }
@@ -864,6 +869,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'DELETE /members/:id',
         'DELETE /members/invitations/:id',
         'DELETE /proofs/:proof_id',
+        'GET /handshakes/:handshake_id',
 
         // List / tenant singletons tested in 1.3 & 1.4
         'GET /requests',
@@ -888,6 +894,7 @@ test('HARDEN-1: Comprehensive cross-tenant IDOR and route isolation suite', { sk
         'GET /members',
         'GET /members/invitations',
         'GET /proofs',
+        'GET /handshakes',
         'GET /intents',
         'GET /agent/v1/budget',
       ]);

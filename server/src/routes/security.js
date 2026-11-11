@@ -1,6 +1,7 @@
 // @ts-check
 import { Router } from 'express';
 import { z } from 'zod';
+import pool from '../db/pool.js';
 import { AppError } from '../lib/errors.js';
 import { getAgent } from '../repositories/agents.js';
 import {
@@ -145,6 +146,13 @@ export function createSecurityRouter({
         const orgId = req.session?.current_org_id || req.membership?.org_id;
         if (!orgId) throw new AppError('ORG_ID_REQUIRED', 400, 'Organization ID is required.');
         const environment = req.environment || req.query.environment || 'SANDBOX';
+
+        // Check if agent exists in the system under another organization
+        const agentRecord = await pool.query('SELECT org_id FROM agents WHERE id = $1', [id]);
+        if (agentRecord.rows.length > 0 && agentRecord.rows[0].org_id !== orgId) {
+          throw new AppError('AGENT_NOT_FOUND', 404, 'Agent not found.');
+        }
+
         const agent = await getAgent(orgId, id, undefined, environment);
         if (!agent) {
           return res.status(200).json({

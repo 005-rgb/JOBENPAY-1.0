@@ -200,6 +200,11 @@ export async function getHandshake(handshakeId, dbClient = null) {
     throw new AppError('VALIDATION_FAILED', 400, 'handshakeId is required');
   }
 
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_REGEX.test(handshakeId)) {
+    throw new AppError('HANDSHAKE_NOT_FOUND', 404, `Handshake ${handshakeId} not found`);
+  }
+
   const db = dbClient || pool;
   const res = await db.query(
     `SELECT * FROM trust_handshakes WHERE handshake_id = $1`,
@@ -251,9 +256,72 @@ export async function expirePendingHandshakes(dbClient = null) {
   return res.rows.length;
 }
 
+/**
+ * Lists trust handshakes for an organization (as requester or target).
+ * 
+ * @param {string} orgId 
+ * @param {object} [options]
+ * @param {string|null} [options.status=null]
+ * @param {number} [options.limit=50]
+ * @param {number} [options.offset=0]
+ * @param {import('pg').PoolClient|null} [dbClient=null]
+ * @returns {Promise<{ handshakes: any[] }>}
+ */
+export async function listHandshakes(orgId, { status = null, limit = 50, offset = 0 } = {}, dbClient = null) {
+  if (!orgId) {
+    throw new AppError('VALIDATION_FAILED', 400, 'orgId is required');
+  }
+
+  const db = dbClient || pool;
+
+  // Auto-expire pending handshakes whose timeout expired
+  await expirePendingHandshakes(db);
+
+  const queryParams = [orgId];
+  let whereClause = `(requester_org_id = $1 OR target_org_id = $1)`;
+
+  if (status && status !== 'ALL') {
+    queryParams.push(status);
+    whereClause += ` AND status = $${queryParams.length}`;
+  }
+
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 50), 100);
+  queryParams.push(safeLimit);
+  const limitClause = `LIMIT $${queryParams.length}`;
+
+  const safeOffset = Math.max(0, Number(offset) || 0);
+  queryParams.push(safeOffset);
+  const offsetClause = `OFFSET $${queryParams.length}`;
+
+  const res = await db.query(
+    `SELECT handshake_id, requester_org_id, target_org_id, agent_id, request_intent,
+            status, issued_at, expires_at, responded_at
+     FROM trust_handshakes
+     WHERE ${whereClause}
+     ORDER BY issued_at DESC
+     ${limitClause} ${offsetClause}`,
+    queryParams,
+  );
+
+  return {
+    handshakes: res.rows.map((row) => ({
+      handshake_id: row.handshake_id,
+      requester_org_id: row.requester_org_id,
+      target_org_id: row.target_org_id,
+      agent_id: row.agent_id,
+      request_intent: row.request_intent,
+      status: row.status,
+      issued_at: row.issued_at,
+      expires_at: row.expires_at,
+      responded_at: row.responded_at,
+    })),
+  };
+}
+
 export default {
   initiateHandshake,
   respondHandshake,
   getHandshake,
   expirePendingHandshakes,
+  listHandshakes,
 };
