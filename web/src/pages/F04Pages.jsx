@@ -151,7 +151,7 @@ function defaultPolicy() {
     autoApproveBelowMinor: 1000,
     payees: { mode: 'ALLOWLIST', ids: [] },
     allowNewPayees: false,
-    schedule: { timezone: 'Asia/Jakarta', days: [1, 2, 3, 4, 5], startHour: 8, endHour: 18 },
+    schedule: { timezone: 'America/New_York', days: [1, 2, 3, 4, 5], startHour: 8, endHour: 18 },
     velocity: { maxRequestsPerHour: 10, maxPayoutPerPayeePerDay: 3 },
     duplicateWindowHours: 24,
     requireInvoice: true,

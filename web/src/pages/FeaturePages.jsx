@@ -1043,7 +1043,7 @@ export function PaypalSettingsPage() {
       return;
     }
     if (isLive && clientId && (clientId.toLowerCase().startsWith('sb-') || clientId.toLowerCase().includes('sandbox'))) {
-      setFeedback('Peringatan: Kredensial terdeteksi sebagai Sandbox. Untuk mode Live, gunakan Client ID produksi.');
+      setFeedback('Warning: Sandbox credentials detected. For Live mode, provide production Client ID.');
       return;
     }
     const body = {
@@ -1096,18 +1096,18 @@ export function PaypalSettingsPage() {
   return (
     <div className={styles.pageStack}>
       {isLive && !isConnected ? (
-        <Banner kind="warning" title="PAYPAL LIVE — BELUM TERHUBUNG">
-          Lingkungan LIVE beroperasi dengan data dan dana nyata. Saat ini <strong>PayPal Live</strong> produksi Anda <strong>BELUM TERHUBUNG</strong>. Silakan masukkan Client ID dan Secret akun produksi Anda di bawah ini, lalu klik Simpan &amp; Uji Koneksi untuk mengaktifkan transaksi nyata. Jangan gunakan kunci Sandbox di sini.
+        <Banner kind="warning" title="PAYPAL LIVE — NOT CONNECTED">
+          The LIVE environment operates with real currency and real funds. Currently, your production <strong>PayPal Live</strong> connector is <strong>NOT CONNECTED</strong>. Please enter your production Client ID and Client Secret below, then click Save &amp; Test Connection to enable real transactions. Never use Sandbox keys here.
         </Banner>
       ) : null}
       {isLive && isConnected ? (
-        <Banner kind="error" title="LIVE MODE WARNING">
-          Konektor <strong>PayPal Live</strong> aktif terhubung ke produksi. Seluruh transaksi dan mutasi saldo di lingkungan ini menggunakan uang nyata.
+        <Banner kind="error" title="LIVE MODE ACTIVE">
+          Production <strong>PayPal Live</strong> connector is active and connected. All transactions and balance mutations in this environment utilize real currency.
         </Banner>
       ) : null}
       {!isLive ? (
         <Banner kind="info" title="PAYPAL SANDBOX">
-          Konektor <strong>PayPal Sandbox</strong> aktif di lingkungan simulasi. Semua transaksi dan saldo bersifat simulasi aman tanpa uang riil.
+          Production <strong>PayPal Sandbox</strong> connector is active in simulated mode. All transactions and balances are safely isolated without real funds.
         </Banner>
       ) : null}
       <Card
@@ -1121,23 +1121,23 @@ export function PaypalSettingsPage() {
           </h2>
           <StatusPill
             status={isConnected ? 'COMPLETED' : (isLive ? 'FAILED' : connection.status)}
-            label={isConnected ? `CONNECTED (${isLive ? 'LIVE' : 'SANDBOX'})` : (isLive ? 'BELUM TERHUBUNG' : connection.status)}
+            label={isConnected ? `CONNECTED (${isLive ? 'LIVE' : 'SANDBOX'})` : (isLive ? 'NOT CONNECTED' : connection.status)}
           />
         </div>
         <dl className={styles.detailsList}>
           <div>
             <dt>{t('app.connectionStatus')}</dt>
             <dd style={{ fontWeight: 600, color: isConnected ? 'var(--jp-success, #16a34a)' : (isLive ? 'var(--jp-error, #dc2626)' : 'inherit') }}>
-              {isConnected ? 'CONNECTED' : (isLive ? 'BELUM TERHUBUNG / NOT CONNECTED' : connection.status)}
+              {isConnected ? 'CONNECTED' : (isLive ? 'NOT CONNECTED' : connection.status)}
             </dd>
           </div>
           <div>
             <dt>{t('app.clientId')}</dt>
-            <dd>{connection.client_id_masked || (isLive ? 'Belum terhubung (Masukkan Live Client ID)' : t('app.noConnection'))}</dd>
+            <dd>{connection.client_id_masked || (isLive ? 'Not connected (Enter Live Client ID)' : t('app.noConnection'))}</dd>
           </div>
           <div>
             <dt>{t('app.lastTested')}</dt>
-            <dd>{connection.lastTestedAt ? new Date(connection.lastTestedAt).toLocaleString() : 'Belum pernah diuji / Never tested'}</dd>
+            <dd>{connection.lastTestedAt ? new Date(connection.lastTestedAt).toLocaleString() : 'Never tested'}</dd>
           </div>
           {connection.lastErrorCode ? <div><dt>{t('components.error')}</dt><dd>{connection.lastErrorCode}</dd></div> : null}
         </dl>
@@ -1149,14 +1149,14 @@ export function PaypalSettingsPage() {
               autoComplete="off"
               label={isLive ? 'Client ID (PayPal Live)' : t('app.clientId')}
               name="clientId"
-              placeholder={isLive ? 'Masukkan Live Client ID produksi' : ''}
+              placeholder={isLive ? 'Enter production Live Client ID' : ''}
             />
             <FloatingInput
               autoComplete="new-password"
               label={isLive ? 'Client Secret (PayPal Live)' : t('app.clientSecret')}
               name="clientSecret"
               type="password"
-              placeholder={isLive ? 'Masukkan Live Client Secret produksi' : ''}
+              placeholder={isLive ? 'Enter production Live Client Secret' : ''}
             />
             <FloatingInput
               key={`${environment}-${connection.webhookId || 'empty'}`}
@@ -1176,8 +1176,8 @@ export function PaypalSettingsPage() {
             <h3>{isLive ? 'PayPal Live Webhook URL' : t('app.webhookUrl')}</h3>
             <p className={styles.fieldHint}>
               {isLive
-                ? 'Daftarkan webhook URL ini pada dashboard pengembang mode Live untuk menerima event mutasi nyata.'
-                : 'Daftarkan webhook URL ini pada dashboard pengembang mode Sandbox untuk menerima event simulasi.'}
+                ? 'Register this webhook URL on your developer dashboard in Live mode to receive production settlement events.'
+                : 'Register this webhook URL on your developer dashboard in Sandbox mode to receive simulation events.'}
             </p>
             <CodeBlock value={connection.webhookUrl} />
           </div>
@@ -1186,8 +1186,8 @@ export function PaypalSettingsPage() {
             <h3>{isLive ? 'PayPal Live Webhook URL' : t('app.webhookUrl')}</h3>
             <p className={styles.fieldHint} style={{ color: 'var(--jp-muted, #64748b)' }}>
               {isLive
-                ? 'Webhook URL Live akan otomatis dibuat dan aktif setelah kredensial PayPal Live Anda disimpan.'
-                : 'Webhook URL Sandbox akan otomatis dibuat dan aktif setelah kredensial PayPal Sandbox Anda disimpan.'}
+                ? 'Live Webhook URL will be automatically provisioned once your PayPal Live credentials are saved.'
+                : 'Sandbox Webhook URL will be automatically provisioned once your PayPal Sandbox credentials are saved.'}
             </p>
           </div>
         )}

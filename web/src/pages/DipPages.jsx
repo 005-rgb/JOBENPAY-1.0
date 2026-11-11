@@ -424,7 +424,7 @@ export function IntentAnchorBuilderPage() {
               rows={3}
               value={naturalLanguageInput}
               onChange={(e) => setNaturalLanguageInput(e.target.value)}
-              placeholder="e.g. Beli laptop untuk tim engineering, RAM minimal 32GB, budget maksimal $2000, hanya merek Apple atau Dell."
+              placeholder="e.g. Purchase high-performance engineering workstations, minimum 32GB RAM, maximum budget $2,000 each, restricted to Apple or Dell."
               required
             />
           </div>
@@ -449,13 +449,84 @@ export function IntentAnchorBuilderPage() {
             </div>
 
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Deadline (ISO-8601)</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className={styles.fieldLabel} style={{ marginBottom: 0 }}>Expiration Deadline</label>
+                <span style={{ fontSize: '11px', color: 'var(--jp-text-muted, #64748b)', fontFamily: 'monospace' }}>
+                  ISO-8601 UTC
+                </span>
+              </div>
               <input
-                type="text"
+                type="datetime-local"
                 className={styles.inputField}
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
+                value={deadline ? deadline.slice(0, 16) : ''}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    const d = new Date(e.target.value);
+                    if (!isNaN(d.getTime())) {
+                      setDeadline(d.toISOString());
+                    }
+                  } else {
+                    setDeadline('');
+                  }
+                }}
+                required
               />
+              <div style={{ display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px' }}
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 7);
+                    setDeadline(d.toISOString());
+                  }}
+                >
+                  +7 Days
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px' }}
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 30);
+                    setDeadline(d.toISOString());
+                  }}
+                >
+                  +30 Days
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px' }}
+                  onClick={() => {
+                    const now = new Date();
+                    const d = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                    setDeadline(d.toISOString());
+                  }}
+                >
+                  End of Month
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px' }}
+                  onClick={() => {
+                    setDeadline('2026-12-31T23:59:59.000Z');
+                  }}
+                >
+                  End of 2026
+                </button>
+              </div>
+              {deadline && (
+                <div style={{ fontSize: '11px', color: 'var(--jp-text-muted, #64748b)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>Target UTC:</span>
+                  <code style={{ background: 'var(--jp-surface-sidebar, #f1f5f9)', padding: '2px 6px', borderRadius: '3px' }}>
+                    {deadline}
+                  </code>
+                </div>
+              )}
             </div>
 
             <div className={styles.field}>

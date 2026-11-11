@@ -271,10 +271,10 @@ export default function OrganizationPage() {
                   className={styles.fieldInput}
                   value={taxId}
                   onChange={(e) => setTaxId(e.target.value)}
-                  placeholder="12.345.678.9-012.000"
+                  placeholder="12-3456789"
                 />
                 <span style={{ fontSize: '11px', color: 'var(--jp-text-muted)', marginTop: '4px' }}>
-                  Stored encrypted with AES-256-GCM.
+                  Stored encrypted with AES-256-GCM (US EIN format).
                 </span>
               </div>
 
@@ -285,7 +285,7 @@ export default function OrganizationPage() {
                   className={styles.fieldInput}
                   value={street}
                   onChange={(e) => setStreet(e.target.value)}
-                  placeholder="Jl. Sudirman No. 1"
+                  placeholder="100 Congress Ave, Suite 2000"
                 />
               </div>
 
@@ -296,7 +296,7 @@ export default function OrganizationPage() {
                   className={styles.fieldInput}
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  placeholder="Jakarta"
+                  placeholder="Austin"
                 />
               </div>
 
@@ -307,7 +307,7 @@ export default function OrganizationPage() {
                   className={styles.fieldInput}
                   value={stateName}
                   onChange={(e) => setStateName(e.target.value)}
-                  placeholder="DKI Jakarta"
+                  placeholder="TX"
                 />
               </div>
 
@@ -318,7 +318,7 @@ export default function OrganizationPage() {
                   className={styles.fieldInput}
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="10220"
+                  placeholder="78701"
                 />
               </div>
 

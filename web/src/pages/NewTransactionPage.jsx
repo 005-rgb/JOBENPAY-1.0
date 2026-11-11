@@ -724,6 +724,56 @@ export function NewTransactionPage() {
                     className={styles.fieldInput}
                     required
                   />
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className={styles.secondaryLink}
+                      style={{ fontSize: '10px', padding: '2px 6px' }}
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 15);
+                        setDueDate(d.toISOString().slice(0, 10));
+                      }}
+                    >
+                      Net 15
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryLink}
+                      style={{ fontSize: '10px', padding: '2px 6px' }}
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 30);
+                        setDueDate(d.toISOString().slice(0, 10));
+                      }}
+                    >
+                      Net 30
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryLink}
+                      style={{ fontSize: '10px', padding: '2px 6px' }}
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 60);
+                        setDueDate(d.toISOString().slice(0, 10));
+                      }}
+                    >
+                      Net 60
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryLink}
+                      style={{ fontSize: '10px', padding: '2px 6px' }}
+                      onClick={() => {
+                        const now = new Date();
+                        const d = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                        setDueDate(d.toISOString().slice(0, 10));
+                      }}
+                    >
+                      End of Month
+                    </button>
+                  </div>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Recipient Email</label>
@@ -814,7 +864,12 @@ export function NewTransactionPage() {
               </span>
               <div className={styles.formGrid}>
                 <div className={`${styles.field} ${styles.fullWidth}`}>
-                  <label className={styles.fieldLabel}>Target Execution Time (UTC)</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className={styles.fieldLabel} style={{ marginBottom: 0 }}>Target Execution Time (UTC / Local)</label>
+                    <span style={{ fontSize: '11px', color: 'var(--jp-text-muted, #64748b)' }}>
+                      Local Calendar Picker
+                    </span>
+                  </div>
                   <input
                     type="datetime-local"
                     value={scheduledExecutionTime}
@@ -822,6 +877,64 @@ export function NewTransactionPage() {
                     className={styles.fieldInput}
                     required
                   />
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className={styles.secondaryLink}
+                      style={{ fontSize: '10px', padding: '2px 6px' }}
+                      onClick={() => {
+                        const d = new Date(Date.now() + 60 * 60 * 1000);
+                        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                        setScheduledExecutionTime(local);
+                      }}
+                    >
+                      +1 Hour
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryLink}
+                      style={{ fontSize: '10px', padding: '2px 6px' }}
+                      onClick={() => {
+                        const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                        d.setHours(9, 0, 0, 0);
+                        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                        setScheduledExecutionTime(local);
+                      }}
+                    >
+                      Tomorrow 09:00
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryLink}
+                      style={{ fontSize: '10px', padding: '2px 6px' }}
+                      onClick={() => {
+                        const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+                        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                        setScheduledExecutionTime(local);
+                      }}
+                    >
+                      In 7 Days
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryLink}
+                      style={{ fontSize: '10px', padding: '2px 6px' }}
+                      onClick={() => {
+                        const d = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                        setScheduledExecutionTime(local);
+                      }}
+                    >
+                      In 30 Days
+                    </button>
+                  </div>
+                  {scheduledExecutionTime && (
+                    <div style={{ fontSize: '11px', color: 'var(--jp-text-muted, #64748b)', marginTop: '4px' }}>
+                      UTC Target: <code style={{ background: 'var(--jp-surface-sidebar)', padding: '2px 6px', borderRadius: '3px' }}>
+                        {new Date(scheduledExecutionTime).toISOString()}
+                      </code>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
