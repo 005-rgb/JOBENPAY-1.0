@@ -246,7 +246,20 @@ export function HandshakesPage() {
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['trust-handshakes', filterStatus, environment],
-    queryFn: () => apiClient.get(`/handshakes${filterStatus !== 'ALL' ? `?status=${filterStatus}` : ''}`),
+    queryFn: async () => {
+      try {
+        return await apiClient.get(`/handshakes${filterStatus !== 'ALL' ? `?status=${filterStatus}` : ''}`);
+      } catch (err) {
+        if (err?.status === 404 || err?.message?.toLowerCase().includes('not found')) {
+          try {
+            return await apiClient.get(`/v1/handshakes${filterStatus !== 'ALL' ? `?status=${filterStatus}` : ''}`);
+          } catch {
+            return { handshakes: [] };
+          }
+        }
+        throw err;
+      }
+    },
   });
 
   const handshakes = data?.handshakes || [];

@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/smknwon2/public_html/jobenpay/
+    - /bin/touch ${DEPLOYPATH}tmp/restart.txt

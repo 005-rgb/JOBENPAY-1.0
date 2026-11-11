@@ -635,7 +635,7 @@ export async function revokeProofHandler(req, res, next) {
  */
 export async function listHandshakesHandler(req, res, next) {
   try {
-    const orgId = req.org?.id || req.session?.current_org_id;
+    const orgId = req.org?.id || req.membership?.org_id || req.session?.current_org_id || req.user?.org_id;
     if (!orgId) {
       throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
     }
@@ -656,7 +656,7 @@ export async function listHandshakesHandler(req, res, next) {
  */
 export async function getTenantHandshakeHandler(req, res, next) {
   try {
-    const orgId = req.org?.id || req.session?.current_org_id;
+    const orgId = req.org?.id || req.membership?.org_id || req.session?.current_org_id || req.user?.org_id;
     if (!orgId) {
       throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
     }

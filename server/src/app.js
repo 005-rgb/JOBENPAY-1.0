@@ -43,6 +43,8 @@ import {
   createTenantProofsRouter,
   getProtocolHtml,
   getProofHandler,
+  listHandshakesHandler,
+  getTenantHandshakeHandler,
 } from './routes/protocol.js';
 import { createDipRouter } from './routes/dip.js';
 import { createCplRouter } from './routes/cpl.js';
@@ -659,6 +661,18 @@ export function createApp() {
   api.use(createOrganizationRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createMembersRouter({ requireSession, requireRole, requireCsrf }));
   api.use(createTenantProofsRouter({ requireSession, requireRole, requireCsrf }));
+  api.get(
+    '/handshakes',
+    requireSession,
+    requireRole('OWNER', 'ADMIN', 'OPERATOR', 'APPROVER', 'VIEWER', 'JUDGE'),
+    listHandshakesHandler,
+  );
+  api.get(
+    '/handshakes/:handshake_id',
+    requireSession,
+    requireRole('OWNER', 'ADMIN', 'OPERATOR', 'APPROVER', 'VIEWER', 'JUDGE'),
+    getTenantHandshakeHandler,
+  );
   api.use(createDipRouter({ requireSession, requireCsrf, agentAuth }));
   api.use(createCplRouter({ requireSession, requireCsrf }));
   api.use(createJplRouter({ requireSession, requireCsrf }));
@@ -2483,6 +2497,18 @@ export function createApp() {
   app.get('/protocol', getProtocolHtml);
   app.get('/proof/:proof_id', getProofHandler);
   app.use('/api/v1', api);
+  app.get(
+    '/api/v1/handshakes',
+    requireSession,
+    requireRole('OWNER', 'ADMIN', 'OPERATOR', 'APPROVER', 'VIEWER', 'JUDGE'),
+    listHandshakesHandler,
+  );
+  app.get(
+    '/api/handshakes',
+    requireSession,
+    requireRole('OWNER', 'ADMIN', 'OPERATOR', 'APPROVER', 'VIEWER', 'JUDGE'),
+    listHandshakesHandler,
+  );
 
   // Catch-all 404 for unhandled API requests (PRD 2.1 §4 - MUST return JSON, never HTML)
   app.use('/api', (_req, res) => {

@@ -9,4 +9,5 @@ spike-out/
 var/uploads/
 .DS_Store
 npm-debug.log*
-tmp/
+tmp/*
+!tmp/restart.txt

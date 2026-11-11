@@ -106,7 +106,7 @@ export function createTenantProofsRouter({ requireSession, requireRole, requireC
   return router;
 }
 
-export { getProtocolHtml, getProofHandler };
+export { getProtocolHtml, getProofHandler, listHandshakesHandler, getTenantHandshakeHandler };
 
 export default {
   createPublicProtocolRouter,
